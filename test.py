@@ -1,3 +1,4 @@
+# Author:LiPu
 import argparse
 import json
 
@@ -6,7 +7,6 @@ from torch.utils.data import DataLoader
 from models import *
 from utils.datasets import *
 from utils.utils import *
-
 
 
 def test(cfg,
@@ -25,16 +25,16 @@ def test(cfg,
         verbose = True
 
         # Initialize model
-        model = Darknet(cfg, img_size).to(device)
-        #print(model)
+        model = Darknet(cfg, arc=opt.arc, quantized=opt.quantized, qlayers=opt.qlayers).to(device)
+        # print(model)
         # Load weights
-        #本身有，被我去掉了
+        # 本身有，被我去掉了
         attempt_download(weights)
         if weights.endswith('.pt'):  # pytorch format
             print('.pth is reading')
             model.load_state_dict(torch.load(weights, map_location=device)['model'])
-            
-            
+
+
         else:  # darknet format
             print('darknet weights is reading')
             _ = load_darknet_weights(model, weights)
@@ -212,6 +212,11 @@ if __name__ == '__main__':
     parser.add_argument('--nms-thres', type=float, default=0.5, help='iou threshold for non-maximum suppression')
     parser.add_argument('--save-json', action='store_true', help='save a cocoapi-compatible JSON results file')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
+    parser.add_argument('--quantized', type=int, default=-1,
+                        help='0:quantization way one Ternarized weight and 8bit activation')
+    parser.add_argument('--qlayers', type=int, default=-1,
+                        help='0:no quantization , x:The shallow layer of current quantized layers(from deep to shallow)')
+
     opt = parser.parse_args()
     print(opt)
 

@@ -4,7 +4,7 @@ import torch.distributed as dist
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 
-import test  # import test.py to get mAP after each epoch
+import test as test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
@@ -28,7 +28,7 @@ hyp = {'giou': 1.582,  # giou loss gain
        'obj': 21.35,  # obj loss gain (*=80 for uBCE with 80 classes)
        'obj_pw': 3.941,  # obj BCELoss positive_weight
        'iou_t': 0.2635,  # iou training threshold
-       'lr0': 0.0001,  # initial learning rate (SGD=1E-3, Adam=9E-5)
+       'lr0': 0.002324,  # initial learning rate (SGD=1E-3, Adam=9E-5)
        'lrf': -4.,  # final LambdaLR learning rate = lr0 * (10 ** lrf)
        'momentum': 0.97,  # SGD momentum
        'weight_decay': 0.0004569,  # optimizer weight decay
@@ -81,7 +81,7 @@ def train():
         os.remove(f)
 
     # Initialize model
-    model = Darknet(cfg, arc=opt.arc).to(device)
+    model = Darknet(cfg, arc=opt.arc, quantized=opt.quantized, qlayers=opt.qlayers).to(device)
 
     # Optimizer
     pg0, pg1 = [], []  # optimizer parameter groups
@@ -455,6 +455,11 @@ if __name__ == '__main__':
     parser.add_argument('--s', type=float, default=0.001, help='scale sparse rate')
     parser.add_argument('--prune', type=int, default=-1,
                         help='0:nomal prune or regular prune 1:shortcut prune 2:tiny prune')
+    parser.add_argument('--quantized', type=int, default=-1,
+                        help='0:quantization way one Ternarized weight and 8bit activation')
+    parser.add_argument('--qlayers', type=int, default=-1,
+                        help='0:no quantization , x:The shallow layer of current quantized layers(from deep to shallow)')
+
     opt = parser.parse_args()
     opt.weights = last if opt.resume else opt.weights
     print(opt)

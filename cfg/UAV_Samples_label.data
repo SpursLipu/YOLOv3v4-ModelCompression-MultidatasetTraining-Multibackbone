@@ -1,0 +1,4 @@
+classes= 1
+train=data/UAV_Samples_label/train.txt
+valid=data/UAV_Samples_label/test.txt
+names=data/UAV_Samples_label.names

@@ -54,7 +54,7 @@ python3 detect.py --source ...
 ## 剪植
 
 ### 剪植特点
-| 剪枝方式 |<center>优点</center>|<center>缺点</center> |
+| 剪枝方案 |<center>优点</center>|<center>缺点</center> |
 | --- | --- | --- |
 | 正常剪枝 |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
 | 极限剪枝 |极高的压缩率。  |需要微调。  |

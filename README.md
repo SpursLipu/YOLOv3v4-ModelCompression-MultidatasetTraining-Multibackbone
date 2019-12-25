@@ -115,25 +115,3 @@ python3 detect.py --source ...
 ```bash
 python3 detect.py --cfg cfg/prune_0.8_yolov3-hand.cfg --weights weights/yolov3_hand_pruning_percent0.8.weights --data data/oxfordhand.data --source test.jpg
 ```
-
-## 剪枝效果
-
-以下数据除极限剪枝外，均未微调。
-
-### YOLO-v3剪枝
-
-| 模型 | 参数量 |模型体积  |压缩率  |耗时  |mAP  |
-| --- | --- | --- | --- | --- | --- |
-| Baseline(416)| 61.5M |246.4MB  |0%  |11.7ms  |0.7924  |
-| 正常剪枝 | 10.9M |43.9MB  |82.2%  |5.92ms  |0.7712  |
-| 规整剪枝 | 15.31M |61.4MB  |75.1%  |6.01ms  |0.7832  |
-| 极限剪枝 | 7.13M |28.6MB  |88.4%  |5.90ms  |0.7382  |
-
-### YOLO-v3-Tiny剪枝
-
-| 模型 |参数量  | 模型体积 |  压缩率| 耗时 | mAP |
-| --- | --- | --- | --- | --- | --- |
-| Baseline(416) | 8.7M | 33.1MB | 0% | 2.2ms | 0.6378 |
-| Tiny剪枝 | 4.4M | 16.8MB | 40.1% |  2.0ms| 0.6132 |
-
-

@@ -51,7 +51,9 @@ python3 detect.py --source ...
 
 # 模型压缩
 
-## 剪植特点
+## 剪植
+
+### 剪植特点
 | 剪枝方式 |<center>优点</center>|<center>缺点</center> |
 | --- | --- | --- |
 | 正常剪枝 |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
@@ -60,7 +62,7 @@ python3 detect.py --source ...
 | Tiny剪枝 |稳定的压缩率。  |由于Tiny本来已很小，压缩率中规中矩。  |
 
 
-## 步骤
+### 步骤
 
 1.正常训练
 
@@ -105,4 +107,4 @@ python3 prune_tiny_yolo.py
 需要注意的是，这里需要在.py文件内，将opt内的cfg和weights变量指向第2步稀疏化后生成的cfg文件和weights文件。
 此外，可通过增大代码中percent的值来获得更大的压缩率。（若稀疏化不到位，且percent值过大，程序会报错。）
 
-
+## 量化

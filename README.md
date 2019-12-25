@@ -37,8 +37,6 @@ YOLOv3 ModelCompression MultidatasetTraining
 
 这里，我们不仅可以使用原始的YOLOV3用来推理展示，还可使用我们剪枝后的模型来推理展示。（修改cfg，weights的指向即可）
 
-<img src="https://user-images.githubusercontent.com/26833433/64067835-51d5b500-cc2f-11e9-982e-843f7f9a6ea2.jpg" width="500">
-
 ```bash
 python3 detect.py --source ...
 ```

@@ -33,6 +33,24 @@ YOLOv3 ModelCompression MultidatasetTraining
 |<center>极限剪枝(shortcut)</center>  | <center>√</center> | <center>√</center> |
 |<center>Tiny剪枝</center>|<center>√</center>|<center>√</center>  |
 
+# 推理展示
+
+这里，我们不仅可以使用原始的YOLOV3用来推理展示，还可使用我们剪枝后的模型来推理展示。（修改cfg，weights的指向即可）
+
+<img src="https://user-images.githubusercontent.com/26833433/64067835-51d5b500-cc2f-11e9-982e-843f7f9a6ea2.jpg" width="500">
+
+```bash
+python3 detect.py --source ...
+```
+
+- Image:  `--source file.jpg`
+- Video:  `--source file.mp4`
+- Directory:  `--source dir/`
+- Webcam:  `--source 0`
+- RTSP stream:  `--source rtsp://170.93.143.139/rtplive/470011e600ef003a004ee33696235daa`
+- HTTP stream:  `--source http://wmccpinetop.axiscam.net/mjpg/video.mjpg`
+
+# 模型压缩
 
 ## 剪植特点
 |剪枝方式|<center>优点</center>|<center>缺点</center> |
@@ -88,19 +106,4 @@ python3 prune_tiny_yolo.py
 需要注意的是，这里需要在.py文件内，将opt内的cfg和weights变量指向第2步稀疏化后生成的cfg文件和weights文件。
 此外，可通过增大代码中percent的值来获得更大的压缩率。（若稀疏化不到位，且percent值过大，程序会报错。）
 
-## 推理展示
 
-这里，我们不仅可以使用原始的YOLOV3用来推理展示，还可使用我们剪枝后的模型来推理展示。（修改cfg，weights的指向即可）
-
-<img src="https://user-images.githubusercontent.com/26833433/64067835-51d5b500-cc2f-11e9-982e-843f7f9a6ea2.jpg" width="500">
-
-```bash
-python3 detect.py --source ...
-```
-
-- Image:  `--source file.jpg`
-- Video:  `--source file.mp4`
-- Directory:  `--source dir/`
-- Webcam:  `--source 0`
-- RTSP stream:  `--source rtsp://170.93.143.139/rtplive/470011e600ef003a004ee33696235daa`
-- HTTP stream:  `--source http://wmccpinetop.axiscam.net/mjpg/video.mjpg`

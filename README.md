@@ -47,11 +47,12 @@ python3 detect.py --source ...
 - Webcam:  `--source 0`
 - RTSP stream:  `--source rtsp://170.93.143.139/rtplive/470011e600ef003a004ee33696235daa`
 - HTTP stream:  `--source http://wmccpinetop.axiscam.net/mjpg/video.mjpg`
+# 多数据集训练
 
 # 模型压缩
 
 ## 剪植特点
-|剪枝方式|<center>优点</center>|<center>缺点</center> |
+| 剪枝方式 |<center>优点</center>|<center>缺点</center> |
 | --- | --- | --- |
 | 正常剪枝 |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
 | 极限剪枝 |极高的压缩率。  |需要微调。  |

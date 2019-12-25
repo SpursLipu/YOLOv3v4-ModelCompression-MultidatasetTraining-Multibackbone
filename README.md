@@ -2,22 +2,21 @@
 YOLOv3 ModelCompression MultidatasetTraining
 
 本项目以[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3的Pytorch实现，剪植方法由[coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning)实现，感谢学长在在模型压缩领域的探索。
-## 剪植特点
-|剪枝方式|<center>优点</center>|<center>缺点</center> |
-| --- | --- | --- |
-| 正常剪枝 |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
-| 极限剪枝 |极高的压缩率。  |需要微调。  |
-| 规整剪枝 |专为硬件部署设计，剪枝后filter个数均为8的倍数，无需微调。 | 为规整牺牲了部分压缩率。 |
-| Tiny剪枝 |稳定的压缩率。  |由于Tiny本来已很小，压缩率中规中矩。  |
 
-## 项目特点
+
+# 环境部署
+1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里重复介绍一下：
+
+- `numpy`
+- `torch >= 1.1.0`
+- `opencv-python`
+- `tqdm`
+
+可直接`pip3 install -U -r requirements.txt`搭建环境，或根据该.txt文件使用conda搭建。
+
+# 项目特点
 
 1.采用的YOLO-v3实现较为准确，mAP相对较高。
-
-模型        | 320         | 416         | 608
----             | ---         | ---         | ---
-`YOLOv3`        | 51.8 (51.5) | 55.4 (55.3) | 58.2 (57.9)
-`YOLOv3-tiny`   | 29.0        | 32.9 (33.1) | 35.5
 
 2.提供对YOLOv3及Tiny的多种剪枝版本，以适应不同的需求。
 
@@ -34,16 +33,15 @@ YOLOv3 ModelCompression MultidatasetTraining
 |<center>极限剪枝(shortcut)</center>  | <center>√</center> | <center>√</center> |
 |<center>Tiny剪枝</center>|<center>√</center>|<center>√</center>  |
 
-## 环境搭建
 
-1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里重复介绍一下：
+## 剪植特点
+|剪枝方式|<center>优点</center>|<center>缺点</center> |
+| --- | --- | --- |
+| 正常剪枝 |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
+| 极限剪枝 |极高的压缩率。  |需要微调。  |
+| 规整剪枝 |专为硬件部署设计，剪枝后filter个数均为8的倍数，无需微调。 | 为规整牺牲了部分压缩率。 |
+| Tiny剪枝 |稳定的压缩率。  |由于Tiny本来已很小，压缩率中规中矩。  |
 
-- `numpy`
-- `torch >= 1.1.0`
-- `opencv-python`
-- `tqdm`
-
-可直接`pip3 install -U -r requirements.txt`搭建环境，或根据该.txt文件使用conda搭建。
 
 ## 数据获取
 

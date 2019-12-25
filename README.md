@@ -43,8 +43,6 @@ YOLOv3 ModelCompression MultidatasetTraining
 | Tiny剪枝 |稳定的压缩率。  |由于Tiny本来已很小，压缩率中规中矩。  |
 
 
-## 数据获取
-
 ## 模型训练
 
 1.正常训练

@@ -27,7 +27,7 @@ def test(cfg,
         verbose = True
 
         # Initialize model
-        model = Darknet(cfg, arc=opt.arc, quantized=quantized, qlayers=qlayers).to(device)
+        model = Darknet(cfg, img_size, quantized=quantized, qlayers=qlayers).to(device)
         # print(model)
         # Load weights
         # 本身有，被我去掉了
@@ -232,5 +232,5 @@ if __name__ == '__main__':
              opt.conf_thres,
              opt.nms_thres,
              opt.save_json,
-             opt.quantized,
-             opt.qlayers)
+             quantized=opt.quantized,
+             qlayers=opt.qlayers)

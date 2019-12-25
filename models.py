@@ -28,7 +28,7 @@ def create_modules(module_defs, img_size, arc, quantized, qlayers):
             filters = int(mdef['filters'])
             kernel_size = int(mdef['size'])
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
-            if i >= qlayers and i <= 74 and quantized != -1 and qlayers!=-1:
+            if i >= qlayers and i <= 74 and quantized != -1 and qlayers != -1:
                 modules.add_module('Conv2d', BinaryConv2d(in_channels=output_filters[-1],
                                                           out_channels=filters,
                                                           kernel_size=kernel_size,
@@ -223,7 +223,7 @@ class YOLOLayer(nn.Module):
 class Darknet(nn.Module):
     # YOLOv3 object detection model
 
-    def __init__(self, cfg, img_size=(416, 416), arc='default', quantized=0, qlayers=0):
+    def __init__(self, cfg, img_size=(416, 416), arc='default', quantized=-1, qlayers=-1):
         # 我的添加
         super(Darknet, self).__init__()
         if isinstance(cfg, str):

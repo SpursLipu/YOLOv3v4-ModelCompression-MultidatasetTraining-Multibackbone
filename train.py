@@ -350,7 +350,9 @@ def train():
                                               img_size=opt.img_size,
                                               model=model,
                                               conf_thres=0.001 if final_epoch and epoch > 0 else 0.1,  # 0.1 for speed
-                                              save_json=final_epoch and epoch > 0 and 'coco.data' in data)
+                                              save_json=final_epoch and epoch > 0 and 'coco.data' in data,
+                                              quantized=opt.quantized,
+                                              qlayers=opt.qlayers)
 
         # Write epoch results
         with open(results_file, 'a') as f:

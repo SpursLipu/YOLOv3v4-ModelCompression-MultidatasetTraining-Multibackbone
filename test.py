@@ -18,14 +18,16 @@ def test(cfg,
          conf_thres=0.001,
          nms_thres=0.5,
          save_json=False,
-         model=None):
+         model=None,
+         quantized=-1,
+         qlayers=-1):
     # Initialize/load model and set device
     if model is None:
         device = torch_utils.select_device(opt.device)
         verbose = True
 
         # Initialize model
-        model = Darknet(cfg, arc=opt.arc, quantized=opt.quantized, qlayers=opt.qlayers).to(device)
+        model = Darknet(cfg, arc=opt.arc, quantized=quantized, qlayers=qlayers).to(device)
         # print(model)
         # Load weights
         # 本身有，被我去掉了
@@ -229,4 +231,6 @@ if __name__ == '__main__':
              opt.iou_thres,
              opt.conf_thres,
              opt.nms_thres,
-             opt.save_json)
+             opt.save_json,
+             opt.quantized,
+             opt.qlayers)

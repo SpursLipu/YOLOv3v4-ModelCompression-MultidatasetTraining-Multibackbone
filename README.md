@@ -22,16 +22,20 @@ YOLOv3 ModelCompression MultidatasetTraining
 
 3.剪枝后保存为.weights格式，可在任何框架下继续训练、推理，或以图像视频展示。
 
-4.目前支持情况
+4.提供多种精度的量化
+
+5.目前支持情况
 
 |<center>功能</center>|<center>单卡</center>|<center>多卡</center>|
 | --- | --- | --- |
 |<center>正常训练</center>|<center>√</center>|<center>√</center>|
-|<center>稀疏化</center>|<center>√</center>|<center>√</center>  |
+|<center>稀疏化训练</center>|<center>√</center>|<center>√</center>  |
 |<center>正常剪枝</center>|<center>√</center>|<center>√</center>|
 |<center>规整剪枝</center>  | <center>√</center> |<center>√</center>  |
 |<center>极限剪枝(shortcut)</center>  | <center>√</center> | <center>√</center> |
 |<center>Tiny剪枝</center>|<center>√</center>|<center>√</center>  |
+|<center>Tiny量化</center>|<center>√</center>|<center>√</center>  |
+|<center>stage-wise 逐层量化</center>|<center>√</center>|<center>√</center>  |
 
 # 推理展示
 
@@ -108,3 +112,5 @@ python3 prune_tiny_yolo.py
 此外，可通过增大代码中percent的值来获得更大的压缩率。（若稀疏化不到位，且percent值过大，程序会报错。）
 
 ## 量化
+
+

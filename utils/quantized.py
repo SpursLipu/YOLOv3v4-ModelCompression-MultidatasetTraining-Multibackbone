@@ -34,8 +34,8 @@ class Ternarize(Function):
     def backward(self, grad_output):
         input, = self.saved_tensors
         grad_input = grad_output.clone()
-        # grad_input[input.ge(1)] = 0
-        # grad_input[input.le(-1)] = 0
+        grad_input[input.ge(1)] = 0
+        grad_input[input.le(-1)] = 0
         return grad_input
 
 
@@ -53,25 +53,8 @@ class Binarize(Function):
     def backward(cxt, grad_output):
         input = cxt.saved_tensors
         grad_input = grad_output.clone()
-        # grad_input[input < -1] = 0
-        # grad_input[input >= 1] = 0
-        return grad_input
-
-
-# 定义前向传播，反向传播权值归一化函数
-class WBN(Function):
-    @staticmethod
-    def forward(self, input):
-        self.save_for_backward(input)
-        output = (input - torch.mean(input)) / torch.sqrt(torch.std(input))
-        return output
-
-    @staticmethod
-    def backward(cxt, grad_output):
-        input = cxt.saved_tensors
-        grad_input = grad_output.clone()
-        # grad_input[input < -1] = 0
-        # grad_input[input >= 1] = 0
+        grad_input[input < -1] = 0
+        grad_input[input >= 1] = 0
         return grad_input
 
 
@@ -93,8 +76,6 @@ class EQ(Function):
 binarize = Binarize.apply
 
 ternarize = Ternarize.apply
-
-WBN = WBN.apply
 
 EQ = EQ.apply
 
@@ -134,7 +115,7 @@ class BinaryLinear(nn.Linear):
 class BinaryConv2d(nn.Conv2d):
 
     def forward(self, input):
-        bw = WBN(self.weight)
+        bw = (self.weight - torch.mean(self.weight)) / torch.sqrt(torch.std(self.weight))
         bw = ternarize(bw)
         return F.conv2d(input, bw, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)

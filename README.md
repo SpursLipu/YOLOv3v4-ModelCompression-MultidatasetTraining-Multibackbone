@@ -34,7 +34,7 @@ YOLOv3 ModelCompression MultidatasetTraining
 |<center>规整剪枝</center>  | <center>√</center> |<center>√</center>  |
 |<center>极限剪枝(shortcut)</center>  | <center>√</center> | <center>√</center> |
 |<center>Tiny剪枝</center>|<center>√</center>|<center>√</center>  |
-|<center>量化</center>|<center>√</center>|<center>√</center>  |
+|<center>weight三值 activation8比特量化</center>|<center>√</center>|<center>√</center>  |
 |<center>stage-wise 逐层量化</center>|<center>√</center>|<center>√</center>  |
 
 # 推理展示

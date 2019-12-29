@@ -40,20 +40,7 @@ YOLOv3 ModelCompression MultidatasetTraining
 |<center>BWN量化</center>|<center>√</center>|<center>√</center>  |
 |<center>stage-wise 逐层量化</center>|<center>√</center>|<center>√</center>  |
 
-# 推理展示
-
-这里，我们不仅可以使用原始的YOLOV3用来推理展示，还可使用我们剪枝后的模型来推理展示。（修改cfg，weights的指向即可）
-
-```bash
-python3 detect.py --source ...
-```
-
-- Image:  `--source file.jpg`
-- Video:  `--source file.mp4`
-- Directory:  `--source dir/`
-- Webcam:  `--source 0`
-- RTSP stream:  `--source rtsp://170.93.143.139/rtplive/470011e600ef003a004ee33696235daa`
-- HTTP stream:  `--source http://wmccpinetop.axiscam.net/mjpg/video.mjpg`
+# 功能支持
 
 # 多数据集训练
 

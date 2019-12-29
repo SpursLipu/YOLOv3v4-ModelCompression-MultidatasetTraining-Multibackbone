@@ -1,10 +1,14 @@
 # YOLOv3-ModelCompression-MultidatasetTraining
 
-本项目主要包含两部分内容：
+本项目包含两部分内容：
+
 1、提供多个主流目标检测数据集的预处理后文件及训练方法。
+
 2、提供包括剪植，量化，知识蒸馏的主流模型压缩算法实现。
 
-本项目以[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3的Pytorch提供，基于BN层的剪植方法由[coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning)提供，感谢学长在在模型压缩领域的探索。
+其中：
+
+以[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3的Pytorch提供，基于BN层的剪植方法由[coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning)提供，感谢学长在在模型压缩领域的探索。
 
 # 环境部署
 1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建详见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里简要说明：

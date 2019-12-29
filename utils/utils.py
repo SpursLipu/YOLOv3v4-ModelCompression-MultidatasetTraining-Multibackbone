@@ -382,16 +382,15 @@ def compute_loss(p, targets, model):  # predictions, targets, model
     return loss, torch.cat((lbox, lobj, lcls, loss)).detach()
 
 
-def compute_lost_KD(s, t):
-    # 定义floattensor
-    loss = torch.zeros(size=[1], dtype=torch.float).cuda()
-    loss_fn = torch.nn.MSELoss()
-    # Compute losses
-    for i in range(3):  # layer index, layer predictions
-        tem_s = s[i].view(-1, 6)
-        tem_t = t[i].view(-1, 6)
-        loss = loss + loss_fn(tem_s, tem_t)
-    return loss
+def compute_lost_KD(output_s, output_t, num_classes, batch_size):
+    T = 3.0
+    Lambda_ST = 0.001
+    criterion_st = torch.nn.KLDivLoss(reduction='sum')
+    output_s = torch.cat([i.view(-1, num_classes + 5) for i in output_s])
+    output_t = torch.cat([i.view(-1, num_classes + 5) for i in output_t])
+    loss_st = criterion_st(nn.functional.log_softmax(output_s / T, dim=1),
+                           nn.functional.softmax(output_t / T, dim=1)) * (T * T) / batch_size
+    return loss_st * Lambda_ST
 
 
 def build_targets(model, targets):

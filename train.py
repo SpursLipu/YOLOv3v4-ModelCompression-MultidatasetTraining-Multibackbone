@@ -50,12 +50,14 @@ if f:
 
 def train():
     cfg = opt.cfg
+    t_cfg = opt.t_cfg  # teacher model cfg for knowledge distillation
     data = opt.data
     img_size = opt.img_size
     epochs = 1 if opt.prebias else opt.epochs  # 500200 batches at bs 64, 117263 images = 273 epochs
     batch_size = opt.batch_size
     accumulate = opt.accumulate  # effective bs = batch_size * accumulate = 16 * 4 = 64
     weights = opt.weights  # initial training weights
+    t_weights = opt.t_weights  # teacher model weights
 
     if 'pw' not in opt.arc:  # remove BCELoss positive weights
         hyp['cls_pw'] = 1.
@@ -82,7 +84,8 @@ def train():
 
     # Initialize model
     model = Darknet(cfg, arc=opt.arc, quantized=opt.quantized, qlayers=opt.qlayers).to(device)
-
+    if t_cfg:
+        t_model = Darknet(t_cfg, (img_size, img_size), arc=opt.arc, quantized=-1, qlayers=-1).to(device)
     # Optimizer
     pg0, pg1 = [], []  # optimizer parameter groups
     for k, v in dict(model.named_parameters()).items():
@@ -133,6 +136,18 @@ def train():
         # possible weights are 'yolov3.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
         cutoff = load_darknet_weights(model, weights)
 
+    if t_cfg:
+        if t_weights.endswith('.pt'):
+            t_model.load_state_dict(torch.load(t_weights, map_location=device)['model'])
+        elif t_weights.endswith('.weights'):
+            load_darknet_weights(t_model, t_weights)
+        else:
+            raise Exception('pls provide proper teacher weights for knowledge distillation')
+        if not mixed_precision:
+            t_model.eval()
+        print('<.....................using knowledge distillation.......................>')
+        print('teacher model:', t_weights, '\n')
+
     if opt.transfer or opt.prebias:  # transfer learning edge (yolo) layers
         nf = int(model.module_defs[model.yolo_layers[0] - 1]['filters'])  # yolo layer size (i.e. 255)
 
@@ -173,7 +188,10 @@ def train():
 
     # Mixed precision training https://github.com/NVIDIA/apex
     if mixed_precision:
-        model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
+        if t_cfg:
+            [model, t_model], optimizer = amp.initialize([model, t_model], optimizer, opt_level='O1', verbosity=1)
+        else:
+            model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=1)
 
     # Initialize distributed training
     if torch.cuda.device_count() > 1:
@@ -302,6 +320,18 @@ def train():
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results
 
+            soft_target = 0
+            reg_ratio = 0  # 表示有多少target的回归是不如老师的，这时学生会跟gt再学习
+            if t_cfg:
+                if mixed_precision:
+                    with torch.no_grad():
+                        output_t = t_model(imgs)
+                else:
+                    _, output_t = t_model(imgs)
+                soft_target = compute_lost_KD(pred, output_t, model.nc, imgs.size(0))
+                # 这里把蒸馏策略改为了二，想换回一的可以注释掉loss2，把loss1取消注释
+                # soft_target, reg_ratio = distillation_loss2(model, targets, pred, output_t)
+                loss += soft_target
             # Scale loss by nominal batch_size of 64
             loss *= batch_size / 64
 
@@ -432,6 +462,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=16)  # effective bs = batch_size * accumulate = 16 * 4 = 64
     parser.add_argument('--accumulate', type=int, default=2, help='batches to accumulate before optimizing')
     parser.add_argument('--cfg', type=str, default='cfg/yolov3-hand.cfg', help='cfg file path')
+    parser.add_argument('--t_cfg', type=str, default='', help='teacher model cfg file path for knowledge distillation')
     parser.add_argument('--data', type=str, default='data/oxfordhand.data', help='*.data file path')
     parser.add_argument('--multi-scale', action='store_true', help='adjust (67% - 150%) img_size every 10 batches')
     parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
@@ -446,6 +477,7 @@ if __name__ == '__main__':
     parser.add_argument('--cache-images', action='store_true', help='cache images for faster training')
     parser.add_argument('--weights', type=str, default='weights/yolov3.weights',
                         help='initial weights')  # i.e. weights/darknet.53.conv.74
+    parser.add_argument('--t_weights', type=str, default='', help='teacher model weights')
     parser.add_argument('--arc', type=str, default='default', help='yolo architecture')  # defaultpw, uCE, uBCE
     parser.add_argument('--prebias', action='store_true', help='transfer-learn yolo biases prior to training')
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')

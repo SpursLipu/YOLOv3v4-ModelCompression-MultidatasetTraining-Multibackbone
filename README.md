@@ -159,12 +159,12 @@ python3 prune_tiny_yolo.py
 ### 量化方法
 `--quantized` 表示选取量化方法，默认值为-1，表示不采用任何量化方法。
 
-`--quantized 0` 表示使用BNN量化方法。
+`--quantized 0` 使用BNN量化方法。
 
 BinaryNet: Training Deep Neural Networks withWeights and Activations Constrained to +1 or -1
 [参考论文](https://arxiv.org/abs/1602.02830)
 
-`--quantized 1` 表示使用BWN量化方法
+`--quantized 1` 使用BWN量化方法
 
 XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
 [参考论文](https://arxiv.org/abs/1603.05279v4)

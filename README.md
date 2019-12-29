@@ -151,7 +151,11 @@ python3 prune_tiny_yolo.py
 
 `--quantized 0` 表示使用BNN量化方法。
 
+[参考论文](https://arxiv.org/abs/1602.02830)
+
 `--quantized 1` 表示选使用BWN量化方法
+
+[参考论文](https://arxiv.org/abs/1603.05279v4)
 
 ### stage-wise 训练策略
 `--qlayers`可以用于选取Darknet中的量化区间，默认为自深层到浅层, 默认值为-1表示无量化层，有效范围为0-74，取0时表示量化所有层，取74时表示无量化层，大于74则无意义。

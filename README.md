@@ -36,6 +36,7 @@
 |<center>BNN量化</center>|<center>√</center>  |
 |<center>BWN量化</center>|<center>√</center>  |
 |<center>stage-wise 逐层量化</center>|<center>√</center>  |
+|<center>知识蒸馏</center>|<center>√</center>  |
 
 # 可用指令
 
@@ -191,6 +192,8 @@ python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/best.p
 ### 蒸馏方法
 蒸馏方法采用基于Hinton于2015年提出的基本蒸馏方法，并结合检测网络做了部分改进。
 
+[参考论文](https://arxiv.org/abs/1503.02531)
+
 `--t_cfg --t_weights` 在命令中加入这两个选项即可以开始蒸馏训练。其中`--t_cfg`表示教师网络配置文件，`--t_weights`表示教师网络权重文件。
 
 蒸馏指令范例：
@@ -199,4 +202,4 @@ python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/best.p
 python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/last.pt --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 150 --quantized 1 --qlayers 72 --t_cfg cfg/yolov3-bdd100k.cfg --t_weights weights/BDDbest.pt
 ```
 
-该指令将量化与蒸馏相结合，通过未量化的教师网络提升量化的学生网络，来达到提高学生网络精度的作用。
+该指令将量化与蒸馏相结合，通过未量化的教师网络提升量化的学生网络，提高学生网络的mAP。

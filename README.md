@@ -82,6 +82,8 @@ Bdd100是一个大规模、多样化的驾驶视频数据集，共包含十万�
 
 [论文](https://arxiv.org/abs/1805.04687)
 
+![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/1.jpg)
+
 # 模型压缩
 
 ## 剪植

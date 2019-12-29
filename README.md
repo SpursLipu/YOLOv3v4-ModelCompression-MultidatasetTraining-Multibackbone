@@ -51,8 +51,24 @@ python3 detect.py --source ...
 - Webcam:  `--source 0`
 - RTSP stream:  `--source rtsp://170.93.143.139/rtplive/470011e600ef003a004ee33696235daa`
 - HTTP stream:  `--source http://wmccpinetop.axiscam.net/mjpg/video.mjpg`
+
 # 多数据集训练
 
+本项目已完成并开放针对YOLOv3仓库的数据集预处理，并提供配置文件(.cfg)，数据集所以文件(.data)，数据集类别文件(.names)以及使用k-means算法重新聚类的anchor box尺寸(包含用于yolov3的9框和tiny-yolov3的6框)。
+
+下载地址如下，下载并解压后将文件夹拷贝至data目录下即可使用。
+
+- [Dior遥感数据集](https://pan.baidu.com/s/1z0IQPBN16I-EctjwN9Idyg)
+  
+  提取码：vnuq
+- [bdd100k无人驾驶数据集](https://pan.baidu.com/s/157Md2qeFgmcOv5UmnIGI_g)
+  
+  提取码：8duw
+  
+## Dior数据集
+DIRO数据集是地球观测社区中最大、最多样化和公开可用的目标检测数据集之一。其中船舶和车辆的实例数较高，在小型实例和大型实例之间实现了良好的平衡。图片采集自Google Earth。
+[数据集详细介绍](https://cloud.tencent.com/developer/article/1509762)
+## 
 # 模型压缩
 
 ## 剪植

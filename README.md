@@ -1,11 +1,13 @@
 # YOLOv3-ModelCompression-MultidatasetTraining
-YOLOv3 ModelCompression MultidatasetTraining
 
-本项目以[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3的Pytorch实现，剪植方法由[coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning)实现，感谢学长在在模型压缩领域的探索。
+本项目主要包含两部分内容：
+1、提供多个主流目标检测数据集的预处理后文件及训练方法。
+2、提供包括剪植，量化，知识蒸馏的主流模型压缩算法实现。
 
+本项目以[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3的Pytorch提供，基于BN层的剪植方法由[coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning)提供，感谢学长在在模型压缩领域的探索。
 
 # 环境部署
-1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里重复介绍一下：
+1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建详见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里简要说明：
 
 - `numpy`
 - `torch >= 1.1.0`
@@ -14,21 +16,12 @@ YOLOv3 ModelCompression MultidatasetTraining
 
 可直接`pip3 install -U -r requirements.txt`搭建环境，或根据该.txt文件使用conda搭建。
 
-# 项目特点
-
-1.采用的YOLO-v3实现较为准确，mAP相对较高。
-
-2.提供对YOLOv3及Tiny的多种剪枝版本，以适应不同的需求。
-
-3.剪枝后保存为.weights格式，可在任何框架下继续训练、推理，或以图像视频展示。
-
-4.提供多种精度的量化
-
-5.目前支持情况
+# 目前支持功能
 
 |<center>功能</center>|<center>单卡</center>|<center>多卡</center>|
 | --- | --- | --- |
 |<center>正常训练</center>|<center>√</center>|<center>√</center>|
+|<center>tiny训练</center>|<center>√</center>|<center>√</center>|
 |<center>Dior数据集训练</center>|<center>√</center>|<center>√</center>|
 |<center>bdd100k数据集训练</center>|<center>√</center>|<center>√</center>|
 |<center>稀疏化训练</center>|<center>√</center>|<center>√</center>  |

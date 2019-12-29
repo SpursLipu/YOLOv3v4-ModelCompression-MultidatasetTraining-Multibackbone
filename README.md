@@ -57,7 +57,7 @@ python3 detect.py --source ...
 
 # 多数据集训练
 
-本项目已完成并开放针对YOLOv3仓库的数据集预处理，并提供配置文件(.cfg)，数据集所以文件(.data)，数据集类别文件(.names)以及使用k-means算法重新聚类的anchor box尺寸(包含用于yolov3的9框和tiny-yolov3的6框)。
+本项目提供针对YOLOv3仓库的预处理数据集，配置文件(.cfg)，数据集索引文件(.data)，数据集类别文件(.names)以及使用k-means算法重新聚类的anchor box尺寸(包含用于yolov3的9框和tiny-yolov3的6框)。
 
 下载地址如下，下载并解压后将文件夹拷贝至data目录下即可使用。
 

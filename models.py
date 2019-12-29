@@ -28,20 +28,38 @@ def create_modules(module_defs, img_size, arc, quantized, qlayers):
             filters = int(mdef['filters'])
             kernel_size = int(mdef['size'])
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
+            # 量化
             if i >= qlayers and i <= 74 and quantized != -1 and qlayers != -1:
-                modules.add_module('Conv2d', BinaryConv2d(in_channels=output_filters[-1],
-                                                          out_channels=filters,
-                                                          kernel_size=kernel_size,
-                                                          stride=int(mdef['stride']),
-                                                          padding=pad,
-                                                          bias=not bn))
-                if bn:
-                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-                if mdef[
-                    'activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
-                    modules.add_module('activation', BinaryLeakyReLU())
-                    # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
-                    # modules.add_module('activation', Swish())
+                # BNN量化
+                if quantized == 0:
+                    modules.add_module('Conv2d', BinaryConv2d(in_channels=output_filters[-1],
+                                                              out_channels=filters,
+                                                              kernel_size=kernel_size,
+                                                              stride=int(mdef['stride']),
+                                                              padding=pad,
+                                                              bias=not bn))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                    if mdef[
+                        'activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
+                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                        # modules.add_module('activation', Swish())
+                # BWN量化
+                elif quantized == 1:
+                    modules.add_module('Conv2d', BWNConv2d(in_channels=output_filters[-1],
+                                                           out_channels=filters,
+                                                           kernel_size=kernel_size,
+                                                           stride=int(mdef['stride']),
+                                                           padding=pad,
+                                                           bias=not bn))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                    if mdef[
+                        'activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
+                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                        # modules.add_module('activation', Swish())
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,

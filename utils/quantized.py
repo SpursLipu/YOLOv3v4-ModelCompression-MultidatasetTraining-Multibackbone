@@ -50,11 +50,11 @@ class Binarize(Function):
         return output
 
     @staticmethod
-    def backward(cxt, grad_output):
-        input = cxt.saved_tensors
+    def backward(self, grad_output):
+        input, = self.saved_tensors
         grad_input = grad_output.clone()
-        grad_input[input < -1] = 0
-        grad_input[input >= 1] = 0
+        grad_input[input.ge(1)] = 0
+        grad_input[input.le(-1)] = 0
         return grad_input
 
 
@@ -63,8 +63,10 @@ class EQ(Function):
     @staticmethod
     def forward(self, input):
         self.save_for_backward(input)
+        s = torch.max(input) - torch.min(input)
         n = float(2 ** 8 - 1)
-        out = torch.round(input * n) / n
+        input = torch.div(input, s)
+        out = torch.round(input * n)
         return out
 
     @staticmethod
@@ -111,12 +113,37 @@ class BinaryLinear(nn.Linear):
         self.weight.lr_scale = 1. / stdv
 
 
-# 对卷积层权重做量化
+# BWN量化
+class BWNConv2d(nn.Conv2d):
+
+    def forward(self, input):
+        bw = binarize(self.weight)
+        alpha = torch.div(self.weight.norm(1), torch.numel(self.weight))
+        output = alpha * (F.conv2d(input, bw, self.bias, self.stride,
+                                   self.padding, self.dilation, self.groups))
+        return output
+
+    def reset_parameters(self):
+        # Glorot initialization
+        in_features = self.in_channels
+        out_features = self.out_channels
+        for k in self.kernel_size:
+            in_features *= k
+            out_features *= k
+        stdv = math.sqrt(1.5 / (in_features + out_features))
+        self.weight.data.uniform_(-stdv, stdv)
+        if self.bias is not None:
+            self.bias.data.zero_()
+
+        self.weight.lr_scale = 1. / stdv
+
+
+# BNN量化
 class BinaryConv2d(nn.Conv2d):
 
     def forward(self, input):
-        bw = (self.weight - torch.mean(self.weight)) / torch.sqrt(torch.std(self.weight))
-        bw = ternarize(bw)
+        # bw = (self.weight - torch.mean(self.weight)) / torch.sqrt(torch.std(self.weight))
+        bw = binarize(self.weight)
         return F.conv2d(input, bw, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
 

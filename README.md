@@ -151,10 +151,12 @@ python3 prune_tiny_yolo.py
 
 `--quantized 0` 表示使用BNN量化方法。
 
+BinaryNet: Training Deep Neural Networks withWeights and Activations Constrained to +1 or -1
 [参考论文](https://arxiv.org/abs/1602.02830)
 
 `--quantized 1` 表示选使用BWN量化方法
 
+XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
 [参考论文](https://arxiv.org/abs/1603.05279v4)
 
 ### stage-wise 训练策略

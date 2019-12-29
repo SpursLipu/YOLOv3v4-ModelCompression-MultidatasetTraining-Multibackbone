@@ -8,7 +8,7 @@
 
 其中：
 
-以[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3的Pytorch提供，基于BN层的剪植方法由[coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning)提供，感谢学长在在模型压缩领域的探索。
+源码使用Pytorch实现，以[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3源码仓库。基于BN层的剪植方法由[coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning)提供，感谢学长在模型压缩领域的探索。
 
 # 环境部署
 1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建详见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里简要说明：

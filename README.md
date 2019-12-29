@@ -126,6 +126,8 @@ python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --we
 
 `--prune 2`为Tiny剪枝的稀疏化
 
+指令范例：
+
 ```bash
 python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3-hand.cfg -sr --s 0.001 --prune 0 
 ```
@@ -152,6 +154,7 @@ python3 prune_tiny_yolo.py
 此外，可通过增大代码中percent的值来获得更大的压缩率。（若稀疏化不到位，且percent值过大，程序会报错。）
 
 ## 量化
+
 ### 量化方法
 `--quantized` 表示选取量化方法，默认值为-1，表示不采用任何量化方法。
 
@@ -181,7 +184,19 @@ XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
 
 ```bash
 python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/best.pt --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 200 --quantized 1 --qlayers 72
-
 ```
 
 ## 知识蒸馏
+
+### 蒸馏方法
+蒸馏方法采用基于Hinton于2015年提出的基本蒸馏方法，并结合检测网络做了部分改进。
+
+`--t_cfg --t_weights` 在命令中加入这两个选项即可以开始蒸馏训练。其中`--t_cfg`表示教师网络配置文件，`--t_weights`表示教师网络权重文件。
+
+蒸馏指令范例：
+
+```bash
+python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/last.pt --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 150 --quantized 1 --qlayers 72 --t_cfg cfg/yolov3-bdd100k.cfg --t_weights weights/BDDbest.pt
+```
+
+该指令将量化与蒸馏相结合，通过未量化的教师网络提升量化的学生网络，来达到提高学生网络精度的作用。

@@ -62,7 +62,6 @@ DIRO数据集是地球观测社区中最大、最多样化和公开可用的目�
 
 ### 检测效果
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/2.jpg)
-
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/3.jpg)
 
 ## bdd100k数据集

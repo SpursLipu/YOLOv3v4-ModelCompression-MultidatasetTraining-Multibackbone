@@ -149,14 +149,14 @@ python3 prune_tiny_yolo.py
 此外，可通过增大代码中percent的值来获得更大的压缩率。（若稀疏化不到位，且percent值过大，程序会报错。）
 
 ## 量化
-1.量化方法
+### 量化方法
 `--quantized` 表示选取量化方法，默认值为-1，表示不采用任何量化方法。
 
-`--quantized 1` 表示使用BNN量化方法。
+`--quantized 0` 表示使用BNN量化方法。
 
-`--quantized 2` 表示选使用BWN量化方法
+`--quantized 1` 表示选使用BWN量化方法
 
-2.stage-wise 训练策略
+### stage-wise 训练策略
 `--qlayers`可以用于选取Darknet中的量化区间，默认为自深层到浅层, 默认值为-1表示无量化层，有效范围为0-74，取0时表示量化所有层，取74时表示无量化层，大于74则无意义。
 
 ![Darknet](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/Darknet.png)
@@ -167,5 +167,12 @@ python3 prune_tiny_yolo.py
 `--qlayers 38` 表示量化Darknet主体网络中从倒数第二八个重复的残差块开始，量化到Darknet主体网络结束。
 
 以此类推，量化时可根据具体情况选择何是的量化层数，以及量化进度，推荐`--qlayers`值自74逐渐下降。
+
+量化指令范例：
+
+```bash
+python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/best.pt --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 200 --quantized 1 --qlayers 72
+
+```
 
 ## 知识蒸馏

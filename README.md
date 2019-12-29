@@ -29,6 +29,8 @@ YOLOv3 ModelCompression MultidatasetTraining
 |<center>功能</center>|<center>单卡</center>|<center>多卡</center>|
 | --- | --- | --- |
 |<center>正常训练</center>|<center>√</center>|<center>√</center>|
+|<center>Dior数据集训练</center>|<center>√</center>|<center>√</center>|
+|<center>bdd100k数据集训练</center>|<center>√</center>|<center>√</center>|
 |<center>稀疏化训练</center>|<center>√</center>|<center>√</center>  |
 |<center>正常剪枝</center>|<center>√</center>|<center>√</center>|
 |<center>规整剪枝</center>  | <center>√</center> |<center>√</center>  |

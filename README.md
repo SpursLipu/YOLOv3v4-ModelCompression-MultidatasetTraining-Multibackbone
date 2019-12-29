@@ -74,7 +74,9 @@ DIRO数据集是地球观测社区中最大、最多样化和公开可用的目�
 [数据集详细介绍](https://cloud.tencent.com/developer/article/1509762)
 
 ### 检测效果
-![检测效果](![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/1.jpg))
+![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/2.jpg)
+
+![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/3.jpg)
 
 ## bdd100k数据集
 Bdd100是一个大规模、多样化的驾驶视频数据集，共包含十万个视频。每个视频大约40秒长，研究者为所有10万个关键帧中常出现在道路上的对象标记了边界框。数据集涵盖了不同的天气条件，包括晴天、阴天和雨天、以及白天和晚上的不同时间。
@@ -86,9 +88,7 @@ Bdd100是一个大规模、多样化的驾驶视频数据集，共包含十万�
 [论文](https://arxiv.org/abs/1805.04687)
 
 ### 检测效果
-![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/2.jpg)
-
-![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/3.jpg)
+![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/1.jpg)
 
 # 模型压缩
 

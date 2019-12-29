@@ -192,9 +192,16 @@ python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/best.p
 ### 蒸馏方法
 蒸馏方法采用基于Hinton于2015年提出的基本蒸馏方法，并结合检测网络做了部分改进。
 
+Distilling the Knowledge in a Neural Network
 [参考论文](https://arxiv.org/abs/1503.02531)
 
-`--t_cfg --t_weights` 在命令中加入这两个选项即可以开始蒸馏训练。其中`--t_cfg`表示教师网络配置文件，`--t_weights`表示教师网络权重文件。
+`--t_cfg --t_weights` 在命令中加入这两个选项即可以开始蒸馏训练。
+
+其中：
+
+`--t_cfg`表示教师网络配置文件。
+
+`--t_weights`表示教师网络权重文件。
 
 蒸馏指令范例：
 

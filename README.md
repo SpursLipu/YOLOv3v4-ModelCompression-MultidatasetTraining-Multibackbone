@@ -23,7 +23,7 @@
 # 目前支持功能
 
 |<center>功能</center>|<center>多卡</center>|
-| --- | --- | --- |
+| --- |--- |
 |<center>正常训练</center>|<center>√</center>|
 |<center>tiny训练</center>|<center>√</center>|
 |<center>Dior数据集训练</center>|<center>√</center>|

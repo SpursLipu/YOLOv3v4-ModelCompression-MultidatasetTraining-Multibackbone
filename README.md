@@ -51,6 +51,14 @@ YOLOv3 ModelCompression MultidatasetTraining
 - [Dior遥感数据集](https://pan.baidu.com/s/1z0IQPBN16I-EctjwN9Idyg)
   
   提取码：vnuq
+
+训练指令
+
+```bash
+python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3-hand.cfg -sr --s 0.001 --prune 0 
+```
+
+
 - [bdd100k无人驾驶数据集](https://pan.baidu.com/s/157Md2qeFgmcOv5UmnIGI_g)
   
   提取码：8duw

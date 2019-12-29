@@ -70,12 +70,16 @@ python3 detect.py --source ...
   
 ## Dior数据集
 DIRO数据集是地球观测社区中最大、最多样化和公开可用的目标检测数据集之一。其中船舶和车辆的实例数较高，在小型实例和大型实例之间实现了良好的平衡。图片采集自Google Earth。
+
 [数据集详细介绍](https://cloud.tencent.com/developer/article/1509762)
 
 ## bdd100k数据集
 Bdd100是一个大规模、多样化的驾驶视频数据集，共包含十万个视频。每个视频大约40秒长，研究者为所有10万个关键帧中常出现在道路上的对象标记了边界框。数据集涵盖了不同的天气条件，包括晴天、阴天和雨天、以及白天和晚上的不同时间。
+
 [官网](http://bair.berkeley.edu/blog/2018/05/30/bdd/)
+
 [原数据集下载](http://bdd-data.berkeley.edu)
+
 [论文](https://arxiv.org/abs/1805.04687)
 
 # 模型压缩

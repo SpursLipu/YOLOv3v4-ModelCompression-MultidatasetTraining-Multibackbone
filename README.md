@@ -22,20 +22,20 @@
 
 # 目前支持功能
 
-|<center>功能</center>|<center>单卡</center>|<center>多卡</center>|
+|<center>功能</center>|<center>多卡</center>|
 | --- | --- | --- |
-|<center>正常训练</center>|<center>√</center>|<center>√</center>|
-|<center>tiny训练</center>|<center>√</center>|<center>√</center>|
-|<center>Dior数据集训练</center>|<center>√</center>|<center>√</center>|
-|<center>bdd100k数据集训练</center>|<center>√</center>|<center>√</center>|
-|<center>稀疏化训练</center>|<center>√</center>|<center>√</center>  |
-|<center>正常剪枝</center>|<center>√</center>|<center>√</center>|
-|<center>规整剪枝</center>  | <center>√</center> |<center>√</center>  |
-|<center>极限剪枝(shortcut)</center>  | <center>√</center> | <center>√</center> |
-|<center>Tiny剪枝</center>|<center>√</center>|<center>√</center>  |
-|<center>BNN量化</center>|<center>√</center>|<center>√</center>  |
-|<center>BWN量化</center>|<center>√</center>|<center>√</center>  |
-|<center>stage-wise 逐层量化</center>|<center>√</center>|<center>√</center>  |
+|<center>正常训练</center>|<center>√</center>|
+|<center>tiny训练</center>|<center>√</center>|
+|<center>Dior数据集训练</center>|<center>√</center>|
+|<center>bdd100k数据集训练</center>|<center>√</center>|
+|<center>稀疏化训练</center>|<center>√</center>  |
+|<center>正常剪枝</center>|<center>√</center>|
+|<center>规整剪枝</center>|<center>√</center>  |
+|<center>极限剪枝(shortcut)</center>|<center>√</center> |
+|<center>Tiny剪枝</center>|<center>√</center>  |
+|<center>BNN量化</center>|<center>√</center>  |
+|<center>BWN量化</center>|<center>√</center>  |
+|<center>stage-wise 逐层量化</center>|<center>√</center>  |
 
 # 功能支持
 

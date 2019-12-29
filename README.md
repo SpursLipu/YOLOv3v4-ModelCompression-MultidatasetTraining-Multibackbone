@@ -37,7 +37,13 @@
 |<center>BWN量化</center>|<center>√</center>  |
 |<center>stage-wise 逐层量化</center>|<center>√</center>  |
 
-# 功能支持
+# 可用指令
+
+`python3 train.py --data ... --cfg ... `为训练模型指令。
+
+`python3 test.py --data ... --cfg ... ` 为mAP测试指令。
+
+`python3 detect.py --data ... --cfg ... --source ...`为推理检测指令，source默认地址为data/samples,输出结果保存在output文件中，检测资源可以为图片，视频等。
 
 # 多数据集训练
 

@@ -28,6 +28,7 @@
 |<center>tiny训练</center>|<center>√</center>|
 |<center>Dior数据集训练</center>|<center>√</center>|
 |<center>bdd100k数据集训练</center>|<center>√</center>|
+|<center>visdrone数据集训练</center>|<center>√</center>|
 |<center>稀疏化训练</center>|<center>√</center>  |
 |<center>正常剪枝</center>|<center>√</center>|
 |<center>规整剪枝</center>|<center>√</center>  |
@@ -72,7 +73,18 @@ python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.w
 ```bash
 python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 200
 ```
+
+
+- [visdrone数据集](https://pan.baidu.com/s/1CPGmS3tLI7my4_m7qDhB4Q)
   
+  提取码：dy4c
+
+  训练指令
+
+```bash
+python train.py --data cfg/visdrone.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3-visdrone.cfg  --img-size 608 --epochs 200 
+```
+
 ## Dior数据集
 DIRO数据集是地球观测社区中最大、最多样化和公开可用的目标检测数据集之一。其中船舶和车辆的实例数较高，在小型实例和大型实例之间实现了良好的平衡。图片采集自Google Earth。
 

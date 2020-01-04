@@ -10,6 +10,10 @@
 
 源码使用Pytorch实现，以[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3源码仓库。基于BN层的剪植方法由[coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning)提供，感谢学长在模型压缩领域的探索。
 
+# 最近更新
+ 2020年1月4日 提供Visdrone数据集剪裁后的下载链接和训练方法。
+
+
 # 环境部署
 1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建详见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里简要说明：
 

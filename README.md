@@ -123,7 +123,8 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 [官网](http://www.aiskyeye.com/)
 
 ### 检测效果
-![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/1.jpg)
+![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/4.jpg)
+![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/5.jpg)
 
 # 模型压缩
 

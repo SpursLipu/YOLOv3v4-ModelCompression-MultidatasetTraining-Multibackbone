@@ -82,7 +82,11 @@ python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.w
 - [bdd100k无人驾驶数据集](https://pan.baidu.com/s/157Md2qeFgmcOv5UmnIGI_g)
   
   提取码：8duw
+  
+- [bdd100k权重文件(https://pan.baidu.com/s/18lZ2laOLNKCBBLsB-8gQ2Q)
 
+  提取码：smvj
+  
   训练指令
 
 ```bash

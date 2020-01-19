@@ -68,6 +68,10 @@ mAP
   
   提取码：vnuq
 
+- [Dior权重文件](https://pan.baidu.com/s/11reX-oNtO-8fKmPIZdt2ow)
+
+  提取码：lgj5
+  
   训练指令
 
 ```bash
@@ -89,7 +93,11 @@ python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov
 - [visdrone数据集](https://pan.baidu.com/s/1CPGmS3tLI7my4_m7qDhB4Q)
   
   提取码：dy4c
+  
+- [visdrone权重文件](https://pan.baidu.com/s/185SSIWwhqj2tg5pRbh-hdA)
 
+  提取码：11og
+  
   训练指令
 
 ```bash

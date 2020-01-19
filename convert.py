@@ -46,7 +46,7 @@ def convert():
     half = half and device.type != 'cpu'  # half precision only supported on CUDA
     if half:
         model.half()
-    save_weights(model, path='weights/Dior-tiny-best.weights')
+    save_weights(model, path='weights/best.weights')
 
 
 if __name__ == '__main__':

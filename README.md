@@ -83,7 +83,7 @@ python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.w
   
   提取码：8duw
   
-- [bdd100k权重文件(https://pan.baidu.com/s/18lZ2laOLNKCBBLsB-8gQ2Q)
+- [bdd100k权重文件](https://pan.baidu.com/s/18lZ2laOLNKCBBLsB-8gQ2Q)
 
   提取码：smvj
   

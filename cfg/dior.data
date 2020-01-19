@@ -1,4 +1,4 @@
 classes= 21
 train=data/DIOR-full/train.txt
 valid=data/DIOR-full/test.txt
-names=data/dior-full.names
+names=data/dior.names

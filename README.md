@@ -31,7 +31,7 @@
 | --- |--- |
 |<center>正常训练</center>|<center>√</center>|
 |<center>tiny训练</center>|<center>√</center>|
-|<center>训练</center>|<center>√</center>|
+|<center>mobilenetv3训练</center>|<center>√</center>|
 |<center>Dior数据集训练</center>|<center>√</center>|
 |<center>bdd100k数据集训练</center>|<center>√</center>|
 |<center>visdrone数据集训练</center>|<center>√</center>|

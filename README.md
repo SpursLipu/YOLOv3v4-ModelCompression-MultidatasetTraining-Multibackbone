@@ -12,7 +12,10 @@
 
 # 最近更新
  2020年1月4日 提供Visdrone数据集剪裁后的下载链接和训练方法。
+ 
  2020年1月19日 提供Dior，Bdd100k，visdrone训练完成，并完成转化的.weights文件。
+ 
+ 2020年3月1日 实现基于mobilenetv3 backbone的YOLOv3。
 
 
 # 环境部署

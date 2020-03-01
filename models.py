@@ -40,11 +40,14 @@ def create_modules(module_defs, img_size, arc, quantized, qlayers):
                                                               bias=not bn))
                     if bn:
                         modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-                    if mdef[
-                        'activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
+                    if mdef['activation'] == 'leaky':
                         modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
                         # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                         # modules.add_module('activation', Swish())
+                    if mdef['activation'] == 'relu6':
+                        modules.add_module('activation', relu6())
+                    if mdef['activation'] == 'h_swish':
+                        modules.add_module('activation', h_swish())
                 # BWN量化
                 elif quantized == 1:
                     modules.add_module('Conv2d', BWNConv2d(in_channels=output_filters[-1],
@@ -55,11 +58,14 @@ def create_modules(module_defs, img_size, arc, quantized, qlayers):
                                                            bias=not bn))
                     if bn:
                         modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-                    if mdef[
-                        'activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
+                    if mdef['activation'] == 'leaky':
                         modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
                         # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                         # modules.add_module('activation', Swish())
+                    if mdef['activation'] == 'relu6':
+                        modules.add_module('activation', relu6())
+                    if mdef['activation'] == 'h_swish':
+                        modules.add_module('activation', h_swish())
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,
@@ -69,12 +75,36 @@ def create_modules(module_defs, img_size, arc, quantized, qlayers):
                                                        bias=not bn))
                 if bn:
                     modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-                if mdef[
-                    'activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
+                if mdef['activation'] == 'leaky':
                     modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
                     # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                     # modules.add_module('activation', Swish())
-
+                if mdef['activation'] == 'relu6':
+                    modules.add_module('activation', relu6())
+                if mdef['activation'] == 'h_swish':
+                    modules.add_module('activation', h_swish())
+        elif mdef['type'] == 'depthwise':
+            bn = int(mdef['batch_normalize'])
+            filters = int(mdef['filters'])
+            kernel_size = int(mdef['size'])
+            pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
+            modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
+                                                        out_channels=filters,
+                                                        kernel_size=kernel_size,
+                                                        stride=int(mdef['stride']),
+                                                        padding=pad,
+                                                        groups=output_filters[-1],
+                                                        bias=not bn), )
+            if bn:
+                modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+            if mdef['activation'] == 'leaky':
+                modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                # modules.add_module('activation', Swish())
+            if mdef['activation'] == 'relu6':
+                modules.add_module('activation', relu6())
+            if mdef['activation'] == 'h_swish':
+                modules.add_module('activation', h_swish())
         elif mdef['type'] == 'maxpool':
             kernel_size = int(mdef['size'])
             stride = int(mdef['stride'])
@@ -84,27 +114,25 @@ def create_modules(module_defs, img_size, arc, quantized, qlayers):
                 modules.add_module('MaxPool2d', maxpool)
             else:
                 modules = maxpool
-
+        elif mdef['type'] == 'se':
+            filters = int(mdef['filters'])
+            modules.add_module('se', SE(channel=filters))
         elif mdef['type'] == 'upsample':
             modules = nn.Upsample(scale_factor=int(mdef['stride']), mode='nearest')
-
         elif mdef['type'] == 'route':  # nn.Sequential() placeholder for 'route' layer
             layers = [int(x) for x in mdef['layers'].split(',')]
             filters = sum([output_filters[i + 1 if i > 0 else i] for i in layers])
             routs.extend([l if l > 0 else l + i for l in layers])
             # if mdef[i+1]['type'] == 'reorg3d':
             #     modules = nn.Upsample(scale_factor=1/float(mdef[i+1]['stride']), mode='nearest')  # reorg3d
-
         elif mdef['type'] == 'shortcut':  # nn.Sequential() placeholder for 'shortcut' layer
             filters = output_filters[int(mdef['from'])]
             layer = int(mdef['from'])
             routs.extend([i + layer if layer < 0 else layer])
-
         elif mdef['type'] == 'reorg3d':  # yolov3-spp-pan-scale
             # torch.Size([16, 128, 104, 104])
             # torch.Size([16, 64, 208, 208]) <-- # stride 2 interpolate dimensions 2 and 3 to cat with prior layer
             pass
-
         elif mdef['type'] == 'yolo':
             yolo_index += 1
             mask = [int(x) for x in mdef['mask'].split(',')]  # anchor mask
@@ -156,6 +184,50 @@ class Swish(nn.Module):
 
     def forward(self, x):
         return x * torch.sigmoid(x)
+
+
+class relu6(nn.Module):
+    def __init__(self):
+        super(relu6, self).__init__()
+
+    def forward(self, x):
+        return F.relu6(x, inplace=True)
+
+
+class h_swish(nn.Module):
+    def __init__(self):
+        super(h_swish, self).__init__()
+
+    def forward(self, x):
+        return x * (F.relu6(x + 3.0, inplace=True) / 6.0)
+
+
+class h_sigmoid(nn.Module):
+    def __init__(self):
+        super(h_sigmoid, self).__init__()
+
+    def forward(self, x):
+        out = F.relu6(x + 3.0, inplace=True) / 6.0
+        return out
+
+
+class SE(nn.Module):
+    def __init__(self, channel, reduction=4):
+        super(SE, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            h_sigmoid()
+            # nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
 
 
 class YOLOLayer(nn.Module):
@@ -239,7 +311,7 @@ class YOLOLayer(nn.Module):
 
 
 class Darknet(nn.Module):
-    # YOLOv3 object detection model
+    # YOLO object detection model
 
     def __init__(self, cfg, img_size=(416, 416), arc='default', quantized=-1, qlayers=-1):
         # 我的添加
@@ -265,7 +337,7 @@ class Darknet(nn.Module):
 
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
-            if mtype in ['convolutional', 'upsample', 'maxpool']:
+            if mtype in ['convolutional', 'depthwise', 'se', 'upsample', 'maxpool']:
                 x = module(x)
             elif mtype == 'route':
                 layers = [int(x) for x in mdef['layers'].split(',')]

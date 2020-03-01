@@ -3,7 +3,7 @@ import argparse
 import torch.distributed as dist
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-
+from torchsummary import summary
 import test as test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
@@ -84,6 +84,7 @@ def train():
 
     # Initialize model
     model = Darknet(cfg, arc=opt.arc, quantized=opt.quantized, qlayers=opt.qlayers).to(device)
+    summary(model, input_size=(3, opt.img_size, opt.img_size))
     if t_cfg:
         t_model = Darknet(t_cfg, (img_size, img_size), arc=opt.arc, quantized=-1, qlayers=-1).to(device)
     # Optimizer
@@ -105,36 +106,39 @@ def train():
     cutoff = -1  # backbone reaches to cutoff layer
     start_epoch = 0
     best_fitness = float('inf')
-    attempt_download(weights)
-    if weights.endswith('.pt'):  # pytorch format
-        # possible weights are 'last.pt', 'yolov3-spp.pt', 'yolov3-tiny.pt' etc.
-        if opt.bucket:
-            os.system('gsutil cp gs://%s/last.pt %s' % (opt.bucket, last))  # download from bucket
-        chkpt = torch.load(weights, map_location=device)
+    if weights != 'None':
+        attempt_download(weights)
+        if weights.endswith('.pt'):  # pytorch format
+            # possible weights are 'last.pt', 'yolov3-spp.pt', 'yolov3-tiny.pt' etc.
+            if opt.bucket:
+                os.system('gsutil cp gs://%s/last.pt %s' % (opt.bucket, last))  # download from bucket
+            chkpt = torch.load(weights, map_location=device)
 
-        # load model
-        # if opt.transfer:
-        chkpt['model'] = {k: v for k, v in chkpt['model'].items() if model.state_dict()[k].numel() == v.numel()}
-        model.load_state_dict(chkpt['model'], strict=False)
-        # else:
-        #    model.load_state_dict(chkpt['model'])
+            # load model
+            # if opt.transfer:
+            chkpt['model'] = {k: v for k, v in chkpt['model'].items() if model.state_dict()[k].numel() == v.numel()}
+            model.load_state_dict(chkpt['model'], strict=False)
+            # else:
+            #    model.load_state_dict(chkpt['model'])
 
-        # load optimizer
-        if chkpt['optimizer'] is not None:
-            optimizer.load_state_dict(chkpt['optimizer'])
-            best_fitness = chkpt['best_fitness']
+            # load optimizer
+            if chkpt['optimizer'] is not None:
+                optimizer.load_state_dict(chkpt['optimizer'])
+                best_fitness = chkpt['best_fitness']
 
-        # load results
-        if chkpt.get('training_results') is not None:
-            with open(results_file, 'w') as file:
-                file.write(chkpt['training_results'])  # write results.txt
+            # load results
+            if chkpt.get('training_results') is not None:
+                with open(results_file, 'w') as file:
+                    file.write(chkpt['training_results'])  # write results.txt
 
-        start_epoch = chkpt['epoch'] + 1
-        del chkpt
+            start_epoch = chkpt['epoch'] + 1
+            del chkpt
 
-    elif len(weights) > 0:  # darknet format
-        # possible weights are 'yolov3.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-        cutoff = load_darknet_weights(model, weights)
+        elif len(weights) > 0:  # darknet format
+            # possible weights are 'yolov3.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
+            cutoff = load_darknet_weights(model, weights)
+    else:
+        cutoff = 64
 
     if t_cfg:
         if t_weights.endswith('.pt'):

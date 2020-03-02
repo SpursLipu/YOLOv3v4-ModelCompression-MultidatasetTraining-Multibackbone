@@ -6,6 +6,8 @@
 
 2、提供包括剪植，量化，知识蒸馏的主流模型压缩算法实现。
 
+3、提供多backbone训练目前包括Darknet-YOLOv3，Tiny-YOLOv3，Mobilenetv3-YOLOv3
+
 其中：
 
 源码使用Pytorch实现，以[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3源码仓库。基于BN层的剪植方法由[coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning)提供，感谢学长在模型压缩领域的探索。

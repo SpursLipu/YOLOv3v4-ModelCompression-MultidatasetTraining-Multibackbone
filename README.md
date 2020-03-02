@@ -111,7 +111,7 @@ python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov
 ```bash
 python train.py --data cfg/visdrone.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3-visdrone.cfg  --img-size 608 --epochs 200 
 ```
-
+  
   mobilenetv3训练指令(from scratch)
 
 ```bash

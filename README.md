@@ -98,6 +98,11 @@ python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.w
 python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 200
 ```
 
+mobilenetv3训练指令(from scratch)
+
+```bash
+python train.py --data cfg/visdrone.data --batch_size 20 --weights None --cfg cfg/yolov3-mobilenet-visdrone.cfg --img_size 608 --epochs 200
+```
 
 - [visdrone数据集](https://pan.baidu.com/s/1CPGmS3tLI7my4_m7qDhB4Q)
   

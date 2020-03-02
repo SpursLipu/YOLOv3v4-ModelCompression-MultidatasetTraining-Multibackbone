@@ -77,7 +77,7 @@ mAP
 
   提取码：lgj5
   
-  训练指令
+训练指令
 
 ```bash
 python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.weights --cfg cfg/yolov3-onDIOR.cfg --img-size 608 --epochs 200
@@ -92,7 +92,7 @@ python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.w
 
   提取码：smvj
   
-  训练指令
+训练指令
 
 ```bash
 python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 200
@@ -106,13 +106,13 @@ python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov
 
   提取码：11og
   
-  训练指令
+训练指令
 
 ```bash
 python train.py --data cfg/visdrone.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3-visdrone.cfg  --img-size 608 --epochs 200 
 ```
   
-  mobilenetv3训练指令(from scratch)
+mobilenetv3训练指令(from scratch)
 
 ```bash
 python train.py --data cfg/visdrone.data --batch_size 20 --weights None --cfg cfg/yolov3-mobilenet-visdrone.cfg --img_size 608 --epochs 200

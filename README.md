@@ -6,7 +6,7 @@
 
 2、提供包括剪植，量化，知识蒸馏的主流模型压缩算法实现。
 
-3、提供多backbone训练目前包括Darknet-YOLOv3，Tiny-YOLOv3，Mobilenetv3-YOLOv3
+3、提供多backbone训练目前包括Darknet-YOLOv3，Tiny-YOLOv3，Mobilenetv3-YOLOv3。
 
 其中：
 

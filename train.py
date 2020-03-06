@@ -200,7 +200,7 @@ def train():
     # Initialize distributed training
     if torch.cuda.device_count() > 1:
         dist.init_process_group(backend='nccl',  # 'distributed backend'
-                                init_method='tcp://127.0.0.1:9999',  # distributed training init method
+                                init_method='tcp://127.0.0.1:8888',  # distributed training init method
                                 world_size=1,  # number of nodes for distributed training
                                 rank=0)  # distributed training node rank
         model = torch.nn.parallel.DistributedDataParallel(model)
@@ -332,9 +332,12 @@ def train():
                         output_t = t_model(imgs)
                 else:
                     _, output_t = t_model(imgs)
-                soft_target = compute_lost_KD(pred, output_t, model.nc, imgs.size(0))
-                # 这里把蒸馏策略改为了二，想换回一的可以注释掉loss2，把loss1取消注释
-                # soft_target, reg_ratio = distillation_loss2(model, targets, pred, output_t)
+                if opt.KDstr == 1:
+                    soft_target = compute_lost_KD(pred, output_t, model.nc, imgs.size(0))
+                elif opt.KDstr == 2:
+                    soft_target, reg_ratio = compute_lost_KD2(model, targets, pred, output_t)
+                else:
+                    print("please select KD strategy!")
                 loss += soft_target
             # Scale loss by nominal batch_size of 64
             loss *= batch_size / 64
@@ -482,6 +485,7 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str, default='weights/yolov3.weights',
                         help='initial weights')  # i.e. weights/darknet.53.conv.74
     parser.add_argument('--t_weights', type=str, default='', help='teacher model weights')
+    parser.add_argument('--KDstr', type=int, default=-1, help='KD strategy')
     parser.add_argument('--arc', type=str, default='default', help='yolo architecture')  # defaultpw, uCE, uBCE
     parser.add_argument('--prebias', action='store_true', help='transfer-learn yolo biases prior to training')
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')

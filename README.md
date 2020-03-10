@@ -228,7 +228,7 @@ XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
 ### stage-wise 训练策略
 `--qlayers`可以用于选取Darknet中的量化区间，默认为自深层到浅层, 默认值为-1表示无量化层，有效范围为0-74，取0时表示量化所有层，取74时表示无量化层，大于74则无意义。
 
-![Darknet](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/Darknet.png)
+![Darknet](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/Darknet-YOLOv3.jpg)
 如：
 
 `--qlayers 63` 表示量化Darknet主体网络中最后四个重复的残差块。

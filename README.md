@@ -90,9 +90,9 @@ python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.w
   
   提取码：8duw
   
-- [bdd100k权重文件](https://pan.baidu.com/s/18lZ2laOLNKCBBLsB-8gQ2Q)
+- [bdd100k权重文件](https://pan.baidu.com/s/1E8aDznODhmH4DwPpV_Gbpg)
 
-  提取码：smvj
+  提取码：q076
   
 训练指令
 
@@ -104,9 +104,9 @@ python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov
   
   提取码：dy4c
   
-- [visdrone权重文件](https://pan.baidu.com/s/185SSIWwhqj2tg5pRbh-hdA)
+- [visdrone权重文件](https://pan.baidu.com/s/1Sf20FGAa-vLF8CCLpKSIug)
 
-  提取码：11og
+  提取码：ynuf
   
 训练指令
 

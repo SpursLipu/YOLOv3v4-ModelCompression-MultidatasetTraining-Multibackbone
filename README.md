@@ -82,7 +82,7 @@
 训练指令
 
 ```bash
-python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.weights --cfg cfg/yolov3-onDIOR.cfg --img-size 608 --epochs 200
+python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-onDIOR.cfg --img-size 608 --epochs 200
 ```
 
 
@@ -97,7 +97,7 @@ python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.w
 训练指令
 
 ```bash
-python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 200
+python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-bdd100k.cfg --img-size 608 --epochs 200
 ```
 
 - [visdrone数据集](https://pan.baidu.com/s/1CPGmS3tLI7my4_m7qDhB4Q)
@@ -111,7 +111,7 @@ python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov
 训练指令
 
 ```bash
-python train.py --data cfg/visdrone.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3-visdrone.cfg  --img-size 608 --epochs 200 
+python train.py --data cfg/visdrone.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-visdrone.cfg  --img-size 608 --epochs 200 
 ```
 
 ## 1、Dior数据集
@@ -162,7 +162,7 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 1.正常训练
 
 ```bash
-python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3-hand.cfg
+python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-hand.cfg
 ```
 
 2.稀疏化训练
@@ -180,7 +180,7 @@ python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --we
 指令范例：
 
 ```bash
-python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3-hand.cfg -sr --s 0.001 --prune 0 
+python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-hand.cfg -sr --s 0.001 --prune 0 
 ```
 
 3.模型剪枝
@@ -234,7 +234,7 @@ XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
 量化指令范例：
 
 ```bash
-python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/best.pt --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 200 --quantized 1 --qlayers 72
+python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/best.pt --cfg cfg/yolov3/yolov3-bdd100k.cfg --img-size 608 --epochs 200 --quantized 1 --qlayers 72
 ```
 
 ## 3、知识蒸馏
@@ -256,7 +256,7 @@ Distilling the Knowledge in a Neural Network
 蒸馏指令范例：
 
 ```bash
-python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/last.pt --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 150 --quantized 1 --qlayers 72 --t_cfg cfg/yolov3-bdd100k.cfg --t_weights weights/BDDbest.pt
+python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/last.pt --cfg cfg/yolov3/yolov3-bdd100k.cfg --img-size 608 --epochs 150 --quantized 1 --qlayers 72 --t_cfg cfg/yolov3/yolov3-bdd100k.cfg --t_weights weights/BDDbest.pt
 ```
 
 该指令将量化与蒸馏相结合，通过未量化的教师网络提升量化的学生网络，提高学生网络的mAP。

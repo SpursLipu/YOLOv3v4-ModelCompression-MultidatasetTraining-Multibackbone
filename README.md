@@ -58,12 +58,12 @@
 
 `python3 detect.py --data ... --cfg ... --source ...`为推理检测指令，source默认地址为data/samples,输出结果保存在output文件中，检测资源可以为图片，视频等。
 
-# 多数据集训练
+# 一、多数据集训练
 本项目提供针对YOLOv3仓库的预处理数据集，配置文件(.cfg)，数据集索引文件(.data)，数据集类别文件(.names)以及使用k-means算法重新聚类的anchor box尺寸(包含用于yolov3的9框和tiny-yolov3的6框)。
 
 mAP
 
-|<center>数据集</center>|<center>mAP</center>|
+|<center>数据集</center>|<center>mAP(Darknet53-YOLOv3)</center>|
 | --- |--- |
 |<center>Dior遥感数据集</center>|<center>0.56</center>|
 |<center>bdd100k自动驾驶数据集</center>|<center>0.38</center>|
@@ -113,14 +113,8 @@ python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov
 ```bash
 python train.py --data cfg/visdrone.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3-visdrone.cfg  --img-size 608 --epochs 200 
 ```
-  
-mobilenetv3训练指令(from scratch)
 
-```bash
-python train.py --data cfg/visdrone.data --batch_size 20 --weights None --cfg cfg/yolov3-mobilenet-visdrone.cfg --img_size 608 --epochs 200
-```
-
-## Dior数据集
+## 1、Dior数据集
 DIRO数据集是地球观测社区中最大、最多样化和公开可用的目标检测数据集之一。其中船舶和车辆的实例数较高，在小型实例和大型实例之间实现了良好的平衡。图片采集自Google Earth。
 
 [数据集详细介绍](https://cloud.tencent.com/developer/article/1509762)
@@ -129,7 +123,7 @@ DIRO数据集是地球观测社区中最大、最多样化和公开可用的目�
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/2.jpg)
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/3.jpg)
 
-## bdd100k数据集
+## 2、bdd100k数据集
 bdd100是一个大规模、多样化的驾驶视频数据集，共包含十万个视频。每个视频大约40秒长，研究者为所有10万个关键帧中常出现在道路上的对象标记了边界框。数据集涵盖了不同的天气条件，包括晴天、阴天和雨天、以及白天和晚上的不同时间。
 
 [官网](http://bair.berkeley.edu/blog/2018/05/30/bdd/)
@@ -141,7 +135,7 @@ bdd100是一个大规模、多样化的驾驶视频数据集，共包含十万�
 ### 检测效果
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/1.jpg)
 
-## Visdrone数据集
+## 3、Visdrone数据集
 VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室的AISKYEYE团队收集。基准数据集包含288个视频片段，由261,908个帧和10,209个帧组成静态图像，由各种安装在无人机上的摄像头捕获，涵盖了广泛的方面，包括位置（从中国相距数千公里的14个不同城市中拍摄），环境（城市和乡村），物体（行人，车辆，自行车等）和密度（稀疏和拥挤的场景）。该数据集是在各种情况下以及在各种天气和光照条件下使用各种无人机平台（即具有不同模型的无人机）收集的。这些框架使用超过260 万个边界框手动标注，这些边界框是人们经常感兴趣的目标，例如行人，汽车，自行车和三轮车。还提供了一些重要属性，包括场景可见性，对象类别和遮挡，以提高数据利用率.
 
 [官网](http://www.aiskyeye.com/)
@@ -150,9 +144,9 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/4.jpg)
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/5.jpg)
 
-# 模型压缩
+# 二、模型压缩
 
-## 剪植
+## 1、剪植
 
 ### 剪植特点
 |剪枝方案 |<center>优点</center>|<center>缺点</center> |
@@ -210,7 +204,7 @@ python3 prune_tiny_yolo.py
 需要注意的是，这里需要在.py文件内，将opt内的cfg和weights变量指向第2步稀疏化后生成的cfg文件和weights文件。
 此外，可通过增大代码中percent的值来获得更大的压缩率。（若稀疏化不到位，且percent值过大，程序会报错。）
 
-## 量化
+## 2、量化
 
 ### 量化方法
 `--quantized` 表示选取量化方法，默认值为-1，表示不采用任何量化方法。
@@ -243,7 +237,7 @@ XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
 python train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/best.pt --cfg cfg/yolov3-bdd100k.cfg --img-size 608 --epochs 200 --quantized 1 --qlayers 72
 ```
 
-## 知识蒸馏
+## 3、知识蒸馏
 
 ### 蒸馏方法
 蒸馏方法采用基于Hinton于2015年提出的基本蒸馏方法，并结合检测网络做了部分改进。

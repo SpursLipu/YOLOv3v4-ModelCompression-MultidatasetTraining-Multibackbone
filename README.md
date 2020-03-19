@@ -71,6 +71,21 @@
 
 下载地址如下，下载并解压后将文件夹拷贝至data目录下即可使用。
 
+- [COCO2017](https://pan.baidu.com/s/1UXKs7ilSQi_P6ijiLgKTUg)
+  
+  提取码：4f06
+
+- [COCO权重文件](https://pan.baidu.com/s/1ganh_WTA8sFsqg__3YGQag)
+
+  提取码：ebwo
+  
+训练指令
+
+```bash
+python3 train.py --data cfg/coco2017.data --batch-size 30 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3.cfg --img-size 608 --epochs 200
+```
+
+
 - [Dior遥感数据集](https://pan.baidu.com/s/1z0IQPBN16I-EctjwN9Idyg)
   
   提取码：vnuq

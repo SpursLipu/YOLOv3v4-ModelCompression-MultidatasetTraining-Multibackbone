@@ -67,7 +67,7 @@
 | --- |--- |
 |<center>Dior遥感数据集</center>|<center>0.56</center>|
 |<center>bdd100k自动驾驶数据集</center>|<center>0.38</center>|
-|<center>visdrone无人机航拍数据集</center>|<center>0.27</center>|
+|<center>visdrone无人机航拍数据集</center>|<center>0.286</center>|
 
 下载地址如下，下载并解压后将文件夹拷贝至data目录下即可使用。
 

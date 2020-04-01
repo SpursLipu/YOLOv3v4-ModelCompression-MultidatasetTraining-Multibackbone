@@ -1,0 +1,6 @@
+classes= 2
+train  = data/screw/train.txt
+valid  = data/screw/valid.txt
+names = data/screw.names
+backup = backup
+

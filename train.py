@@ -374,6 +374,7 @@ def train():
         scheduler.step()
 
         # Process epoch results
+        # final_epoch是一个bool值，用于判断epoch+1是否等于epochs
         final_epoch = epoch + 1 == epochs
         if opt.prebias:
             print_model_biases(model)

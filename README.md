@@ -61,7 +61,7 @@
 # 一、多数据集训练
 本项目提供针对YOLOv3仓库的预处理数据集，配置文件(.cfg)，数据集索引文件(.data)，数据集类别文件(.names)以及使用k-means算法重新聚类的anchor box尺寸(包含用于yolov3的9框和tiny-yolov3的6框)。
 
-基于Darknet-53的YOLOv3baseline网络mAP
+基于Darknet-53的YOLOv3-608网络mAP
 
 |<center>数据集</center>|<center>mAP</center>|
 | --- |--- |
@@ -75,14 +75,14 @@
   
   提取码：4f06
 
-- [COCO权重文件](https://pan.baidu.com/s/1ganh_WTA8sFsqg__3YGQag)
+- [COCO权重文件](https://pan.baidu.com/s/1JZylwRQIgAd389oWUu0djg)
 
-  提取码：ebwo
+  提取码：k8ms
   
 训练指令
 
 ```bash
-python3 train.py --data cfg/coco2017.data --batch-size 30 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3.cfg --img-size 608 --epochs 200
+python3 train.py --data cfg/coco2017.data --batch-size 30 --weights weights/yolov3-608.weights --cfg cfg/yolov3/yolov3.cfg --img-size 608 --epochs 200
 ```
 
 
@@ -159,7 +159,18 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/4.jpg)
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/5.jpg)
 
-# 二、模型压缩
+# 二、多种网络结构
+在mobilenetv3基础上设计了一下三种网络结构
+
+|结构名称 |<center>backbone参数量</center>|<center>后处理参数量</center> |<center>总参数量</center> |<center>coco2017mAP</center> |
+| --- | --- | --- | --- | --- |
+|YOLOv3 |38.74M  |20.39M  |59.13M  |0.695  |
+|YOLOv3tiny |6.00M  |2.45M  |8.45M  |  |
+|YOLOv3-mobilenet |2.84M  |  |  |  |
+|YOLOv3tiny-mobilenet |2.84M  |  |  |  |
+|YOLOv3tiny-mobilenet-small |0.92M  |2.00M  |2.92M  |0.332  |
+
+# 三、模型压缩
 
 ## 1、剪植
 

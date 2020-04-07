@@ -136,7 +136,7 @@ def train():
 
         elif len(weights) > 0:  # darknet format
             # possible weights are 'yolov3.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-            cutoff = load_darknet_weights(model, weights)
+            cutoff = load_darknet_weights(model, weights, pt=opt.pt)
     else:
         cutoff = 64
 
@@ -216,9 +216,6 @@ def train():
         elif opt.prune == 0:
             print('normal sparse training ')
             _, _, prune_idx = parse_module_defs(model.module.module_defs)
-        elif opt.prune == 2:
-            print('tiny yolo normal sparse traing')
-            _, _, prune_idx = parse_module_defs3(model.module.module_defs)
 
     else:
         print('single-gpu sparse')
@@ -228,9 +225,6 @@ def train():
         elif opt.prune == 0:
             print('normal sparse training')
             _, _, prune_idx = parse_module_defs(model.module_defs)
-        elif opt.prune == 2:
-            print('tiny yolo normal sparse traing')
-            _, _, prune_idx = parse_module_defs3(model.module_defs)
 
     # Dataset
     dataset = LoadImagesAndLabels(train_path,
@@ -495,6 +489,8 @@ if __name__ == '__main__':
     parser.add_argument('--var', type=float, help='debug variable')
     parser.add_argument('--sparsity-regularization', '-sr', dest='sr', action='store_true',
                         help='train with channel sparsity regularization')
+    parser.add_argument('--pretrain', '-pt', dest='pt', action='store_true',
+                        help='use pretrain model')
     parser.add_argument('--s', type=float, default=0.001, help='scale sparse rate')
     parser.add_argument('--prune', type=int, default=-1,
                         help='0:nomal prune or regular prune 1:shortcut prune 2:tiny prune')
@@ -559,7 +555,6 @@ if __name__ == '__main__':
             # Train mutation
             prebias()
             results = train()
-
             # Write mutation results
             print_mutation(hyp, results, opt.bucket)
 

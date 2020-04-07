@@ -18,6 +18,9 @@
  2020年1月19日 提供Dior，Bdd100k，visdrone训练完成，并完成转化的.weights文件。
  
  2020年3月1日 实现基于mobilenetv3 backbone的YOLOv3。
+ 
+ 2020年4月7日 实现基于mobilenetv3的两种backbone模型，YOLOv3-mobilenet和YOLOv3tiny-mobilene-small
+ ，提供预训练模型，将正常剪植算法扩展到基于mobilenet的两个模型和YOLOv3tiny模型，删除tiny剪植。
 
 
 # 环境部署
@@ -34,17 +37,21 @@
 
 |<center>功能</center>|<center></center>|
 | --- |--- |
+|<center>训练</center>|
 |<center>正常训练</center>|<center>√</center>|
 |<center>tiny训练</center>|<center>√</center>|
 |<center>mobilenetv3训练</center>|<center>√</center>|
+|<center>mobilenetv3-small训练</center>|<center>√</center>|
+|<center>多数据集</center>|
 |<center>Dior数据集训练</center>|<center>√</center>|
 |<center>bdd100k数据集训练</center>|<center>√</center>|
 |<center>visdrone数据集训练</center>|<center>√</center>|
+|<center>剪植</center>|
 |<center>稀疏化训练</center>|<center>√</center>  |
 |<center>正常剪枝</center>|<center>√</center>|
 |<center>规整剪枝</center>|<center>√</center>  |
 |<center>极限剪枝(shortcut)</center>|<center>√</center> |
-|<center>Tiny剪枝</center>|<center>√</center>  |
+|<center>量化</center>|
 |<center>BNN量化</center>|<center>√</center>  |
 |<center>BWN量化</center>|<center>√</center>  |
 |<center>stage-wise 逐层量化</center>|<center>√</center>  |
@@ -52,7 +59,7 @@
 
 # 可用指令
 
-`python3 train.py --data ... --cfg ... `为训练模型指令。
+`python3 train.py --data ... --cfg ... `为训练模型指令，使用coco预训练模型时需要-pt指令。
 
 `python3 test.py --data ... --cfg ... ` 为mAP测试指令。
 
@@ -82,7 +89,7 @@
 训练指令
 
 ```bash
-python3 train.py --data cfg/coco2017.data --batch-size 30 --weights weights/yolov3-608.weights --cfg cfg/yolov3/yolov3.cfg --img-size 608 --epochs 200
+python3 train.py --data cfg/coco2017.data --batch-size 30 --weights weights/yolov3-608.weights -pt --cfg cfg/yolov3/yolov3.cfg --img-size 608 --epochs 200
 ```
 
 
@@ -97,7 +104,7 @@ python3 train.py --data cfg/coco2017.data --batch-size 30 --weights weights/yolo
 训练指令
 
 ```bash
-python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-onDIOR.cfg --img-size 608 --epochs 200
+python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3-608.weights -pt --cfg cfg/yolov3/yolov3-onDIOR.cfg --img-size 608 --epochs 200
 ```
 
 
@@ -112,7 +119,7 @@ python3 train.py --data cfg/dior.data --batch-size 30 --weights weights/yolov3.w
 训练指令
 
 ```bash
-python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-bdd100k.cfg --img-size 608 --epochs 200
+python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov3-608.weights -pt --cfg cfg/yolov3/yolov3-bdd100k.cfg --img-size 608 --epochs 200
 ```
 
 - [visdrone数据集](https://pan.baidu.com/s/1CPGmS3tLI7my4_m7qDhB4Q)
@@ -126,7 +133,7 @@ python3 train.py --data cfg/bdd100k.data --batch-size 20 --weights weights/yolov
 训练指令
 
 ```bash
-python train.py --data cfg/visdrone.data --batch-size 20 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-visdrone.cfg  --img-size 608 --epochs 200 
+python train.py --data cfg/visdrone.data --batch-size 20 --weights weights/yolov3-608.weights -pt --cfg cfg/yolov3/yolov3-visdrone.cfg  --img-size 608 --epochs 200 
 ```
 
 ## 1、Dior数据集
@@ -165,10 +172,38 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 |结构名称 |<center>backbone参数量</center>|<center>后处理参数量</center> |<center>总参数量</center> |<center>coco2017mAP</center> |
 | --- | --- | --- | --- | --- |
 |YOLOv3 |38.74M  |20.39M  |59.13M  |0.695  |
-|YOLOv3tiny |6.00M  |2.45M  |8.45M  |  |
-|YOLOv3-mobilenet |2.84M  |  |  |  |
-|YOLOv3tiny-mobilenet |2.84M  |  |  |  |
+|YOLOv3tiny |6.00M  |2.45M  |8.45M  |0.301  |
+|YOLOv3-mobilenet |2.84M  |20.25M  |23.09M  |  |
 |YOLOv3tiny-mobilenet-small |0.92M  |2.00M  |2.92M  |0.332  |
+
+## 训练指令
+1、YOLOv3
+```bash
+python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3-608.weights --cfg cfg/yolov3/yolov3-hand.cfg --img_size 608
+```
+
+权重文件下载
+- [COCO预训练权重文件](https://pan.baidu.com/s/1JZylwRQIgAd389oWUu0djg)
+
+  提取码：k8ms
+
+2、YOLOv3tiny
+```bash
+python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3tiny.weights --cfg cfg/yolov3/yolov3-hand.cfg --img_size 608
+```
+
+- [COCO预训练权重文件](https://pan.baidu.com/s/1iWGxdjR3TWxEe37__msyRA)
+
+  提取码：udfe
+  
+3、YOLOv3tiny-mobilenet-small
+```bash
+python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3tiny-mobilenet-small.weights --cfg cfg/yolov3/yolov3tiny-mobilenet-small/yolov3tiny-mobilenet-small-hand.cfg --img_size 608
+```
+
+- [COCO预训练权重文件](https://pan.baidu.com/s/1vWRcn5A95PoYhBtB2rWH8A)
+
+  提取码：yixp
 
 # 三、模型压缩
 
@@ -180,7 +215,6 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 |正常剪枝 |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
 |极限剪枝 |极高的压缩率。  |需要微调。  |
 |规整剪枝 |专为硬件部署设计，剪枝后filter个数均为8的倍数，无需微调。 | 为规整牺牲了部分压缩率。 |
-|Tiny剪枝 |稳定的压缩率。  |由于Tiny本来已很小，压缩率中规中矩。  |
 
 
 ### 步骤
@@ -200,8 +234,6 @@ python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --we
 `--prune 0`为正常剪枝和规整剪枝的稀疏化
 
 `--prune 1`为极限剪枝的稀疏化
-
-`--prune 2`为Tiny剪枝的稀疏化
 
 指令范例：
 
@@ -223,10 +255,7 @@ python3 regular_prune.py
 ```bash
 python3 shortcut_prune.py
 ```
-- Tiny剪枝
-```bash
-python3 prune_tiny_yolo.py
-```
+
 需要注意的是，这里需要在.py文件内，将opt内的cfg和weights变量指向第2步稀疏化后生成的cfg文件和weights文件。
 此外，可通过增大代码中percent的值来获得更大的压缩率。（若稀疏化不到位，且percent值过大，程序会报错。）
 

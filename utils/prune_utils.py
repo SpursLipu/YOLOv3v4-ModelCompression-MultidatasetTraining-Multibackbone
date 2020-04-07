@@ -10,25 +10,6 @@ def get_sr_flag(epoch, sr):
     return sr
 
 
-def parse_module_defs3(module_defs):
-    CBL_idx = []
-    Conv_idx = []
-    for i, module_def in enumerate(module_defs):
-        if module_def['type'] == 'convolutional':
-            if module_def['batch_normalize'] == '1':
-                CBL_idx.append(i)
-            else:
-                Conv_idx.append(i)
-
-    ignore_idx = set()
-
-    ignore_idx.add(18)
-
-    prune_idx = [idx for idx in CBL_idx if idx not in ignore_idx]
-
-    return CBL_idx, Conv_idx, prune_idx
-
-
 def parse_module_defs2(module_defs):
     CBL_idx = []
     Conv_idx = []
@@ -56,9 +37,9 @@ def parse_module_defs2(module_defs):
                 shortcut_idx[i - 1] = identity_idx - 1
                 shortcut_all.add(identity_idx - 1)
             shortcut_all.add(i - 1)
-    # 上采样层前的卷积层不裁剪
-    ignore_idx.add(84)
-    ignore_idx.add(96)
+        # 上采样层前的卷积层不裁剪
+        if module_def['type'] == 'upsample':
+            ignore_idx.add(i - 1)
 
     prune_idx = [idx for idx in CBL_idx if idx not in ignore_idx]
 
@@ -67,15 +48,18 @@ def parse_module_defs2(module_defs):
 
 def parse_module_defs(module_defs):
     CBL_idx = []
-    Conv_idx = []
+    Other_idx = []
     for i, module_def in enumerate(module_defs):
         if module_def['type'] == 'convolutional':
             if module_def['batch_normalize'] == '1':
                 CBL_idx.append(i)
             else:
-                Conv_idx.append(i)
+                Other_idx.append(i)
+        elif module_def['type'] == 'depthwise' or module_def['type'] == 'se':
+            Other_idx.append(i)
     ignore_idx = set()
     for i, module_def in enumerate(module_defs):
+        # 跳连层的前一层不剪,跳连层的来源层不剪
         if module_def['type'] == 'shortcut':
             ignore_idx.add(i - 1)
             identity_idx = (i + int(module_def['from']))
@@ -83,13 +67,16 @@ def parse_module_defs(module_defs):
                 ignore_idx.add(identity_idx)
             elif module_defs[identity_idx]['type'] == 'shortcut':
                 ignore_idx.add(identity_idx - 1)
-    # 上采样层前的卷积层不裁剪
-    ignore_idx.add(84)
-    ignore_idx.add(96)
+        # 深度可分离卷积层的其前一层不剪
+        if module_def['type'] == 'depthwise':
+            ignore_idx.add(i - 1)
+        # 上采样层前的卷积层不裁剪
+        if module_def['type'] == 'upsample':
+            ignore_idx.add(i - 1)
 
     prune_idx = [idx for idx in CBL_idx if idx not in ignore_idx]
 
-    return CBL_idx, Conv_idx, prune_idx
+    return CBL_idx, Other_idx, prune_idx
 
 
 def gather_bn_weights(module_list, prune_idx):
@@ -146,6 +133,14 @@ def get_input_mask(module_defs, idx, CBLidx2mask):
 
     if module_defs[idx - 1]['type'] == 'convolutional':
         return CBLidx2mask[idx - 1]
+    # for tiny
+    elif module_defs[idx - 1]['type'] == 'maxpool':
+        return CBLidx2mask[idx - 2]
+    # for mobilenet
+    elif module_defs[idx - 1]['type'] == 'se':
+        return CBLidx2mask[idx - 3]
+    elif module_defs[idx - 1]['type'] == 'depthwise':
+        return CBLidx2mask[idx - 2]
     elif module_defs[idx - 1]['type'] == 'shortcut':
         return CBLidx2mask[idx - 2]
     elif module_defs[idx - 1]['type'] == 'route':
@@ -158,13 +153,17 @@ def get_input_mask(module_defs, idx, CBLidx2mask):
         if len(route_in_idxs) == 1:
             return CBLidx2mask[route_in_idxs[0]]
         elif len(route_in_idxs) == 2:
-            return np.concatenate([CBLidx2mask[in_idx - 1] for in_idx in route_in_idxs])
+            # tiny剪植时使用
+            if module_defs[route_in_idxs[1] - 1]['type'] == 'maxpool':
+                return np.concatenate([CBLidx2mask[route_in_idxs[0] - 1], CBLidx2mask[route_in_idxs[1]]])
+            else:
+                return np.concatenate([CBLidx2mask[in_idx - 1] for in_idx in route_in_idxs])
         else:
             print("Something wrong with route module!")
             raise Exception
 
 
-def init_weights_from_loose_model(compact_model, loose_model, CBL_idx, Conv_idx, CBLidx2mask):
+def init_weights_from_loose_model(compact_model, loose_model, CBL_idx, Other_idx, CBLidx2mask):
     for idx in CBL_idx:
         compact_CBL = compact_model.module_list[idx]
         loose_CBL = loose_model.module_list[idx]
@@ -182,18 +181,45 @@ def init_weights_from_loose_model(compact_model, loose_model, CBL_idx, Conv_idx,
         tmp = loose_conv.weight.data[:, in_channel_idx, :, :].clone()
         compact_conv.weight.data = tmp[out_channel_idx, :, :, :].clone()
 
-    for idx in Conv_idx:
+    for idx in Other_idx:
         compact_conv = compact_model.module_list[idx][0]
         loose_conv = loose_model.module_list[idx][0]
 
         input_mask = get_input_mask(loose_model.module_defs, idx, CBLidx2mask)
         in_channel_idx = np.argwhere(input_mask)[:, 0].tolist()
-        compact_conv.weight.data = loose_conv.weight.data[:, in_channel_idx, :, :].clone()
-        compact_conv.bias.data = loose_conv.bias.data.clone()
+        # 拷贝非剪植层的时候包括三种情况
+        # 情况1：卷积层，需要拷贝bias
+        # 情况2：se层，需要分别拷贝fc1和fc2
+        # 情况3：depthwise层，直接拷贝卷积
+        if loose_model.module_defs[idx]['type'] == 'convolutional':
+            compact_conv.weight.data = loose_conv.weight.data[:, in_channel_idx, :, :].clone()
+            compact_conv.bias.data = loose_conv.bias.data.clone()
+        elif loose_model.module_defs[idx]['type'] == 'se':
+            compact_fc1 = compact_conv.fc[0]
+            loose_fc1 = loose_conv.fc[0]
+            compact_fc1.weight.data = loose_fc1.weight.data.clone()
+            compact_fc2 = compact_conv.fc[2]
+            loose_fc2 = loose_conv.fc[2]
+            compact_fc2.weight.data = loose_fc2.weight.data.clone()
+        else:
+            compact_conv.weight.data = loose_conv.weight.data.clone()
 
 
 def prune_model_keep_size(model, prune_idx, CBL_idx, CBLidx2mask):
     pruned_model = deepcopy(model)
+    maxpool = set()
+    upsample = set()
+    module_defs = model.module_defs
+
+    # 生成upsample集合
+    for i, module_def in enumerate(module_defs):
+        if module_def['type'] == 'upsample':
+            upsample.add(i - 6)
+    # 生成下一层为maxpool的卷积集合
+    for i, module_def in enumerate(module_defs):
+        if module_def['type'] == 'maxpool':
+            maxpool.add(i - 1)
+
     for idx in prune_idx:
         mask = torch.from_numpy(CBLidx2mask[idx]).cuda()
         bn_module = pruned_model.module_list[idx][1]
@@ -201,13 +227,19 @@ def prune_model_keep_size(model, prune_idx, CBL_idx, CBLidx2mask):
         bn_module.weight.data.mul_(mask)
 
         activation = F.leaky_relu((1 - mask) * bn_module.bias.data, 0.1)
-
+        if idx in maxpool:
+            next_idx_list = [idx + 2]
+        else:
+            next_idx_list = [idx + 1]
         # 两个上采样层前的卷积层
-        next_idx_list = [idx + 1]
-        if idx == 79:
-            next_idx_list.append(84)
-        elif idx == 91:
-            next_idx_list.append(96)
+        # if idx == 79:
+        #     next_idx_list.append(84)
+        # elif idx == 91:
+        #     next_idx_list.append(96)
+
+        # 更通用的方法
+        if idx in upsample:
+            next_idx_list.append(idx + 5)
 
         for next_idx in next_idx_list:
             next_conv = pruned_model.module_list[next_idx][0]

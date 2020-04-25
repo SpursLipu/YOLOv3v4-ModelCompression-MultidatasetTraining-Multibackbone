@@ -167,19 +167,19 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/5.jpg)
 
 # 二、多种网络结构
-在mobilenetv3基础上设计了一下三种网络结构
+在mobilenetv3基础上设计了两种网络结构
 
 |结构名称 |<center>backbone参数量</center>|<center>后处理参数量</center> |<center>总参数量</center> |<center>coco2017mAP</center> |
 | --- | --- | --- | --- | --- |
-|YOLOv3 |38.74M  |20.39M  |59.13M  |0.695  |
-|YOLOv3tiny |6.00M  |2.45M  |8.45M  |0.301  |
-|YOLOv3-mobilenet |2.84M  |20.25M  |23.09M  |  |
+|YOLOv3 |38.74M  |20.39M  |59.13M  |0.582  |
+|YOLOv3tiny |6.00M  |2.45M  |8.45M  |0.326  |
+|YOLOv3-mobilenet |2.84M  |20.25M  |23.09M  |0.448  |
 |YOLOv3tiny-mobilenet-small |0.92M  |2.00M  |2.92M  |0.332  |
 
 ## 训练指令
 1、YOLOv3
 ```bash
-python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3-608.weights --cfg cfg/yolov3/yolov3-hand.cfg --img_size 608
+python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3-608.weights --cfg cfg/yolov3/yolov3.cfg --img_size 608
 ```
 
 权重文件下载
@@ -189,7 +189,7 @@ python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 -pt 
 
 2、YOLOv3tiny
 ```bash
-python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3tiny.weights --cfg cfg/yolov3/yolov3-hand.cfg --img_size 608
+python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3tiny.weights --cfg cfg/yolov3tiny/yolov3-tiny.cfg --img_size 608
 ```
 
 - [COCO预训练权重文件](https://pan.baidu.com/s/1iWGxdjR3TWxEe37__msyRA)
@@ -198,12 +198,21 @@ python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 -pt 
   
 3、YOLOv3tiny-mobilenet-small
 ```bash
-python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3tiny-mobilenet-small.weights --cfg cfg/yolov3/yolov3tiny-mobilenet-small/yolov3tiny-mobilenet-small-hand.cfg --img_size 608
+python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3tiny-mobilenet-small.weights --cfg cfg/yolov3tiny-mobilenet-small/yolov3tiny-mobilenet-small-coco.cfg --img_size 608
 ```
 
 - [COCO预训练权重文件](https://pan.baidu.com/s/1vWRcn5A95PoYhBtB2rWH8A)
 
   提取码：yixp
+
+4、YOLOv3-mobilenet
+```bash
+python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3-mobilenet.weights --cfg cfg/yolov3tiny-mobilenet/yolov3tiny-mobilenet-small-coco.cfg --img_size 608
+```
+
+- [COCO预训练权重文件](https://pan.baidu.com/s/1hR2SYvb5mjh_ysepCtFnmw)
+
+  提取码：iayy
 
 # 三、模型压缩
 
@@ -222,7 +231,7 @@ python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 -pt 
 1.正常训练
 
 ```bash
-python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-hand.cfg
+python3 train.py --data data/oxfordhand.data -pt --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-hand.cfg
 ```
 
 2.稀疏化训练
@@ -238,7 +247,7 @@ python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --we
 指令范例：
 
 ```bash
-python3 train.py --data data/oxfordhand.data --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-hand.cfg -sr --s 0.001 --prune 0 
+python3 train.py --data data/oxfordhand.data -pt --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-hand.cfg -sr --s 0.001 --prune 0 
 ```
 
 3.模型剪枝

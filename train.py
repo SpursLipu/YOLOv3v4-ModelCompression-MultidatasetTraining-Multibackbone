@@ -213,6 +213,9 @@ def train():
         if opt.prune == 1:
             print('shortcut sparse training')
             _, _, prune_idx, _, _ = parse_module_defs2(model.module.module_defs)
+        elif opt.prune == 2:
+            print('layer sparse training')
+            _, _, prune_idx = parse_module_defs4(model.module.module_defs)
         elif opt.prune == 0:
             print('normal sparse training ')
             _, _, prune_idx = parse_module_defs(model.module.module_defs)
@@ -222,6 +225,9 @@ def train():
         if opt.prune == 1:
             print('shortcut sparse training')
             _, _, prune_idx, _, _ = parse_module_defs2(model.module_defs)
+        elif opt.prune == 2:
+            print('layer sparse training')
+            _, _, prune_idx = parse_module_defs4(model.module_defs)
         elif opt.prune == 0:
             print('normal sparse training')
             _, _, prune_idx = parse_module_defs(model.module_defs)
@@ -348,7 +354,8 @@ def train():
                 if opt.prune != -1:
                     BNOptimizer.updateBN(sr_flag, model.module.module_list, opt.s, prune_idx)
             else:
-                BNOptimizer.updateBN(sr_flag, model.module_list, opt.s, prune_idx)
+                if opt.prune != -1:
+                    BNOptimizer.updateBN(sr_flag, model.module_list, opt.s, prune_idx)
 
             # Accumulate gradient for x batches before optimizing
             if ni % accumulate == 0:

@@ -7,10 +7,12 @@ from utils.utils import *
 from utils.quantized import *
 import copy
 import os
+import numpy
 
 ONNX_EXPORT = False
 
 
+# 生成模型函数
 def create_modules(module_defs, img_size, arc, quantized, qlayers):
     # Constructs module list of layer blocks from module configuration in module_defs
 
@@ -310,6 +312,7 @@ class YOLOLayer(nn.Module):
             return io.view(bs, -1, 5 + self.nc), p
 
 
+# 模型文件
 class Darknet(nn.Module):
     # YOLO object detection model
 
@@ -334,10 +337,32 @@ class Darknet(nn.Module):
         img_size = x.shape[-2:]
         layer_outputs = []
         output = []
-
+        # beta_list = []
+        # gamma_list = []
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
             if mtype in ['convolutional', 'depthwise', 'se', 'upsample', 'maxpool']:
+                # # 绘制gamma参数和beta参数的函数图
+                # if hasattr(module, 'BatchNorm2d'):
+                #     # 初始化GPU
+                #     device = torch_utils.select_device()
+                #     # 卷积计算
+                #     con_temp = module.Conv2d(x)
+                #     # 保存beta值
+                #     beta = module.BatchNorm2d.bias.data
+                #     # 提取bn层
+                #     bn = module.BatchNorm2d
+                #     # 使bn层参数为0
+                #     bn.bias.data = torch.zeros(size=bn.bias.data.size()).to(device)
+                #     # 计算bn层取值
+                #     bn_temp = bn(con_temp).cpu()
+                #     # 赋回值
+                #     bn.bias.data = beta
+                #
+                #     beta_mean = numpy.abs(numpy.mean(beta.cpu().numpy()))
+                #     gamma_mean = numpy.abs(numpy.mean(bn_temp.numpy()))
+                #     beta_list.append(beta_mean)
+                #     gamma_list.append(gamma_mean)
                 x = module(x)
             elif mtype == 'route':
                 layers = [int(x) for x in mdef['layers'].split(',')]
@@ -359,13 +384,16 @@ class Darknet(nn.Module):
 
         if self.training:
             return output
+            # return output, gamma_list, beta_list
         elif ONNX_EXPORT:
             output = torch.cat(output, 1)  # cat 3 layers 85 x (507, 2028, 8112) to 85 x 10647
             nc = self.module_list[self.yolo_layers[0]].nc  # number of classes
             return output[5:5 + nc].t(), output[:4].t()  # ONNX scores, boxes
+            # return output[5:5 + nc].t(), output[:4].t(), gamma_list, beta_list  # ONNX scores, boxes
         else:
             io, p = list(zip(*output))  # inference output, training output
             return torch.cat(io, 1), p
+            # return torch.cat(io, 1), p, gamma_list, beta_list
 
     def fuse(self):
         # Fuse Conv2d + BatchNorm2d layers throughout model

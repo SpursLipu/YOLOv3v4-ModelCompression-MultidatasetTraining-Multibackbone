@@ -10,15 +10,7 @@ from utils.utils import *
 from utils.prune_utils import *
 from torchsummary import summary
 import os
-
-
-class opt():
-    # model_def = "cfg/yolov3tiny-mobilenet-small/yolov3tiny-mobilenet-small-coco.cfg"
-    # data_config = "cfg/coco2017.data"
-    # model = 'weights/best.weights'
-    model_def = "cfg/yolov3tiny/yolov3-tiny-UAV.cfg"
-    data_config = "cfg/UAV_Samples_label.data"
-    model = 'weights/last.pt'
+import argparse
 
 
 # 该函数有很重要的意义：
@@ -42,7 +34,7 @@ def prune_and_eval(model, sorted_bn, percent=.0):
     remain_num = 0
     for idx in prune_idx:
         bn_module = model_copy.module_list[idx][1]
-
+        # 根据BN的阈值找到BN的mask
         mask = obtain_bn_mask(bn_module, thre)
 
         remain_num += int(mask.sum())
@@ -104,25 +96,35 @@ def obtain_avg_forward_time(input, model, repeat=200):
 
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--cfg', type=str, default='cfg/yolov3.cfg', help='cfg file path')
+    parser.add_argument('--data', type=str, default='data/coco.data', help='*.data file path')
+    parser.add_argument('--weights', type=str, default='weights/last.pt', help='sparse model weights')
+    parser.add_argument('--percent', type=float, default=0.5, help='global channel prune percent')
+    parser.add_argument('--img_size', type=int, default=608, help='inference size (pixels)')
+    opt = parser.parse_args()
+    print(opt)
+
+    percent = opt.percent
     # 指定GPU
     # torch.cuda.set_device(2)
-    percent = 0.2
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Darknet(opt.model_def).to(device)
+    model = Darknet(opt.cfg).to(device)
 
-    if opt.model:
-        if opt.model.endswith(".pt"):
-            model.load_state_dict(torch.load(opt.model, map_location=device)['model'])
+    if opt.weights:
+        if opt.weights.endswith(".pt"):
+            model.load_state_dict(torch.load(opt.weights, map_location=device)['model'])
         else:
-            _ = load_darknet_weights(model, opt.model)
+            _ = load_darknet_weights(model, opt.weights)
 
-    data_config = parse_data_cfg(opt.data_config)
+    data_config = parse_data_cfg(opt.data)
 
     valid_path = data_config["valid"]
     class_names = load_classes(data_config["names"])
     # test model
-    eval_model = lambda model: test(model=model, cfg=opt.model_def, data=opt.data_config)
+    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data)
     # 获取参数个数
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
@@ -133,17 +135,19 @@ if __name__ == '__main__':
     # CBL表示后接BN的卷积层，Other_idx表示不接BN的卷积层和其他层
     CBL_idx, Other_idx, prune_idx = parse_module_defs(model.module_defs)
 
-    # 将所有要剪枝的BN层的α参数，拷贝到bn_weights列表
+    # 将所有要剪枝的BN层的γ参数，拷贝到bn_weights列表
     bn_weights = gather_bn_weights(model.module_list, prune_idx)
 
     # torch.sort返回二维列表，第一维是排序后的值列表，第二维是排序后的值列表对应的索引
     sorted_bn = torch.sort(bn_weights)[0]
-
+    # 对BN中的γ参数排序
     # 避免剪掉所有channel的最高阈值(每个BN层的gamma的最大值的最小值即为阈值上限)
     highest_thre = []
     for idx in prune_idx:
         # .item()可以得到张量里的元素值
+        # 获取每一层中γ参数的最大值
         highest_thre.append(model.module_list[idx][1].weight.data.abs().max().item())
+    # 获取所有层中的最小值
     highest_thre = min(highest_thre)
 
     # 找到highest_thre对应的下标对应的百分比
@@ -151,19 +155,16 @@ if __name__ == '__main__':
 
     print(f'Threshold should be less than {highest_thre:.4f}.')
     print(f'The corresponding prune ratio is {percent_limit:.3f}.')
-
+    # 获得在目标百分百比下的剪植阈值
     threshold = prune_and_eval(model, sorted_bn, percent)
 
-    # ****************************************************************
-    # 虽然上面已经能看到剪枝后的效果，但是没有生成剪枝后的模型结构，因此下面的代码是为了生成新的模型结构并拷贝旧模型参数到新模型
-
-    # %%
-
+    # 获得保留的卷积核的个数和每层对应的mask
     num_filters, filters_mask = obtain_filters_mask(model, threshold, CBL_idx, prune_idx)
 
-    # CBLidx2mask存储CBL_idx中，每一层BN层对应的mask
+    # CBLidx2mask存储CBL_idx中，每一层BN层对应的mask，将需要被剪植的层和剪植后的mask结合起来
     CBLidx2mask = {idx: mask for idx, mask in zip(CBL_idx, filters_mask)}
 
+    # 返回剪植后的模型
     pruned_model = prune_model_keep_size(model, prune_idx, CBL_idx, CBLidx2mask)
 
     with torch.no_grad():
@@ -175,14 +176,13 @@ if __name__ == '__main__':
     for idx, num in zip(CBL_idx, num_filters):
         assert compact_module_defs[idx]['type'] == 'convolutional'
         compact_module_defs[idx]['filters'] = str(num)
-
+    # 生成新模型
     compact_model = Darknet([model.hyperparams.copy()] + compact_module_defs).to(device)
     compact_nparameters = obtain_num_parameters(compact_model)
-
+    # 拷贝权重
     init_weights_from_loose_model(compact_model, pruned_model, CBL_idx, Other_idx, CBLidx2mask)
-
+    # 测试运行速度
     random_input = torch.rand((16, 3, 416, 416)).to(device)
-
     pruned_forward_time, pruned_output = obtain_avg_forward_time(random_input, pruned_model)
     compact_forward_time, compact_output = obtain_avg_forward_time(random_input, compact_model)
 
@@ -200,14 +200,14 @@ if __name__ == '__main__':
     print(AsciiTable(metric_table).table)
 
     # 生成剪枝后的cfg文件并保存模型
-    pruned_cfg_name = opt.model_def.replace('/', f'/prune_{percent}_')
+    pruned_cfg_name = opt.cfg.replace('/', f'/prune_{percent}_')
     # 创建存储目录
     dir_name = pruned_cfg_name.split('/')[0] + '/' + pruned_cfg_name.split('/')[1]
     if not os.path.isdir(dir_name):
         os.makedirs(dir_name)
 
     # 由于原始的compact_module_defs将anchor从字符串变为了数组，因此这里将anchors重新变为字符串
-    file = open(opt.model_def, 'r')
+    file = open(opt.cfg, 'r')
     lines = file.read().split('\n')
     for line in lines:
         if line.split(' = ')[0] == 'anchors':

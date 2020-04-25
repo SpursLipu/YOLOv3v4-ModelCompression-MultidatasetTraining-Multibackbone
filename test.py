@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from models import *
 from utils.datasets import *
 from utils.utils import *
+import numpy
 
 
 def test(cfg,
@@ -22,6 +23,8 @@ def test(cfg,
          quantized=-1,
          qlayers=-1):
     # Initialize/load model and set device
+    beta = []
+    gamma = []
     if model is None:
         device = torch_utils.select_device(opt.device)
         verbose = True
@@ -79,7 +82,9 @@ def test(cfg,
 
         # Run model
         inf_out, train_out = model(imgs)  # inference and training outputs
-
+        # inf_out, train_out, gamma_list, beta_list = model(imgs)  # inference and training outputs
+        # beta = beta + beta_list
+        # gamma = gamma + gamma_list
         # Compute loss
         if hasattr(model, 'hyp'):  # if model has loss hyperparameters
             loss += compute_loss(train_out, targets, model)[1][:3].cpu()  # GIoU, obj, cls
@@ -194,6 +199,14 @@ def test(cfg,
             map = cocoEval.stats[1]  # update mAP to pycocotools mAP
         except:
             print('WARNING: missing dependency pycocotools from requirements.txt. Can not compute official COCO mAP.')
+    # # 绘图
+    # x = np.arange(0, 1, 0.01)
+    # y = x
+    # plt.plot(x, y)
+    # plt.xlabel('γi﹡Xi')
+    # plt.ylabel('β')
+    # plt.scatter(gamma, beta, s=5, color='red')
+    # plt.savefig('scatter.png')
 
     # Return results
     maps = np.zeros(nc) + map

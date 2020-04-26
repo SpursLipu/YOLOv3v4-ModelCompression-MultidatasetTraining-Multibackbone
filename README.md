@@ -207,7 +207,7 @@ python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --
 
 4、YOLOv3-mobilenet
 ```bash
-python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3-mobilenet.weights --cfg cfg/yolov3tiny-mobilenet/yolov3tiny-mobilenet-small-coco.cfg --img_size 608
+python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --weights weights/yolov3-mobilenet.weights --cfg cfg/yolov3-mobilenet/yolov3-mobilenet-coco.cfg --img_size 608
 ```
 
 - [COCO预训练权重文件](https://pan.baidu.com/s/1hR2SYvb5mjh_ysepCtFnmw)

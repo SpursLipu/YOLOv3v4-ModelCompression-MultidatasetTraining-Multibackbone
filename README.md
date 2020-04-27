@@ -22,6 +22,9 @@
  2020年4月7日 实现基于mobilenetv3的两种backbone模型，YOLOv3-mobilenet和YOLOv3tiny-mobilene-small
  ，提供预训练模型，将正常剪植算法扩展到基于mobilenet的两个模型和YOLOv3tiny模型，删除tiny剪植。
 
+ 2020年4月27日更新 完成了mobilenetv3的模型预训练，但是发现模型结构上有些问题需要再调整一下重新训练。
+ 添加了层剪植方法,方法来自于[tanluren/yolov3-channel-and-layer-pruning/yolov3](https://github.com/tanluren/yolov3-channel-and-layer-pruning)，
+ 感谢大佬的分享。
 
 # 环境部署
 1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建详见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里简要说明：
@@ -231,7 +234,7 @@ python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --
 1.正常训练
 
 ```bash
-python3 train.py --data data/oxfordhand.data -pt --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-hand.cfg
+python3 train.py --data ... -pt --batch-size 32 --accumulate 1 --weights ... --cfg ...
 ```
 
 2.稀疏化训练
@@ -244,26 +247,39 @@ python3 train.py --data data/oxfordhand.data -pt --batch-size 32 --accumulate 1 
 
 `--prune 1`为极限剪枝的稀疏化
 
+`--prune 2`为层剪植稀疏化
+
 指令范例：
 
 ```bash
-python3 train.py --data data/oxfordhand.data -pt --batch-size 32 --accumulate 1 --weights weights/yolov3.weights --cfg cfg/yolov3/yolov3-hand.cfg -sr --s 0.001 --prune 0 
+python3 train.py --data ... -pt --batch-size 32 --accumulate 1 --weights ... --cfg ... -sr --s 0.001 --prune 0 
 ```
 
 3.模型剪枝
 
 - 正常剪枝
 ```bash
-python3 normal_prune.py
+python3 normal_prune.py --cfg ... --data ... --weights ... --percent ...
 ```
 - 规整剪枝
 ```bash
-python3 regular_prune.py
+python3 regular_prune.py --cfg ... --data ... --weights ... --percent ...
 ```
 - 极限剪枝
 ```bash
-python3 shortcut_prune.py
+python3 shortcut_prune.py --cfg ... --data ... --weights ... --percent ...
 ```
+
+- 层剪植
+```bash
+python3 layer_prune.py --cfg ... --data ... --weights ... --shortcut ...
+```
+
+- 层剪植+通道剪植
+```bash
+python3 layer_channel_prune.py --cfg ... --data ... --weights ... --shortcut ... --percent ...
+```
+
 
 需要注意的是，这里需要在.py文件内，将opt内的cfg和weights变量指向第2步稀疏化后生成的cfg文件和weights文件。
 此外，可通过增大代码中percent的值来获得更大的压缩率。（若稀疏化不到位，且percent值过大，程序会报错。）

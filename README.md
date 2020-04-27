@@ -23,7 +23,7 @@
  ，提供预训练模型，将正常剪植算法扩展到基于mobilenet的两个模型和YOLOv3tiny模型，删除tiny剪植。
 
  2020年4月27日更新 完成了mobilenetv3的模型预训练，但是发现模型结构上有些问题需要再调整一下重新训练。
- 添加了层剪植方法,方法来自于[tanluren/yolov3-channel-and-layer-pruning/yolov3](https://github.com/tanluren/yolov3-channel-and-layer-pruning)，
+ 添加了层剪植方法，方法来自于[tanluren/yolov3-channel-and-layer-pruning/yolov3](https://github.com/tanluren/yolov3-channel-and-layer-pruning)，
  感谢大佬的分享。
 
 # 环境部署
@@ -230,7 +230,7 @@ python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --
 |极限剪枝2  |采用shortcut融合的方法提升剪植精度。  |针对shortcut最优的方法。|
 |规整剪枝   |专为硬件部署设计，剪枝后filter个数均为8的倍数，无需微调。 |为规整牺牲了部分压缩率。 |
 |层剪枝     |以ResBlock为基本单位剪植，利于硬件部署。 |但是只能剪backbone，剪植率有限。 |
-|层通道剪植 |先进行通道剪植再进行层剪植，剪植率非常高。 |可能会影响精度 |
+|层通道剪植 |先进行通道剪植再进行层剪植，剪植率非常高。 |可能会影响精度。 |
 
 ### 步骤
 

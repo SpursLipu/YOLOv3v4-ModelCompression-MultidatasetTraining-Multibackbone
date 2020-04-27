@@ -13,7 +13,7 @@ if __name__ == '__main__':
     parser.add_argument('--cfg', type=str, default='cfg/yolov3.cfg', help='cfg file path')
     parser.add_argument('--data', type=str, default='data/coco.data', help='*.data file path')
     parser.add_argument('--weights', type=str, default='weights/last.pt', help='sparse model weights')
-    parser.add_argument('--global_percent', type=float, default=0.8, help='global channel prune percent')
+    parser.add_argument('--percent', type=float, default=0.8, help='global channel prune percent')
     parser.add_argument('--layer_keep', type=float, default=0.01, help='channel keep percent per layer')
     parser.add_argument('--img_size', type=int, default=416, help='inference size (pixels)')
     opt = parser.parse_args()
@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     sorted_bn = torch.sort(bn_weights)[0]
     sorted_bn, sorted_index = torch.sort(bn_weights)
-    thresh_index = int(len(bn_weights) * opt.global_percent)
+    thresh_index = int(len(bn_weights) * opt.percent)
     thresh = sorted_bn[thresh_index].cuda()
 
     print(f'Global Threshold should be less than {thresh:.4f}.')
@@ -171,11 +171,11 @@ if __name__ == '__main__':
     ]
     print(AsciiTable(metric_table).table)
 
-    pruned_cfg_name = opt.cfg.replace('/', f'/prune_{opt.global_percent}_keep_{opt.layer_keep}_')
+    pruned_cfg_name = opt.cfg.replace('/', f'/prune_{opt.percent}_keep_{opt.layer_keep}_')
     pruned_cfg_file = write_cfg(pruned_cfg_name, [model.hyperparams.copy()] + compact_module_defs)
     print(f'Config file has been saved: {pruned_cfg_file}')
 
-    compact_model_name = opt.weights.replace('/', f'/prune_{opt.global_percent}_keep_{opt.layer_keep}_')
+    compact_model_name = opt.weights.replace('/', f'/prune_{opt.percent}_keep_{opt.layer_keep}_')
     if compact_model_name.endswith('.pt'):
         compact_model_name = compact_model_name.replace('.pt', '.weights')
     save_weights(compact_model, path=compact_model_name)

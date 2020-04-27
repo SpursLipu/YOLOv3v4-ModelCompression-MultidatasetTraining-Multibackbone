@@ -223,13 +223,14 @@ python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --
 ## 1、剪植
 
 ### 剪植特点
-|剪枝方案 |<center>优点</center>|<center>缺点</center> |
+|<center>剪枝方案</center> |<center>优点</center>|<center>缺点</center> |
 | --- | --- | --- |
-|正常剪枝  |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
-|极限剪枝  |极高的压缩率。  |需要微调。  |
-|规整剪枝  |专为硬件部署设计，剪枝后filter个数均为8的倍数，无需微调。 | 为规整牺牲了部分压缩率。 |
-|层剪枝    |以ResBlock为基本单位剪植，网络结构会整体变换，利于硬件部署。但是只能剪backbone，剪植率有限。 |
-|层通道剪植|先进行通道剪植再进行层剪植，剪植率非常高。 |
+|正常剪枝   |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
+|极限剪枝   |极高的压缩率。  |需要微调。  |
+|极限剪枝2  |采用shortcut融合的方法提升剪植精度。  |针对shortcut最优的方法。|
+|规整剪枝   |专为硬件部署设计，剪枝后filter个数均为8的倍数，无需微调。 |为规整牺牲了部分压缩率。 |
+|层剪枝     |以ResBlock为基本单位剪植，利于硬件部署。 |但是只能剪backbone，剪植率有限。 |
+|层通道剪植 |先进行通道剪植再进行层剪植，剪植率非常高。 |可能会影响精度 |
 
 ### 步骤
 
@@ -270,6 +271,11 @@ python3 regular_prune.py --cfg ... --data ... --weights ... --percent ...
 - 极限剪枝
 ```bash
 python3 shortcut_prune.py --cfg ... --data ... --weights ... --percent ...
+```
+
+- 极限剪枝2
+```bash
+python3 slim_prune.py --cfg ... --data ... --weights ... --percent ...
 ```
 
 - 层剪植

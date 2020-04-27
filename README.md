@@ -54,6 +54,7 @@
 |<center>正常剪枝</center>|<center>√</center>|
 |<center>规整剪枝</center>|<center>√</center>  |
 |<center>极限剪枝(shortcut)</center>|<center>√</center> |
+|<center>层剪植</center>|<center>√</center> |
 |<center>量化</center>|
 |<center>BNN量化</center>|<center>√</center>  |
 |<center>BWN量化</center>|<center>√</center>  |
@@ -224,11 +225,11 @@ python3 train.py --data data/coco2017.data --batch-size 32 --accumulate 1 -pt --
 ### 剪植特点
 |剪枝方案 |<center>优点</center>|<center>缺点</center> |
 | --- | --- | --- |
-|正常剪枝 |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
-|极限剪枝 |极高的压缩率。  |需要微调。  |
-|规整剪枝 |专为硬件部署设计，剪枝后filter个数均为8的倍数，无需微调。 | 为规整牺牲了部分压缩率。 |
-|层剪枝   |以ResBlock为基本单位剪植，网络结构会整体变换，利于硬件部署。但是只能剪backbone，剪植率有限。 |
-|层剪植+通道剪植   |先进行通道剪植再进行层剪植，剪植率非常高。 |
+|正常剪枝  |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
+|极限剪枝  |极高的压缩率。  |需要微调。  |
+|规整剪枝  |专为硬件部署设计，剪枝后filter个数均为8的倍数，无需微调。 | 为规整牺牲了部分压缩率。 |
+|层剪枝    |以ResBlock为基本单位剪植，网络结构会整体变换，利于硬件部署。但是只能剪backbone，剪植率有限。 |
+|层通道剪植|先进行通道剪植再进行层剪植，剪植率非常高。 |
 
 ### 步骤
 

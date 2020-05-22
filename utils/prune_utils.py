@@ -25,7 +25,7 @@ def parse_module_defs2(module_defs):
     ignore_idx = set()
     for i, module_def in enumerate(module_defs):
         if module_def['type'] == 'shortcut':
-            identity_idx = (i + int(module_def['from']))
+            identity_idx = (i + int(module_def['from'][0]))
             if module_defs[identity_idx]['type'] == 'convolutional':
 
                 # ignore_idx.add(identity_idx)
@@ -62,7 +62,7 @@ def parse_module_defs(module_defs):
         # 跳连层的前一层不剪,跳连层的来源层不剪
         if module_def['type'] == 'shortcut':
             ignore_idx.add(i - 1)
-            identity_idx = (i + int(module_def['from']))
+            identity_idx = (i + int(module_def['from'][0]))
             if module_defs[identity_idx]['type'] == 'convolutional':
                 ignore_idx.add(identity_idx)
             elif module_defs[identity_idx]['type'] == 'shortcut':

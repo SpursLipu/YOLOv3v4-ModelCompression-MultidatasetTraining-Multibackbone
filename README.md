@@ -25,8 +25,7 @@
  2020年4月27日 更新mobilenetv3的模型预训练，添加了层剪植方法，方法来自于[tanluren/yolov3-channel-and-layer-pruning/yolov3](https://github.com/tanluren/yolov3-channel-and-layer-pruning)，
  感谢大佬的分享。
  
- 2020年5月22日 更新了[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3源码仓库。
- 的最新优化，更新YOLOv4网络结构和权重文件。
+ 2020年5月22日 更新了[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3源码仓库的最新优化，更新YOLOv4网络结构和权重文件。
 
 # 环境部署
 1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建详见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里简要说明：

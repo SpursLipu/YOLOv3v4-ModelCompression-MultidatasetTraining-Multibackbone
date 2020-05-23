@@ -138,11 +138,50 @@ class Swish(nn.Module):
         return x * torch.sigmoid(x)
 
 
-class HardSwish(nn.Module):  # https://arxiv.org/pdf/1905.02244.pdf
-    def forward(self, x):
-        return x * F.hardtanh(x + 3, 0., 6., True) / 6.
-
-
 class Mish(nn.Module):  # https://github.com/digantamisra98/Mish
     def forward(self, x):
         return x * F.softplus(x).tanh()
+
+
+class ReLU6(nn.Module):
+    def __init__(self):
+        super(ReLU6, self).__init__()
+
+    def forward(self, x):
+        return F.relu6(x, inplace=True)
+
+
+class HardSwish(nn.Module):
+    def __init__(self):
+        super(HardSwish, self).__init__()
+
+    def forward(self, x):
+        return x * (F.relu6(x + 3.0, inplace=True) / 6.0)
+
+
+class HardSigmoid(nn.Module):
+    def __init__(self):
+        super(HardSigmoid, self).__init__()
+
+    def forward(self, x):
+        out = F.relu6(x + 3.0, inplace=True) / 6.0
+        return out
+
+
+class SE(nn.Module):
+    def __init__(self, channel, reduction=4):
+        super(SE, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            HardSigmoid()
+            # nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)

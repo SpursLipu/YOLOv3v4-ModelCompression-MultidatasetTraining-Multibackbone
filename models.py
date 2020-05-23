@@ -41,9 +41,9 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                         # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                         # modules.add_module('activation', Swish())
                     if mdef['activation'] == 'relu6':
-                        modules.add_module('activation', relu6())
+                        modules.add_module('activation', ReLU6())
                     if mdef['activation'] == 'h_swish':
-                        modules.add_module('activation', h_swish())
+                        modules.add_module('activation', HardSwish())
                     if mdef['activation'] == 'relu':
                         modules.add_module('activation', nn.ReLU())
                 # BWN量化
@@ -61,9 +61,9 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                         # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                         # modules.add_module('activation', Swish())
                     if mdef['activation'] == 'relu6':
-                        modules.add_module('activation', relu6())
+                        modules.add_module('activation', ReLU6())
                     if mdef['activation'] == 'h_swish':
-                        modules.add_module('activation', h_swish())
+                        modules.add_module('activation', HardSwish())
                     if mdef['activation'] == 'relu':
                         modules.add_module('activation', nn.ReLU())
             else:
@@ -80,9 +80,9 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                     # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                     # modules.add_module('activation', Swish())
                 if mdef['activation'] == 'relu6':
-                    modules.add_module('activation', relu6())
+                    modules.add_module('activation', ReLU6())
                 if mdef['activation'] == 'h_swish':
-                    modules.add_module('activation', h_swish())
+                    modules.add_module('activation', HardSwish())
                 if mdef['activation'] == 'relu':
                     modules.add_module('activation', nn.ReLU())
                 if mdef['activation'] == 'mish':
@@ -107,9 +107,9 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                 # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                 # modules.add_module('activation', Swish())
             if mdef['activation'] == 'relu6':
-                modules.add_module('activation', relu6())
+                modules.add_module('activation', ReLU6())
             if mdef['activation'] == 'h_swish':
-                modules.add_module('activation', h_swish())
+                modules.add_module('activation', HardSwish())
             if mdef['activation'] == 'relu':
                 modules.add_module('activation', nn.ReLU())
 
@@ -192,50 +192,6 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
     for i in routs:
         routs_binary[i] = True
     return module_list, routs_binary
-
-
-class relu6(nn.Module):
-    def __init__(self):
-        super(relu6, self).__init__()
-
-    def forward(self, x):
-        return F.relu6(x, inplace=True)
-
-
-class h_swish(nn.Module):
-    def __init__(self):
-        super(h_swish, self).__init__()
-
-    def forward(self, x):
-        return x * (F.relu6(x + 3.0, inplace=True) / 6.0)
-
-
-class h_sigmoid(nn.Module):
-    def __init__(self):
-        super(h_sigmoid, self).__init__()
-
-    def forward(self, x):
-        out = F.relu6(x + 3.0, inplace=True) / 6.0
-        return out
-
-
-class SE(nn.Module):
-    def __init__(self, channel, reduction=4):
-        super(SE, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(channel, channel // reduction, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Linear(channel // reduction, channel, bias=False),
-            h_sigmoid()
-            # nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        b, c, _, _ = x.size()
-        y = self.avg_pool(x).view(b, c)
-        y = self.fc(y).view(b, c, 1, 1)
-        return x * y.expand_as(x)
 
 
 class YOLOLayer(nn.Module):

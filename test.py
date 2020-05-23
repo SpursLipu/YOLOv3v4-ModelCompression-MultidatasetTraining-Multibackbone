@@ -43,7 +43,7 @@ def test(cfg,
         # Fuse
         model.fuse()
         model.to(device)
-        # summary(model, input_size=(3, img_size, img_size))
+
         if device.type != 'cpu' and torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
     else:  # called by train.py

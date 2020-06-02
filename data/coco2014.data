@@ -1,0 +1,4 @@
+classes=80
+train=data/coco2014/train2014.txt
+valid=data/coco2014/val2014.txt
+names=data/coco.names

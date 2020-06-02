@@ -177,7 +177,7 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 
 ### 检测效果YOLOv4
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/5.jpg)
-![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/6.jpg)
+![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/6.png)
 
 # 二、多种网络结构
 在mobilenetv3基础上设计了两种网络结构

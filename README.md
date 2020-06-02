@@ -73,13 +73,14 @@
 # 一、多数据集训练
 本项目提供针对YOLOv3仓库的预处理数据集，配置文件(.cfg)，数据集索引文件(.data)，数据集类别文件(.names)以及使用k-means算法重新聚类的anchor box尺寸(包含用于yolov3的9框和tiny-yolov3的6框)。
 
-基于Darknet-53的YOLOv3-608网络mAP
+mAP统计
 
-|<center>数据集</center>|<center>mAP</center>|
-| --- |--- |
+|<center>数据集</center>|<center>YOLOv3-608</center>|<center>YOLOv4-640</center>|
+| --- |--- |--- |
 |<center>Dior遥感数据集</center>|<center>0.56</center>|
 |<center>bdd100k自动驾驶数据集</center>|<center>0.38</center>|
-|<center>visdrone无人机航拍数据集</center>|<center>0.286</center>|
+|<center>visdrone无人机航拍数据集</center>|<center>0.273</center>|<center>0.324</center>|
+
 
 下载地址如下，下载并解压后将文件夹拷贝至data目录下即可使用。
 
@@ -131,10 +132,14 @@ python3 train.py --data data/bdd100k.data --batch-size ... --weights weights/yol
   
   提取码：dy4c
   
-- [visdrone权重文件](https://pan.baidu.com/s/1Sf20FGAa-vLF8CCLpKSIug)
+- [YOLOv3-visdrone权重文件](https://pan.baidu.com/s/1N4qDP3b0tt8TIWuTFefDEw)
 
-  提取码：ynuf
-  
+  提取码：87lf
+
+- [YOLOv4-visdrone权重文件](https://pan.baidu.com/s/1zOFyt_AFiNk0fAFa8yE9RQ)
+
+  提取码：xblu
+ 
 训练指令
 
 ```bash
@@ -167,20 +172,23 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 
 [官网](http://www.aiskyeye.com/)
 
-### 检测效果
+### 检测效果YOLOv3
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/4.jpg)
+
+### 检测效果YOLOv4
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/5.jpg)
+![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/6.jpg)
 
 # 二、多种网络结构
 在mobilenetv3基础上设计了两种网络结构
 
 |结构名称 |<center>backbone参数量</center>|<center>后处理参数量</center> |<center>总参数量</center> |<center>GFLOPs</center> |<center>mAP0.5</center> |<center>mAP0.5:0.95</center> |
 | --- | --- | --- | --- | --- | --- | --- |
-|YOLOv3                      |38.74M  |20.39M  |59.13M  |117.3   |0.667  |0.394  |
-|YOLOv3tiny                  |6.00M   |2.45M   |8.45M   |9.9     |0.275  |0.115  |
+|YOLOv3                      |38.74M  |20.39M  |59.13M  |117.3   |0.580  |0.340  |
+|YOLOv3tiny                  |6.00M   |2.45M   |8.45M   |9.9     |0.347  |0.168  |
 |YOLOv3-mobilenetv3          |2.84M   |20.25M  |23.09M  |32.2    |0.459  |0.282  |
-|YOLOv3tiny-mobilenetv3-small|0.92M   |2.00M   |2.92M   |2.9     |0.301  |0.162  |
-|YOLOv4                      |-       |-       |61.35M  |107.1   |0.704  |0.483  |
+|YOLOv3tiny-mobilenetv3-small|0.92M   |2.00M   |2.92M   |2.9     |0.396  |0.213  |
+|YOLOv4                      |-       |-       |61.35M  |107.1   |0.650  |0.438  |
 ## 训练指令
 1、YOLOv3
 ```bash

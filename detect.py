@@ -6,7 +6,8 @@ from utils.utils import *
 
 
 def detect(save_img=False):
-    img_size = (320, 192) if ONNX_EXPORT else opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
+    # img_size = (320, 192) if ONNX_EXPORT else opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
+    img_size = opt.img_size
     out, source, weights, half, view_img, save_txt = opt.output, opt.source, opt.weights, opt.half, opt.view_img, opt.save_txt
     webcam = source == '0' or source.startswith('rtsp') or source.startswith('http') or source.endswith('.txt')
 
@@ -81,6 +82,10 @@ def detect(save_img=False):
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        # 0.5填充
+        # fill_img = torch.ones((3, img_size, img_size)) / 2
+        # fill_img[:, (img_size - img.shape[1]) // 2:img.shape[1] + (img_size - img.shape[1]) // 2, :] = img
+        # img = fill_img
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
 

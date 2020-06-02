@@ -209,7 +209,7 @@ def test(cfg,
             print('WARNING: missing pycocotools package, can not compute official COCO mAP. See requirements.txt.')
 
         # https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocoEvalDemo.ipynb
-        cocoGt = COCO(glob.glob('data/coco/instances_val*.json')[0])  # initialize COCO ground truth api
+        cocoGt = COCO(glob.glob('data/coco2014/instances_val*.json')[0])  # initialize COCO ground truth api
         cocoDt = cocoGt.loadRes('results.json')  # initialize COCO pred api
 
         cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')

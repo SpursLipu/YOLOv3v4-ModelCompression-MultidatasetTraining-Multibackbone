@@ -75,11 +75,11 @@
 
 mAP统计
 
-|<center>数据集</center>|<center>YOLOv3-608</center>|<center>YOLOv4-640</center>|
-| --- |--- |--- |
+|<center>数据集</center>|<center>YOLOv3-608</center>|<center>YOLOv4-640</center>|<center>YOLOv3-mobilenet-640</center>|
+| --- |--- |--- |--- |
 |<center>Dior遥感数据集</center>|<center>0.56</center>|
 |<center>bdd100k自动驾驶数据集</center>|<center>0.38</center>|
-|<center>visdrone无人机航拍数据集</center>|<center>0.273</center>|<center>0.324</center>|
+|<center>visdrone无人机航拍数据集</center>|<center>0.273</center>|<center>0.324</center>|<center>0.348</center>|
 
 
 下载地址如下，下载并解压后将文件夹拷贝至data目录下即可使用。
@@ -139,6 +139,10 @@ python3 train.py --data data/bdd100k.data --batch-size ... --weights weights/yol
 - [YOLOv4-visdrone权重文件](https://pan.baidu.com/s/1zOFyt_AFiNk0fAFa8yE9RQ)
 
   提取码：xblu
+  
+ - [YOLOv3-mobilenet-visdrone权重文件](https://pan.baidu.com/s/1BHC8b6xHmTuN8h74QJFt1g)
+
+  提取码：fb6y
  
 训练指令
 

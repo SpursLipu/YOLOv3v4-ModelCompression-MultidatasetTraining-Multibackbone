@@ -58,28 +58,9 @@ class Binarize(Function):
         return grad_input
 
 
-# 定义前向传播，反向传播八位定点量化函数
-class EQ(Function):
-    @staticmethod
-    def forward(self, input):
-        self.save_for_backward(input)
-        s = torch.max(input) - torch.min(input)
-        n = float(2 ** 8 - 1)
-        input = torch.div(input, s)
-        out = torch.round(input * n)
-        return out
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        grad_input = grad_output.clone()
-        return grad_input
-
-
 binarize = Binarize.apply
 
 ternarize = Ternarize.apply
-
-EQ = EQ.apply
 
 
 # 重载LeakyRelu
@@ -160,3 +141,5 @@ class BinaryConv2d(nn.Conv2d):
             self.bias.data.zero_()
 
         self.weight.lr_scale = 1. / stdv
+
+

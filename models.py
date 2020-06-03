@@ -1,6 +1,7 @@
 from utils.google_utils import *
 from utils.layers import *
 from utils.parse_config import *
+from utils.quantized_lowbit import *
 from utils.quantized import *
 
 ONNX_EXPORT = False
@@ -24,8 +25,8 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
             filters = int(mdef['filters'])
             kernel_size = int(mdef['size'])
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
-            # 量化
-            if i >= qlayers and i <= 74 and quantized != -1 and qlayers != -1:
+            # 低比特量化
+            if i >= qlayers and i <= 74 and (quantized == 0 or quantized == 1) and qlayers != -1:
                 # BNN量化
                 if quantized == 0:
                     modules.add_module('Conv2d', BinaryConv2d(in_channels=output_filters[-1],
@@ -67,12 +68,20 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                     if mdef['activation'] == 'relu':
                         modules.add_module('activation', nn.ReLU())
             else:
-                modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
-                                                       out_channels=filters,
-                                                       kernel_size=kernel_size,
-                                                       stride=int(mdef['stride']),
-                                                       padding=pad,
-                                                       bias=not bn))
+                if quantized == 3:
+                    modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
+                                                                 out_channels=filters,
+                                                                 kernel_size=kernel_size,
+                                                                 stride=int(mdef['stride']),
+                                                                 padding=pad,
+                                                                 bias=not bn))
+                else:
+                    modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
+                                                           out_channels=filters,
+                                                           kernel_size=kernel_size,
+                                                           stride=int(mdef['stride']),
+                                                           padding=pad,
+                                                           bias=not bn))
                 if bn:
                     modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
                 if mdef['activation'] == 'leaky':
@@ -540,6 +549,27 @@ def save_weights(self, path='model.weights', cutoff=-1):
                     conv_layer.bias.data.cpu().numpy().tofile(f)
                 # Load conv weights
                 conv_layer.weight.data.cpu().numpy().tofile(f)
+            elif mdef['type'] == 'depthwise':
+                depthwise_layer = module[0]
+                # If batch norm, load bn first
+                if mdef['batch_normalize']:
+                    bn_layer = module[1]
+                    bn_layer.bias.data.cpu().numpy().tofile(f)
+                    bn_layer.weight.data.cpu().numpy().tofile(f)
+                    bn_layer.running_mean.data.cpu().numpy().tofile(f)
+                    bn_layer.running_var.data.cpu().numpy().tofile(f)
+                # Load conv bias
+                else:
+                    depthwise_layer.bias.data.cpu().numpy().tofile(f)
+                # Load conv weights
+                depthwise_layer.weight.data.cpu().numpy().tofile(f)
+            elif mdef['type'] == 'se':
+                se_layer = module[0]
+                fc = se_layer.fc
+                fc1 = fc[0]
+                fc2 = fc[2]
+                fc1.weight.data.cpu().numpy().tofile(f)
+                fc2.weight.data.cpu().numpy().tofile(f)
 
 
 def convert(cfg='cfg/yolov3-spp.cfg', weights='weights/yolov3-spp.weights'):

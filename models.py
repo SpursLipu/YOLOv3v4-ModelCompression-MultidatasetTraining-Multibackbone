@@ -102,13 +102,22 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
             filters = int(mdef['filters'])
             kernel_size = int(mdef['size'])
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
-            modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
-                                                        out_channels=filters,
-                                                        kernel_size=kernel_size,
-                                                        stride=int(mdef['stride']),
-                                                        padding=pad,
-                                                        groups=output_filters[-1],
-                                                        bias=not bn), )
+            if quantized == 3:
+                modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
+                                                                  out_channels=filters,
+                                                                  kernel_size=kernel_size,
+                                                                  stride=int(mdef['stride']),
+                                                                  padding=pad,
+                                                                  groups=output_filters[-1],
+                                                                  bias=not bn))
+            else:
+                modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
+                                                            out_channels=filters,
+                                                            kernel_size=kernel_size,
+                                                            stride=int(mdef['stride']),
+                                                            padding=pad,
+                                                            groups=output_filters[-1],
+                                                            bias=not bn), )
             if bn:
                 modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
             if mdef['activation'] == 'leaky':
@@ -299,8 +308,10 @@ class Darknet(nn.Module):
         super(Darknet, self).__init__()
 
         self.module_defs = parse_model_cfg(cfg)
-        self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=quantized,
-                                                      qlayers=qlayers)
+        self.quantized = quantized
+        self.qlayers = qlayers
+        self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
+                                                      qlayers=self.qlayers)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 

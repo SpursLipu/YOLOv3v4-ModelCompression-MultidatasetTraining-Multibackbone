@@ -84,9 +84,13 @@ mAP统计
 
 下载地址如下，下载并解压后将文件夹拷贝至data目录下即可使用。
 
-- [COCO2017](https://pan.baidu.com/s/1UXKs7ilSQi_P6ijiLgKTUg)
+- [COCO2017](https://pan.baidu.com/s/1KysFL6AmdbCBq4tHDebqlw)
   
-  提取码：4f06
+  提取码：hjln
+
+- [COCO2014](https://pan.baidu.com/s/1EoXOR77yEVokqPCaxg8QGg)
+  
+  提取码：rhqx
 
 - [COCO权重文件](https://pan.baidu.com/s/1JZylwRQIgAd389oWUu0djg)
 

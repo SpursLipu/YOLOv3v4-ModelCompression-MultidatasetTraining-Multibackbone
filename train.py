@@ -5,7 +5,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 from torchsummary import summary
-import test  # import test.py to get mAP after each epoch
+import test as T  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
@@ -91,8 +91,9 @@ def train(hyp):
         os.remove(f)
 
     # Initialize model
-    model = Darknet(cfg).to(device)
-    summary(model, input_size=(3, img_size, img_size))
+    model = Darknet(cfg, quantized=opt.quantized, qlayers=opt.qlayers).to(device)
+    if opt.quantized == -1:
+        summary(model, input_size=(3, img_size, img_size))
     if t_cfg:
         t_model = Darknet(t_cfg, (img_size, img_size), arc=opt.arc, quantized=-1, qlayers=-1).to(device)
 
@@ -377,14 +378,16 @@ def train(hyp):
         final_epoch = epoch + 1 == epochs
         if not opt.notest or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
-            results, maps = test.test(cfg,
-                                      data,
-                                      batch_size=batch_size,
-                                      img_size=imgsz_test,
-                                      model=ema.ema,
-                                      save_json=final_epoch and is_coco,
-                                      single_cls=opt.single_cls,
-                                      dataloader=testloader)
+            results, maps = T.test(cfg,
+                                   data,
+                                   batch_size=batch_size,
+                                   img_size=imgsz_test,
+                                   model=ema.ema,
+                                   save_json=final_epoch and is_coco,
+                                   single_cls=opt.single_cls,
+                                   dataloader=testloader,
+                                   quantized=opt.quantized,
+                                   qlayers=opt.qlayers)
 
         # Write
         with open(results_file, 'a') as f:

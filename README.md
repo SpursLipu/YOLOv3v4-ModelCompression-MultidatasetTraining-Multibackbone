@@ -143,7 +143,7 @@ python3 train.py --data data/bdd100k.data --batch-size ... --weights weights/yol
  - [YOLOv3-mobilenet-visdrone权重文件](https://pan.baidu.com/s/1BHC8b6xHmTuN8h74QJFt1g)
 
   提取码：fb6y
- 
+
 训练指令
 
 ```bash

@@ -310,8 +310,8 @@ class Darknet(nn.Module):
         self.module_defs = parse_model_cfg(cfg)
         self.quantized = quantized
         self.qlayers = qlayers
-        self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=quantized,
-                                                      qlayers=qlayers)
+        self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
+                                                      qlayers=self.qlayers)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 

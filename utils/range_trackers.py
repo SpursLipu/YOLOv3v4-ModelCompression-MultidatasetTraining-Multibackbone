@@ -73,20 +73,3 @@ class AveragedRangeTracker(RangeTracker):
             self.max_val.div_(1 - (1 - self.momentum) ** self.step)  # Bias correction
         else:
             self.max_val = max_val
-
-
-def test():
-    net = GlobalRangeTracker([1, 3, 1, 1])
-    inputs = torch.randn([2, 3, 4, 4])
-
-    print(inputs)
-    # out = net(inputs)
-    # print (net.min_val)
-    # for k,v in net.state_dict().items():
-    #     print(k, v)
-    print(torch.min(inputs))
-    print(inputs)
-
-
-if __name__ == '__main__':
-    test()

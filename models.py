@@ -405,7 +405,7 @@ class Darknet(nn.Module):
         print('Fusing layers...')
         fused_list = nn.ModuleList()
         for a in list(self.children())[0]:
-            if isinstance(a, nn.Sequential) and not hasattr(a, "DepthWise2d"):
+            if isinstance(a, nn.Sequential):
                 for i, b in enumerate(a):
                     if isinstance(b, nn.modules.batchnorm.BatchNorm2d):
                         # fuse this bn layer with the previous conv2d layer
@@ -608,7 +608,7 @@ def convert(cfg='cfg/yolov3-spp.cfg', weights='weights/yolov3-spp.weights'):
 
         target = weights.rsplit('.', 1)[0] + '.pt'
         torch.save(chkpt, target)
-        print("Success: converted '%s' to '%'" % (weights, target))
+        print("Success: converted '%s' to 's%'" % (weights, target))
 
     else:
         print('Error: extension not supported.')

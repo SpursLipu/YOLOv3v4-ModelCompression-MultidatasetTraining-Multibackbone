@@ -4,8 +4,8 @@ import torch.distributed as dist
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
-from torchsummary import summary
-import test as T  # import test.py to get mAP after each epoch
+
+import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
@@ -33,7 +33,7 @@ hyp = {'giou': 3.54,  # giou loss gain
        'lr0': 0.01,  # initial learning rate (SGD=5E-3, Adam=5E-4)
        'lrf': 0.0005,  # final learning rate (with cos scheduler)
        'momentum': 0.937,  # SGD momentum
-       'weight_decay': 0.000484,  # optimizer weight decay
+       'weight_decay': 0.0005,  # optimizer weight decay
        'fl_gamma': 0.0,  # focal loss gamma (efficientDet default is gamma=1.5)
        'hsv_h': 0.0138,  # image HSV-Hue augmentation (fraction)
        'hsv_s': 0.678,  # image HSV-Saturation augmentation (fraction)
@@ -92,10 +92,8 @@ def train(hyp):
 
     # Initialize model
     model = Darknet(cfg, quantized=opt.quantized, qlayers=opt.qlayers).to(device)
-    if opt.quantized == -1:
-        summary(model, input_size=(3, img_size, img_size))
     if t_cfg:
-        t_model = Darknet(t_cfg, (img_size, img_size), arc=opt.arc, quantized=-1, qlayers=-1).to(device)
+        t_model = Darknet(t_cfg).to(device)
 
     # Optimizer
     pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
@@ -120,8 +118,8 @@ def train(hyp):
 
     start_epoch = 0
     best_fitness = 0.0
+    attempt_download(weights)
     if weights != 'None':
-        attempt_download(weights)
         if weights.endswith('.pt'):  # pytorch format
             # possible weights are '*.pt', 'yolov3-spp.pt', 'yolov3-tiny.pt' etc.
             chkpt = torch.load(weights, map_location=device)
@@ -151,7 +149,6 @@ def train(hyp):
         elif len(weights) > 0:  # darknet format
             # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
             load_darknet_weights(model, weights, pt=opt.pt)
-
     if t_cfg:
         if t_weights.endswith('.pt'):
             t_model.load_state_dict(torch.load(t_weights, map_location=device)['model'])
@@ -163,7 +160,6 @@ def train(hyp):
             t_model.eval()
         print('<.....................using knowledge distillation.......................>')
         print('teacher model:', t_weights, '\n')
-
     # Mixed precision training https://github.com/NVIDIA/apex
     if mixed_precision:
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
@@ -201,7 +197,6 @@ def train(hyp):
                                   rect=opt.rect,  # rectangular training
                                   cache_images=opt.cache_images,
                                   single_cls=opt.single_cls)
-
     # 获得要剪枝的层
     if hasattr(model, 'module'):
         print('muti-gpus sparse')
@@ -255,7 +250,8 @@ def train(hyp):
     model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device)  # attach class weights
 
     # Model EMA
-    ema = torch_utils.ModelEMA(model)
+    if opt.quantized == -1:
+        ema = torch_utils.ModelEMA(model)
 
     # Start training
     nb = len(dataloader)  # number of batches
@@ -287,16 +283,16 @@ def train(hyp):
             targets = targets.to(device)
 
             # Burn-in
-            if ni <= n_burn * 2:
-                model.gr = np.interp(ni, [0, n_burn * 2], [0.0, 1.0])  # giou loss ratio (obj_loss = 1.0 or giou)
-                if ni == n_burn:  # burnin complete
-                    print_model_biases(model)
-
+            if ni <= n_burn:
+                xi = [0, n_burn]  # x interp
+                model.gr = np.interp(ni, xi, [0.0, 1.0])  # giou loss ratio (obj_loss = 1.0 or giou)
+                accumulate = max(1, np.interp(ni, xi, [1, 64 / batch_size]).round())
                 for j, x in enumerate(optimizer.param_groups):
                     # bias lr falls from 0.1 to lr0, all other lrs rise from 0.0 to lr0
-                    x['lr'] = np.interp(ni, [0, n_burn], [0.1 if j == 2 else 0.0, x['initial_lr'] * lf(epoch)])
+                    x['lr'] = np.interp(ni, xi, [0.1 if j == 2 else 0.0, x['initial_lr'] * lf(epoch)])
+                    x['weight_decay'] = np.interp(ni, xi, [0.0, hyp['weight_decay'] if j == 1 else 0.0])
                     if 'momentum' in x:
-                        x['momentum'] = np.interp(ni, [0, n_burn], [0.9, hyp['momentum']])
+                        x['momentum'] = np.interp(ni, xi, [0.9, hyp['momentum']])
 
             # Multi-Scale
             if opt.multi_scale:
@@ -352,7 +348,8 @@ def train(hyp):
             if ni % accumulate == 0:
                 optimizer.step()
                 optimizer.zero_grad()
-                ema.update(model)
+                if opt.quantized == -1:
+                    ema.update(model)
 
             # Print
             mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
@@ -374,20 +371,22 @@ def train(hyp):
         scheduler.step()
 
         # Process epoch results
-        ema.update_attr(model)
+        if opt.quantized == -1:
+            ema.update_attr(model)
         final_epoch = epoch + 1 == epochs
         if not opt.notest or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
-            results, maps = T.test(cfg,
-                                   data,
-                                   batch_size=batch_size,
-                                   img_size=imgsz_test,
-                                   model=ema.ema,
-                                   save_json=final_epoch and is_coco,
-                                   single_cls=opt.single_cls,
-                                   dataloader=testloader,
-                                   quantized=opt.quantized,
-                                   qlayers=opt.qlayers)
+            results, maps = test.test(cfg,
+                                      data,
+                                      batch_size=batch_size,
+                                      imgsz=imgsz_test,
+                                      model=ema.ema if opt.quantized == -1 else model,
+                                      save_json=final_epoch and is_coco,
+                                      single_cls=opt.single_cls,
+                                      dataloader=testloader,
+                                      multi_label=ni > n_burn,
+                                      quantized=opt.quantized,
+                                      qlayers=opt.qlayers)
 
         # Write
         with open(results_file, 'a') as f:
@@ -410,12 +409,22 @@ def train(hyp):
 
         # Save model
         save = (not opt.nosave) or (final_epoch and not opt.evolve)
+        if opt.quantized == -1:
+            if hasattr(model, 'module'):
+                model_temp = ema.ema.module.state_dict()
+            else:
+                model_temp = ema.ema.state_dict()
+        else:
+            if hasattr(model, 'module'):
+                model_temp = model.module.state_dict()
+            else:
+                model_temp = model.state_dict()
         if save:
             with open(results_file, 'r') as f:  # create checkpoint
                 chkpt = {'epoch': epoch,
                          'best_fitness': best_fitness,
                          'training_results': f.read(),
-                         'model': ema.ema.module.state_dict() if hasattr(model, 'module') else ema.ema.state_dict(),
+                         'model': model_temp,
                          'optimizer': None if final_epoch else optimizer.state_dict()}
 
             # Save last, best and delete
@@ -484,6 +493,8 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     opt.weights = last if opt.resume else opt.weights
     check_git_status()
+    opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
+    # opt.data = list(glob.iglob('./**/' + opt.data, recursive=True))[0]  # find file
     print(opt)
     opt.img_size.extend([opt.img_size[-1]] * (3 - len(opt.img_size)))  # extend to 3 sizes (min, max, test)
     device = torch_utils.select_device(opt.device, apex=mixed_precision, batch_size=opt.batch_size)

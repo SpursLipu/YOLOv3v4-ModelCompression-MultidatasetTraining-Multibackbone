@@ -115,16 +115,3 @@ class Unsigned_Quantizer(Quantizer):
         self.scale = float_range / quantized_range
         self.zero_point = torch.round(-self.range_tracker.min_val / self.scale)
         self.num_batches_calibration.add_(1)
-
-
-def test():
-    from .range_trackers import GlobalRangeTracker
-    net = Unsigned_Quantizer(8, GlobalRangeTracker(per_dim=0, track_type='weight'))
-    out = net(torch.randn([1, 3, 16, 16]))
-    print(net)
-    for k, v in net.state_dict().items():
-        print(k, v)
-
-
-if __name__ == '__main__':
-    test()

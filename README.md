@@ -27,6 +27,8 @@
  
  2020年5月22日 更新了[ultralytics/yolov3](https://github.com/ultralytics/yolov3)为YOLOv3源码仓库的最新优化，更新YOLOv4网络结构和权重文件。
 
+2020年5月22日 更新了8位定点量化方法，修复一些bug。
+
 # 环境部署
 1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建详见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里简要说明：
 
@@ -320,7 +322,7 @@ python3 layer_channel_prune.py --cfg ... --data ... --weights ... --shortcut ...
 
 ## 2、量化
 
-### 量化方法
+### 低比特量化
 `--quantized` 表示选取量化方法，默认值为-1，表示不采用任何量化方法。
 
 `--quantized 0` 使用BNN量化方法。
@@ -333,7 +335,7 @@ BinaryNet: Training Deep Neural Networks withWeights and Activations Constrained
 XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
 [参考论文](https://arxiv.org/abs/1603.05279v4)
 
-### stage-wise 训练策略
+#### stage-wise 训练策略
 `--qlayers`可以用于选取Darknet中的量化区间，默认为自深层到浅层, 默认值为-1表示无量化层，有效范围为0-74，取0时表示量化所有层，取74时表示无量化层，大于74则无意义。
 
 ![Darknet](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/Darknet-YOLOv3.jpg)
@@ -350,7 +352,13 @@ XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
 ```bash
 python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 1 --qlayers 72
 ```
+### 定点量化
 
+`--quantized 3` 使用8位定点量化方法
+
+```bash
+python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 3
+```
 ## 3、知识蒸馏
 
 ### 蒸馏方法

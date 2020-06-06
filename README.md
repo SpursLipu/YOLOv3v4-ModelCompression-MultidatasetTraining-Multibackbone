@@ -194,7 +194,7 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 | --- | --- | --- | --- | --- | --- | --- |
 |YOLOv3                      |38.74M  |20.39M  |59.13M  |117.3   |0.580  |0.340  |
 |YOLOv3tiny                  |6.00M   |2.45M   |8.45M   |9.9     |0.347  |0.168  |
-|YOLOv3-mobilenetv3          |2.84M   |20.25M  |23.09M  |32.2    |0.459  |0.282  |
+|YOLOv3-mobilenetv3          |2.84M   |20.25M  |23.09M  |32.2    |0.684  |0.419  |
 |YOLOv3tiny-mobilenetv3-small|0.92M   |2.00M   |2.92M   |2.9     |0.396  |0.213  |
 |YOLOv4                      |-       |-       |61.35M  |107.1   |0.650  |0.438  |
 ## 训练指令
@@ -231,9 +231,9 @@ python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weight
 python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weights/yolov3-mobilenet.weights --cfg cfg/yolov3-mobilenet/yolov3-mobilenet-coco.cfg --img_size ...
 ```
 
-- [COCO预训练权重文件](https://pan.baidu.com/s/1hR2SYvb5mjh_ysepCtFnmw)
+- [COCO预训练权重文件](https://pan.baidu.com/s/1EI2Xh1i18CRLoZo_P3NVHw)
 
-  提取码：iayy
+  提取码：3vm8
 
 5、YOLOv4
 ```bash

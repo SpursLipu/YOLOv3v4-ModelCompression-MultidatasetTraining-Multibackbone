@@ -209,7 +209,10 @@ def test(cfg,
             from pycocotools.cocoeval import COCOeval
 
             # https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocoEvalDemo.ipynb
-            cocoGt = COCO(glob.glob('../coco/annotations/instances_val*.json')[0])  # initialize COCO ground truth api
+            # cocovision = opt.data.split('\\')[-1].split('.')[0]
+            # print(cocovision)
+            # cocoGt = COCO(glob.glob('data/'+cocovision+'/instances_val*.json')[0])  # initialize COCO ground truth api
+            cocoGt = COCO(glob.glob('data/coco2014/instances_val*.json')[0])  # initialize COCO ground truth api
             cocoDt = cocoGt.loadRes('results.json')  # initialize COCO pred api
 
             cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')
@@ -251,6 +254,7 @@ if __name__ == '__main__':
     opt.save_json = opt.save_json or any([x in opt.data for x in ['coco.data', 'coco2014.data', 'coco2017.data']])
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
     opt.data = list(glob.iglob('./**/' + opt.data, recursive=True))[0]  # find file
+
     print(opt)
 
     # task = 'test', 'study', 'benchmark'

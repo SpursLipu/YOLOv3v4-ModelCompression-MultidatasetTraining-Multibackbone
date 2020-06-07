@@ -196,13 +196,18 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 | --- | --- | --- | --- | --- | --- | --- |
 |YOLOv3                      |38.74M  |20.39M  |59.13M  |117.3   |0.580  |0.340  |
 |YOLOv3tiny                  |6.00M   |2.45M   |8.45M   |9.9     |0.347  |0.168  |
-|YOLOv3-mobilenetv3          |2.84M   |20.25M  |23.09M  |32.2    |0.684  |0.419  |
-|YOLOv3tiny-mobilenetv3-small|0.92M   |2.00M   |2.92M   |2.9     |0.396  |0.213  |
+|YOLOv3-mobilenetv3          |2.84M   |20.25M  |23.09M  |32.2    |0.547  |0.346  |
+|YOLOv3tiny-mobilenetv3-small|0.92M   |2.00M   |2.92M   |2.9     |0.342  |0.182  |
 |YOLOv4                      |-       |-       |61.35M  |107.1   |0.650  |0.438  |
+
+注：YOLOv3,YOLOv3tiny和YOLOv4是在coco2014上训练和测试的，YOLOv3-mobilenetv3和YOLOv3tiny-mobilenetv3-small是在coco2017上训练和测试的。
+
+训练测试集与训练集应当相匹配，不匹配会造成map虚高的问题。原因参照[issue](https://github.com/ultralytics/yolov3/issues/970)
+
 ## 训练指令
 1、YOLOv3
 ```bash
-python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weights/yolov3-608.weights --cfg cfg/yolov3/yolov3.cfg --img_size ...
+python3 train.py --data data/... --batch-size ... -pt --weights weights/yolov3-608.weights --cfg cfg/yolov3/yolov3.cfg --img_size ...
 ```
 
 权重文件下载
@@ -212,7 +217,7 @@ python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weight
 
 2、YOLOv3tiny
 ```bash
-python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weights/yolov3tiny.weights --cfg cfg/yolov3tiny/yolov3-tiny.cfg --img_size ...
+python3 train.py --data data/... --batch-size ... -pt --weights weights/yolov3tiny.weights --cfg cfg/yolov3tiny/yolov3-tiny.cfg --img_size ...
 ```
 
 - [COCO预训练权重文件](https://pan.baidu.com/s/1iWGxdjR3TWxEe37__msyRA)
@@ -221,7 +226,7 @@ python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weight
   
 3、YOLOv3tiny-mobilenet-small
 ```bash
-python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weights/yolov3tiny-mobilenet-small.weights --cfg cfg/yolov3tiny-mobilenet-small/yolov3tiny-mobilenet-small-coco.cfg --img_size ...
+python3 train.py --data data/... --batch-size ... -pt --weights weights/yolov3tiny-mobilenet-small.weights --cfg cfg/yolov3tiny-mobilenet-small/yolov3tiny-mobilenet-small-coco.cfg --img_size ...
 ```
 
 - [COCO预训练权重文件](https://pan.baidu.com/s/1vWRcn5A95PoYhBtB2rWH8A)
@@ -230,7 +235,7 @@ python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weight
 
 4、YOLOv3-mobilenet
 ```bash
-python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weights/yolov3-mobilenet.weights --cfg cfg/yolov3-mobilenet/yolov3-mobilenet-coco.cfg --img_size ...
+python3 train.py --data data/... --batch-size ... -pt --weights weights/yolov3-mobilenet.weights --cfg cfg/yolov3-mobilenet/yolov3-mobilenet-coco.cfg --img_size ...
 ```
 
 - [COCO预训练权重文件](https://pan.baidu.com/s/1EI2Xh1i18CRLoZo_P3NVHw)
@@ -239,7 +244,7 @@ python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weight
 
 5、YOLOv4
 ```bash
-python3 train.py --data data/coco2017.data --batch-size ... -pt --weights weights/yolov4.weights --cfg cfg/yolov4/yolov4.cfg --img_size ...
+python3 train.py --data data/... --batch-size ... -pt --weights weights/yolov4.weights --cfg cfg/yolov4/yolov4.cfg --img_size ...
 ```
 
 - [COCO预训练权重文件](https://pan.baidu.com/s/1jAGNNC19oQhAIgBfUrkzmQ)

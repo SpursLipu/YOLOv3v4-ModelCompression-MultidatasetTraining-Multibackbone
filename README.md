@@ -197,7 +197,7 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 |YOLOv3                      |38.74M  |20.39M  |59.13M  |117.3   |0.580  |0.340  |
 |YOLOv3tiny                  |6.00M   |2.45M   |8.45M   |9.9     |0.347  |0.168  |
 |YOLOv3-mobilenetv3          |2.84M   |20.25M  |23.09M  |32.2    |0.547  |0.346  |
-|YOLOv3tiny-mobilenetv3-small|0.92M   |2.00M   |2.92M   |2.9     |0.342  |0.182  |
+|YOLOv3tiny-mobilenetv3-small|0.92M   |2.00M   |2.92M   |2.9     |0.375  |0.213  |
 |YOLOv4                      |-       |-       |61.35M  |107.1   |0.650  |0.438  |
 
 注：YOLOv3,YOLOv3tiny和YOLOv4是在coco2014上训练和测试的，YOLOv3-mobilenetv3和YOLOv3tiny-mobilenetv3-small是在coco2017上训练和测试的。

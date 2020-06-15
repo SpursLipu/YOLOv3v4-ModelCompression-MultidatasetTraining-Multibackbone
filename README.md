@@ -77,7 +77,7 @@
 
 mAP统计
 
-|<center>数据集</center>|<center>YOLOv3-608</center>|<center>YOLOv4-640</center>|<center>YOLOv3-mobilenet-640</center>|
+|<center>数据集</center>|<center>YOLOv3-640</center>|<center>YOLOv4-640</center>|<center>YOLOv3-mobilenet-640</center>|
 | --- |--- |--- |--- |
 |<center>Dior遥感数据集</center>|<center>0.56</center>|
 |<center>bdd100k自动驾驶数据集</center>|<center>0.38</center>|

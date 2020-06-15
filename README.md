@@ -81,7 +81,7 @@ mAP统计
 | --- |--- |--- |--- |
 |<center>Dior遥感数据集</center>|<center>0.56</center>|
 |<center>bdd100k自动驾驶数据集</center>|<center>0.38</center>|
-|<center>visdrone无人机航拍数据集</center>|<center>0.273</center>|<center>0.324</center>|<center>0.348</center>|
+|<center>visdrone无人机航拍数据集</center>|<center>0.311</center>|<center>0.383</center>|<center>0.348</center>|
 
 
 下载地址如下，下载并解压后将文件夹拷贝至data目录下即可使用。

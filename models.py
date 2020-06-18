@@ -2,7 +2,8 @@ from utils.google_utils import *
 from utils.layers import *
 from utils.parse_config import *
 from utils.quantized_lowbit import *
-from utils.quantized import *
+from utils.quantized_google import *
+from utils.quantized_dorefa import *
 
 ONNX_EXPORT = False
 
@@ -68,6 +69,13 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                     if mdef['activation'] == 'relu':
                         modules.add_module('activation', nn.ReLU())
             else:
+                if quantized == 2:
+                    modules.add_module('Conv2d', DorefaConv2d(in_channels=output_filters[-1],
+                                                              out_channels=filters,
+                                                              kernel_size=kernel_size,
+                                                              stride=int(mdef['stride']),
+                                                              padding=pad,
+                                                              bias=not bn))
                 if quantized == 3:
                     modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
                                                                  out_channels=filters,
@@ -102,7 +110,15 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
             filters = int(mdef['filters'])
             kernel_size = int(mdef['size'])
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
-            if quantized == 3:
+            if quantized == 2:
+                modules.add_module('DepthWise2d', DorefaConv2d(in_channels=output_filters[-1],
+                                                               out_channels=filters,
+                                                               kernel_size=kernel_size,
+                                                               stride=int(mdef['stride']),
+                                                               padding=pad,
+                                                               groups=output_filters[-1],
+                                                               bias=not bn))
+            elif quantized == 3:
                 modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
                                                                   out_channels=filters,
                                                                   kernel_size=kernel_size,

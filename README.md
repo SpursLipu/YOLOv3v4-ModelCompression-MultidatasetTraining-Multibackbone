@@ -200,13 +200,13 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 # 二、多种网络结构
 在mobilenetv3基础上设计了两种网络结构
 
-|结构名称 |<center>backbone参数量</center>|<center>后处理参数量</center> |<center>总参数量</center> |<center>GFLOPS</center> |<center>mAP0.5</center> |<center>mAP0.5:0.95</center> |<center>speed(inference/NMS/total)</center> |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-|YOLOv3                      |38.74M  |20.39M  |59.13M  |117.3   |0.580  |0.340  |12.3/1.7/14.0 ms 71.4fps  |
-|YOLOv3tiny                  |6.00M   |2.45M   |8.45M   |9.9     |0.347  |0.168  |3.5/1.8/5.3 ms   188.7fps |
-|YOLOv3-mobilenetv3          |2.84M   |20.25M  |23.09M  |32.2    |0.547  |0.346  |7.9/1.8/9.7 ms   103.1fps |
-|YOLOv3tiny-mobilenetv3-small|0.92M   |2.00M   |2.92M   |2.9     |0.379  |0.214  |5.2/1.9/7.1 ms   140.8fps |
-|YOLOv4                      |-       |-       |61.35M  |107.1   |0.650  |0.438  |13.5/1.8/15.3 ms 65.4fps  |
+|结构名称 |<center>backbone参数量</center>|<center>后处理参数量</center> |<center>总参数量</center> |<center>GFLOPS</center> |<center>mAP0.5</center> |<center>mAP0.5:0.95</center> |<center>speed(inference/NMS/total)</center> |<center>FPS</center> |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|YOLOv3                      |38.74M  |20.39M  |59.13M  |117.3   |0.580  |0.340  |12.3/1.7/14.0 ms|71.4fps  |
+|YOLOv3tiny                  |6.00M   |2.45M   |8.45M   |9.9     |0.347  |0.168  |3.5/1.8/5.3 ms  |188.7fps |
+|YOLOv3-mobilenetv3          |2.84M   |20.25M  |23.09M  |32.2    |0.547  |0.346  |7.9/1.8/9.7 ms  |103.1fps |
+|YOLOv3tiny-mobilenetv3-small|0.92M   |2.00M   |2.92M   |2.9     |0.379  |0.214  |5.2/1.9/7.1 ms  |140.8fps |
+|YOLOv4                      |-       |-       |61.35M  |107.1   |0.650  |0.438  |13.5/1.8/15.3 ms|65.4fps  |
 
 注：
 

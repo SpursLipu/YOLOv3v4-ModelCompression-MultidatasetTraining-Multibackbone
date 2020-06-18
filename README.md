@@ -4,12 +4,15 @@ This project mainly include three parts.
 本项目包含三部分内容：
 
 1.Provides training methods for multiple mainstream object detection datasets(coco2017, coco2014, BDD100k, Visdrone, Hand)
+
 1、提供多个主流目标检测数据集的预处理后文件及训练方法。
 
 2.Provides a mainstream model compression algorithm including pruning, quantization, and knowledge distillation.
+
 2、提供包括剪植，量化，知识蒸馏的主流模型压缩算法实现。
 
 3.Provides multiple backbone for yolov3 including Darknet-YOLOv3，Tiny-YOLOv3，Mobilenetv3-YOLOv3
+
 3、提供多backbone训练目前包括Darknet-YOLOv3，Tiny-YOLOv3，Mobilenetv3-YOLOv3。
 
 其中：

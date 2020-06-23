@@ -17,7 +17,7 @@ def parse_module_defs2(module_defs):
     shortcut_all = set()
     for i, module_def in enumerate(module_defs):
         if module_def['type'] == 'convolutional':
-            if module_def['batch_normalize'] == '1':
+            if module_def['batch_normalize']:
                 CBL_idx.append(i)
             else:
                 Conv_idx.append(i)
@@ -51,7 +51,7 @@ def parse_module_defs(module_defs):
     Other_idx = []
     for i, module_def in enumerate(module_defs):
         if module_def['type'] == 'convolutional':
-            if module_def['batch_normalize'] == '1':
+            if module_def['batch_normalize']:
                 CBL_idx.append(i)
             else:
                 Other_idx.append(i)
@@ -85,7 +85,7 @@ def parse_module_defs4(module_defs):
     shortcut_idx = []
     for i, module_def in enumerate(module_defs):
         if module_def['type'] == 'convolutional':
-            if module_def['batch_normalize'] == '1':
+            if module_def['batch_normalize']:
                 CBL_idx.append(i)
             else:
                 Conv_idx.append(i)
@@ -161,7 +161,7 @@ def get_input_mask(module_defs, idx, CBLidx2mask):
         return CBLidx2mask[idx - 2]
     elif module_defs[idx - 1]['type'] == 'route':
         route_in_idxs = []
-        for layer_i in module_defs[idx - 1]['layers'].split(","):
+        for layer_i in module_defs[idx - 1]['layers']:
             if int(layer_i) < 0:
                 route_in_idxs.append(idx - 1 + int(layer_i))
             else:

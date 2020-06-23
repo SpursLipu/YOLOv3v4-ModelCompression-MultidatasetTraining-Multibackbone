@@ -4,6 +4,7 @@ from utils.parse_config import *
 from utils.quantized_lowbit import *
 from utils.quantized_google import *
 from utils.quantized_dorefa import *
+import copy
 
 ONNX_EXPORT = False
 
@@ -323,9 +324,14 @@ class Darknet(nn.Module):
     def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, qlayers=-1):
         super(Darknet, self).__init__()
 
-        self.module_defs = parse_model_cfg(cfg)
+        if isinstance(cfg, str):
+            self.module_defs = parse_model_cfg(cfg)
+        elif isinstance(cfg, list):
+            self.module_defs = cfg
         self.quantized = quantized
         self.qlayers = qlayers
+
+        self.hyperparams = copy.deepcopy(self.module_defs[0])
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
                                                       qlayers=self.qlayers)
         self.yolo_layers = get_yolo_layers(self)

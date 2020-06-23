@@ -124,7 +124,7 @@ if __name__ == '__main__':
     valid_path = data_config["valid"]
     class_names = load_classes(data_config["names"])
     # test model
-    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data)
+    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, imgsz=opt.img_size)
     # 获取参数个数
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 

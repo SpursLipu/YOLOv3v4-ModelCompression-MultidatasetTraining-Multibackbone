@@ -186,19 +186,6 @@ class ModelEMA:
                 if v.dtype.is_floating_point:
                     v *= d
                     v += (1. - d) * msd[k].detach()
-                # if type(model) in (nn.parallel.DataParallel, nn.parallel.DistributedDataParallel):
-                #     quantized = model.module.quantized
-                # else:
-                #     quantized = model.quantized
-                # if quantized == -1:
-                #     if v.dtype.is_floating_point:
-                #         v *= d
-                #         v += (1. - d) * msd[k].detach()
-                # else:
-                #     key = k.split('.')[-1]
-                #     if key == 'weight' or key == 'bias':
-                #         v *= d
-                #         v += (1. - d) * msd[k].detach()
 
     def update_attr(self, model):
         # Assign attributes (which may change during training)

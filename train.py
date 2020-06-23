@@ -380,13 +380,12 @@ def train(hyp):
                                       data,
                                       batch_size=batch_size,
                                       imgsz=imgsz_test,
-                                      model=ema.ema if opt.quantized == -1 else model,
+                                      # model=ema.ema if opt.quantized == -1 else model,
+                                      model=model,
                                       save_json=final_epoch and is_coco,
                                       single_cls=opt.single_cls,
                                       dataloader=testloader,
-                                      multi_label=ni > n_burn,
-                                      quantized=opt.quantized,
-                                      qlayers=opt.qlayers)
+                                      multi_label=ni > n_burn, )
 
         # Write
         with open(results_file, 'a') as f:

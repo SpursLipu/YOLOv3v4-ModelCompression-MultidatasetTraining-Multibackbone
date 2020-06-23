@@ -33,7 +33,7 @@ def test(cfg,
             os.remove(f)
 
         # Initialize model
-        model = Darknet(cfg, imgsz, quantized=opt.quantized, qlayers=opt.qlayers)
+        model = Darknet(cfg, imgsz, quantized=quantized, qlayers=qlayers)
 
         # Load weights
         attempt_download(weights)
@@ -63,7 +63,7 @@ def test(cfg,
 
     # Dataloader
     if dataloader is None:
-        dataset = LoadImagesAndLabels(path, imgsz, batch_size, rect=True, single_cls=opt.single_cls)
+        dataset = LoadImagesAndLabels(path, imgsz, batch_size, rect=True, single_cls=single_cls)
         batch_size = min(batch_size, len(dataset))
         dataloader = DataLoader(dataset,
                                 batch_size=batch_size,

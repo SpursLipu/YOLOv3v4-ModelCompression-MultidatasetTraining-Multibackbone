@@ -1,4 +1,4 @@
 classes= 1
-train=data/train.txt
-valid=data/valid.txt
+train=data/hand/train.txt
+valid=data/hand/valid.txt
 names=data/oxfordhand.names

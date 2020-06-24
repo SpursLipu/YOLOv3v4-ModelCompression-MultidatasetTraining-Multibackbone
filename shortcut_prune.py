@@ -251,10 +251,13 @@ if __name__ == '__main__':
             anchor = line.split(' = ')[1]
             break
     file.close()
-    for item in compact_module_defs:
-        if item['type'] == 'yolo':
-            item['anchors'] = anchor
 
+    for item in compact_module_defs:
+        if item['type'] == 'route':
+            item['layers'] = ",".join('%s' % i for i in item['layers'])
+        elif item['type'] == 'yolo':
+            item['mask'] = ",".join('%s' % i for i in item['mask'])
+            item['anchors'] = anchor
     pruned_cfg_file = write_cfg(pruned_cfg_name, [model.hyperparams.copy()] + compact_module_defs)
     print(f'Config file has been saved: {pruned_cfg_file}')
 

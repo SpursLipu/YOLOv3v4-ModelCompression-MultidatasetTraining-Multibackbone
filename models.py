@@ -76,6 +76,7 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                                                               kernel_size=kernel_size,
                                                               stride=int(mdef['stride']),
                                                               padding=pad,
+                                                              groups=mdef['groups'] if 'groups' in mdef else 1,
                                                               bias=not bn))
                 if quantized == 3:
                     modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
@@ -83,6 +84,7 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                                                                  kernel_size=kernel_size,
                                                                  stride=int(mdef['stride']),
                                                                  padding=pad,
+                                                                 groups=mdef['groups'] if 'groups' in mdef else 1,
                                                                  bias=not bn))
                 else:
                     modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
@@ -90,6 +92,7 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                                                            kernel_size=kernel_size,
                                                            stride=int(mdef['stride']),
                                                            padding=pad,
+                                                           groups=mdef['groups'] if 'groups' in mdef else 1,
                                                            bias=not bn))
                 if bn:
                     modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
@@ -167,8 +170,11 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                 modules = maxpool
 
         elif mdef['type'] == 'se':
-            filters = int(mdef['filters'])
-            modules.add_module('se', SE(channel=filters))
+            if 'filters' in mdef:
+                filters = int(mdef['filters'])
+                modules.add_module('se', SE(channel=filters))
+            if 'reduction' in mdef:
+                modules.add_module('se', SE(output_filters[-1], reduction=int(mdef['reduction'])))
 
         elif mdef['type'] == 'upsample':
             if ONNX_EXPORT:  # explicitly state size, avoid scale_factor

@@ -126,7 +126,7 @@ if __name__ == '__main__':
         _ = load_darknet_weights(model, opt.weights)
     print('\nloaded weights from ', opt.weights)
 
-    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=16, img_size=img_size)
+    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=16, imgsz=img_size)
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
     print("\nlet's test the original model first:")
@@ -237,20 +237,18 @@ if __name__ == '__main__':
 
     for module_def in compact_module_defs:
         if module_def['type'] == 'route':
-            from_layers = [int(s) for s in module_def['layers'].split(',')]
+            from_layers = [int(s) for s in module_def['layers']]
             if len(from_layers) == 2:
                 count = 0
                 for i in index_prune:
                     if i <= from_layers[1]:
                         count += 1
                 from_layers[1] = from_layers[1] - count
-                from_layers = ', '.join([str(s) for s in from_layers])
+                # from_layers = ', '.join([str(s) for s in from_layers])
                 module_def['layers'] = from_layers
 
     compact_module_defs = [compact_module_defs[i] for i in index_remain]
     compact_model2 = Darknet([compact_model1.hyperparams.copy()] + compact_module_defs, (img_size, img_size)).to(device)
-    for i, index in enumerate(index_remain):
-        compact_model2.module_list[i] = pruned_model.module_list[index]
 
     compact_nparameters2 = obtain_num_parameters(compact_model2)
 

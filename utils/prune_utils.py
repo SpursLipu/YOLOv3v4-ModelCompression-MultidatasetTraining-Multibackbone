@@ -291,7 +291,7 @@ def prune_model_keep_size2(model, prune_idx, CBL_idx, CBLidx2mask):
 
         elif model_def['type'] == 'shortcut':
             actv1 = activations[i - 1]
-            from_layer = int(model_def['from'])
+            from_layer = int(model_def['from'][0])
             actv2 = activations[i + from_layer]
             activation = actv1 + actv2
             update_activation(i, pruned_model, activation, CBL_idx)
@@ -301,7 +301,7 @@ def prune_model_keep_size2(model, prune_idx, CBL_idx, CBLidx2mask):
 
         elif model_def['type'] == 'route':
             # spp不参与剪枝，其中的route不用更新，仅占位
-            from_layers = [int(s) for s in model_def['layers'].split(',')]
+            from_layers = [int(s) for s in model_def['layers']]
             activation = None
             if len(from_layers) == 1:
                 activation = activations[i + from_layers[0]]
@@ -350,7 +350,7 @@ def merge_mask(model, CBLidx2mask, CBLidx2filters):
                     if bn:
                         Merge_masks.append(CBLidx2mask[layer_i - 1].unsqueeze(0))
 
-                layer_i = int(model.module_defs[layer_i]['from']) + layer_i
+                layer_i = int(model.module_defs[layer_i]['from'][0]) + layer_i
                 mtype = model.module_defs[layer_i]['type']
 
                 if mtype == 'convolutional':
@@ -374,7 +374,7 @@ def merge_mask(model, CBLidx2mask, CBLidx2filters):
                         CBLidx2mask[layer_i - 1] = merge_mask
                         CBLidx2filters[layer_i - 1] = int(torch.sum(merge_mask).item())
 
-                layer_i = int(model.module_defs[layer_i]['from']) + layer_i
+                layer_i = int(model.module_defs[layer_i]['from'][0]) + layer_i
                 mtype = model.module_defs[layer_i]['type']
 
                 if mtype == 'convolutional':

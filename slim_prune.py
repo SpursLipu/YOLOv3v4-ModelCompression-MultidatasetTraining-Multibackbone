@@ -29,7 +29,7 @@ if __name__ == '__main__':
         _ = load_darknet_weights(model, opt.weights)
     print('\nloaded weights from ', opt.weights)
 
-    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=16, img_size=img_size)
+    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=16, imgsz=img_size)
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
     print("\nlet's test the original model first:")
@@ -172,6 +172,26 @@ if __name__ == '__main__':
     print(AsciiTable(metric_table).table)
 
     pruned_cfg_name = opt.cfg.replace('/', f'/prune_{opt.percent}_keep_{opt.layer_keep}_')
+    # 创建存储目录
+    dir_name = pruned_cfg_name.split('/')[0] + '/' + pruned_cfg_name.split('/')[1]
+    if not os.path.isdir(dir_name):
+        os.makedirs(dir_name)
+
+    # 由于原始的compact_module_defs将anchor从字符串变为了数组，因此这里将anchors重新变为字符串
+    file = open(opt.cfg, 'r')
+    lines = file.read().split('\n')
+    for line in lines:
+        if line.split(' = ')[0] == 'anchors':
+            anchor = line.split(' = ')[1]
+            break
+    file.close()
+
+    for item in compact_module_defs:
+        if item['type'] == 'route':
+            item['layers'] = ",".join('%s' % i for i in item['layers'])
+        elif item['type'] == 'yolo':
+            item['mask'] = ",".join('%s' % i for i in item['mask'])
+            item['anchors'] = anchor
     pruned_cfg_file = write_cfg(pruned_cfg_name, [model.hyperparams.copy()] + compact_module_defs)
     print(f'Config file has been saved: {pruned_cfg_file}')
 

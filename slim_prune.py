@@ -8,6 +8,70 @@ import time
 from utils.prune_utils import *
 import argparse
 
+
+# %%
+def obtain_filters_mask(model, thre, CBL_idx, prune_idx):
+    pruned = 0
+    total = 0
+    num_filters = []
+    filters_mask = []
+    for idx in CBL_idx:
+        bn_module = model.module_list[idx][1]
+        if idx in prune_idx:
+
+            weight_copy = bn_module.weight.data.abs().clone()
+
+            channels = weight_copy.shape[0]  #
+            min_channel_num = int(channels * opt.layer_keep) if int(channels * opt.layer_keep) > 0 else 1
+            mask = weight_copy.gt(thresh).float()
+
+            if int(torch.sum(mask)) < min_channel_num:
+                _, sorted_index_weights = torch.sort(weight_copy, descending=True)
+                mask[sorted_index_weights[:min_channel_num]] = 1.
+            remain = int(mask.sum())
+            pruned = pruned + mask.shape[0] - remain
+
+            print(f'layer index: {idx:>3d} \t total channel: {mask.shape[0]:>4d} \t '
+                  f'remaining channel: {remain:>4d}')
+        else:
+            mask = torch.ones(bn_module.weight.data.shape)
+            remain = mask.shape[0]
+
+        total += mask.shape[0]
+        num_filters.append(remain)
+        filters_mask.append(mask.clone())
+
+    prune_ratio = pruned / total
+    print(f'Prune channels: {pruned}\tPrune ratio: {prune_ratio:.3f}')
+
+    return num_filters, filters_mask
+
+
+def prune_and_eval(model, CBL_idx, CBLidx2mask):
+    model_copy = deepcopy(model)
+
+    for idx in CBL_idx:
+        bn_module = model_copy.module_list[idx][1]
+        mask = CBLidx2mask[idx].cuda()
+        bn_module.weight.data.mul_(mask)
+
+    with torch.no_grad():
+        mAP = eval_model(model_copy)[0][2]
+
+    print(f'mask the gamma as zero, mAP of the model is {mAP:.4f}')
+
+
+def obtain_avg_forward_time(input, model, repeat=200):
+    model.eval()
+    start = time.time()
+    with torch.no_grad():
+        for i in range(repeat):
+            output = model(input)
+    avg_infer_time = (time.time() - start) / repeat
+
+    return avg_infer_time, output
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--cfg', type=str, default='cfg/yolov3.cfg', help='cfg file path')
@@ -48,46 +112,6 @@ if __name__ == '__main__':
 
     print(f'Global Threshold should be less than {thresh:.4f}.')
 
-
-    # %%
-    def obtain_filters_mask(model, thre, CBL_idx, prune_idx):
-
-        pruned = 0
-        total = 0
-        num_filters = []
-        filters_mask = []
-        for idx in CBL_idx:
-            bn_module = model.module_list[idx][1]
-            if idx in prune_idx:
-
-                weight_copy = bn_module.weight.data.abs().clone()
-
-                channels = weight_copy.shape[0]  #
-                min_channel_num = int(channels * opt.layer_keep) if int(channels * opt.layer_keep) > 0 else 1
-                mask = weight_copy.gt(thresh).float()
-
-                if int(torch.sum(mask)) < min_channel_num:
-                    _, sorted_index_weights = torch.sort(weight_copy, descending=True)
-                    mask[sorted_index_weights[:min_channel_num]] = 1.
-                remain = int(mask.sum())
-                pruned = pruned + mask.shape[0] - remain
-
-                print(f'layer index: {idx:>3d} \t total channel: {mask.shape[0]:>4d} \t '
-                      f'remaining channel: {remain:>4d}')
-            else:
-                mask = torch.ones(bn_module.weight.data.shape)
-                remain = mask.shape[0]
-
-            total += mask.shape[0]
-            num_filters.append(remain)
-            filters_mask.append(mask.clone())
-
-        prune_ratio = pruned / total
-        print(f'Prune channels: {pruned}\tPrune ratio: {prune_ratio:.3f}')
-
-        return num_filters, filters_mask
-
-
     num_filters, filters_mask = obtain_filters_mask(model, thresh, CBL_idx, prune_idx)
     CBLidx2mask = {idx: mask for idx, mask in zip(CBL_idx, filters_mask)}
     CBLidx2filters = {idx: filters for idx, filters in zip(CBL_idx, num_filters)}
@@ -98,21 +122,6 @@ if __name__ == '__main__':
 
     print('merge the mask of layers connected to shortcut!')
     merge_mask(model, CBLidx2mask, CBLidx2filters)
-
-
-    def prune_and_eval(model, CBL_idx, CBLidx2mask):
-        model_copy = deepcopy(model)
-
-        for idx in CBL_idx:
-            bn_module = model_copy.module_list[idx][1]
-            mask = CBLidx2mask[idx].cuda()
-            bn_module.weight.data.mul_(mask)
-
-        with torch.no_grad():
-            mAP = eval_model(model_copy)[0][2]
-
-        print(f'mask the gamma as zero, mAP of the model is {mAP:.4f}')
-
 
     prune_and_eval(model, CBL_idx, CBLidx2mask)
 
@@ -141,19 +150,6 @@ if __name__ == '__main__':
     init_weights_from_loose_model(compact_model, pruned_model, CBL_idx, Conv_idx, CBLidx2mask)
 
     random_input = torch.rand((1, 3, img_size, img_size)).to(device)
-
-
-    def obtain_avg_forward_time(input, model, repeat=200):
-
-        model.eval()
-        start = time.time()
-        with torch.no_grad():
-            for i in range(repeat):
-                output = model(input)
-        avg_infer_time = (time.time() - start) / repeat
-
-        return avg_infer_time, output
-
 
     print('testing inference time...')
     pruned_forward_time, pruned_output = obtain_avg_forward_time(random_input, pruned_model)

@@ -164,6 +164,16 @@ python3 train.py --data data/bdd100k.data --batch-size ... --weights weights/yol
 python train.py --data data/visdrone.data --batch-size ... --weights weights/yolov3-608.weights -pt --cfg cfg/yolov3/yolov3-visdrone.cfg  --img-size ... --epochs ...
 ```
 
+- [oxfordhand数据集](https://pan.baidu.com/s/1JL4gFGh-W_gYEEsiIQssZw)
+  
+  提取码：3du4
+
+训练指令
+
+```bash
+python train.py --data data/oxfordhand.data --batch-size ... --weights weights/yolov3-608.weights -pt --cfg cfg/yolov3/yolov3-visdrone.cfg  --img-size ... --epochs ...
+```
+
 ## 1、Dior数据集
 DIRO数据集是地球观测社区中最大、最多样化和公开可用的目标检测数据集之一。其中船舶和车辆的实例数较高，在小型实例和大型实例之间实现了良好的平衡。图片采集自Google Earth。
 
@@ -196,6 +206,7 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 ### 检测效果YOLOv4
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/5.jpg)
 ![检测效果](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/6.png)
+
 
 # 二、多种网络结构
 在mobilenetv3基础上设计了两种网络结构

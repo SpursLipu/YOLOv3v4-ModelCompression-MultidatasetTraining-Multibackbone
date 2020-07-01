@@ -253,7 +253,9 @@ if __name__ == '__main__':
     file.close()
 
     for item in compact_module_defs:
-        if item['type'] == 'route':
+        if item['type'] == 'shortcut':
+            item['from'] = str(item['from'][0])
+        elif item['type'] == 'route':
             item['layers'] = ",".join('%s' % i for i in item['layers'])
         elif item['type'] == 'yolo':
             item['mask'] = ",".join('%s' % i for i in item['mask'])

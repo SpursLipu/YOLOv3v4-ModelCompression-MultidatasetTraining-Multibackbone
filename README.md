@@ -300,7 +300,7 @@ python3 train.py --data ... -pt --batch-size ... --weights ... --cfg ...
 指令范例：
 
 ```bash
-python3 train.py --data ... -pt --batch-size 32 --accumulate 1 --weights ... --cfg ... -sr --s 0.001 --prune 0 
+python3 train.py --data ... -pt --batch-size 32  --weights ... --cfg ... -sr --s 0.001 --prune 0 
 ```
 
 3.模型剪枝

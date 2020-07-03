@@ -350,7 +350,7 @@ python3 layer_channel_prune.py --cfg ... --data ... --weights ... --shortcut ...
 
 ### 剪植实验
 1、正常剪植 
-oxfprdhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
+oxfordhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
 
 |<center>模型</center> |<center>剪植前参数量</center> |<center>剪植前mAP</center>|<center>剪植前推理时间</center>|<center>剪植率</center> |<center>剪植后参数量</center> |<center>剪植后mAP</center> |<center>剪植后推理时间</center>
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -358,7 +358,7 @@ oxfprdhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
 |yolov3tiny(微调)   |8.27M    |0.708   |0.0144s   |0.5    |1.13M  |0.641 |0.0116s |
 
 2、规则剪植
-oxfprdhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
+oxfordhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
 
 |<center>模型</center> |<center>剪植前参数量</center> |<center>剪植前mAP</center>|<center>剪植前推理时间</center>|<center>剪植率</center> |<center>剪植后参数量</center> |<center>剪植后mAP</center> |<center>剪植后推理时间</center>
 | --- | --- | --- | --- | --- | --- | --- | --- |

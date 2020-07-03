@@ -88,7 +88,7 @@ mAP统计
 |<center>数据集</center>|<center>YOLOv3-640</center>|<center>YOLOv4-640</center>|<center>YOLOv3-mobilenet-640</center>|
 | --- |--- |--- |--- |
 |<center>Dior遥感数据集</center>|<center>0.56</center>|
-|<center>bdd100k自动驾驶数据集</center>|<center>0.38</center>|
+|<center>bdd100k自动驾驶数据集</center>|<center>0.543</center>|
 |<center>visdrone无人机航拍数据集</center>|<center>0.311</center>|<center>0.383</center>|<center>0.348</center>|
 
 
@@ -132,9 +132,9 @@ python3 train.py --data data/dior.data --batch-size ... --weights weights/yolov3
   
   提取码：8duw
   
-- [bdd100k权重文件](https://pan.baidu.com/s/1E8aDznODhmH4DwPpV_Gbpg)
+- [bdd100k权重文件](https://pan.baidu.com/s/1wWiHlLxIaK_WHy_mG2wmAA)
 
-  提取码：q076
+  提取码：xeqo
   
 训练指令
 
@@ -347,6 +347,23 @@ python3 layer_channel_prune.py --cfg ... --data ... --weights ... --shortcut ...
 
 需要注意的是，这里需要在.py文件内，将opt内的cfg和weights变量指向第2步稀疏化后生成的cfg文件和weights文件。
 此外，可通过增大代码中percent的值来获得更大的压缩率。（若稀疏化不到位，且percent值过大，程序会报错。）
+
+### 剪植实验
+1、正常剪植 
+oxfprdhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
+
+|<center>模型</center> |<center>剪植前参数量</center> |<center>剪植前mAP</center>|<center>剪植前推理时间</center>|<center>剪植率</center> |<center>剪植后参数量</center> |<center>剪植后mAP</center> |<center>剪植后推理时间</center>
+| --- | --- | --- | --- | --- | --- | --- | --- |
+|yolov3(不微调)     |58.67M   |0.806   |0.1139s   |0.8    |10.32M |0.802 |0.0844s |
+|yolov3tiny(微调)   |8.27M    |0.708   |0.0144s   |0.5    |1.13M  |0.641 |0.0116s |
+
+2、规则剪植
+oxfprdhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
+
+|<center>模型</center> |<center>剪植前参数量</center> |<center>剪植前mAP</center>|<center>剪植前推理时间</center>|<center>剪植率</center> |<center>剪植后参数量</center> |<center>剪植后mAP</center> |<center>剪植后推理时间</center>
+| --- | --- | --- | --- | --- | --- | --- | --- |
+|yolov3(不微调)     |58.67M   |0.806   |0.1139s   |0.8    |12.15M |0.805 |0.0874s |
+|yolov3tiny(微调)   |8.27M    |0.708   |0.0144s   |0.5    |1.82M  |0.703 |0.0122s |
 
 ## 2、量化
 

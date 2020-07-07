@@ -250,7 +250,7 @@ def train(hyp):
     model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device)  # attach class weights
 
     # Model EMA
-    if opt.quantized == -1:
+    if opt.ema:
         ema = torch_utils.ModelEMA(model)
 
     # Start training
@@ -324,6 +324,12 @@ def train(hyp):
                     soft_target = compute_lost_KD(pred, output_t, model.nc, imgs.size(0))
                 elif opt.KDstr == 2:
                     soft_target, reg_ratio = compute_lost_KD2(model, targets, pred, output_t)
+                elif opt.KDstr == 3:
+                    soft_target = compute_lost_KD3(model, targets, pred, output_t, imgs.size(0))
+                elif opt.KDstr == 4:
+                    soft_target = compute_lost_KD4(model, targets, pred, output_t)
+                elif opt.KDstr == 5:
+                    soft_target = compute_lost_KD5(model, targets, pred, output_t,imgs.size(0))
                 else:
                     print("please select KD strategy!")
                 loss += soft_target
@@ -348,7 +354,7 @@ def train(hyp):
             if ni % accumulate == 0:
                 optimizer.step()
                 optimizer.zero_grad()
-                if opt.quantized == -1:
+                if opt.ema:
                     ema.update(model)
 
             # Print
@@ -371,7 +377,7 @@ def train(hyp):
         scheduler.step()
 
         # Process epoch results
-        if opt.quantized == -1:
+        if opt.ema:
             ema.update_attr(model)
         final_epoch = epoch + 1 == epochs
         if not opt.notest or final_epoch:  # Calculate mAP
@@ -380,8 +386,7 @@ def train(hyp):
                                       data,
                                       batch_size=batch_size,
                                       imgsz=imgsz_test,
-                                      # model=ema.ema if opt.quantized == -1 else model,
-                                      model=model,
+                                      model=ema.ema if opt.ema else model,
                                       save_json=final_epoch and is_coco,
                                       single_cls=opt.single_cls,
                                       dataloader=testloader,
@@ -408,7 +413,7 @@ def train(hyp):
 
         # Save model
         save = (not opt.nosave) or (final_epoch and not opt.evolve)
-        if opt.quantized == -1:
+        if opt.ema:
             if hasattr(model, 'module'):
                 model_temp = ema.ema.module.state_dict()
             else:
@@ -476,6 +481,7 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
+    parser.add_argument('--ema', action='store_true', help='use ema')
     parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--sparsity-regularization', '-sr', dest='sr', action='store_true',
                         help='train with channel sparsity regularization')

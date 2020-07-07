@@ -87,7 +87,7 @@ mAP统计
 
 |<center>数据集</center>|<center>YOLOv3-640</center>|<center>YOLOv4-640</center>|<center>YOLOv3-mobilenet-640</center>|
 | --- |--- |--- |--- |
-|<center>Dior遥感数据集</center>|<center>0.56</center>|
+|<center>Dior遥感数据集</center>|<center>0.749</center>|
 |<center>bdd100k自动驾驶数据集</center>|<center>0.543</center>|
 |<center>visdrone无人机航拍数据集</center>|<center>0.311</center>|<center>0.383</center>|<center>0.348</center>|
 
@@ -117,9 +117,9 @@ python3 train.py --data data/coco2017.data --batch-size ... --weights weights/yo
   
   提取码：vnuq
 
-- [Dior权重文件](https://pan.baidu.com/s/11reX-oNtO-8fKmPIZdt2ow)
+- [Dior权重文件](https://pan.baidu.com/s/12lYOgBAo1R5VkOZqDqCFJQ)
 
-  提取码：lgj5
+  提取码：l8wz
   
 训练指令
 
@@ -354,16 +354,18 @@ oxfordhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
 
 |<center>模型</center> |<center>剪植前参数量</center> |<center>剪植前mAP</center>|<center>剪植前推理时间</center>|<center>剪植率</center> |<center>剪植后参数量</center> |<center>剪植后mAP</center> |<center>剪植后推理时间</center>
 | --- | --- | --- | --- | --- | --- | --- | --- |
-|yolov3(不微调)     |58.67M   |0.806   |0.1139s   |0.8    |10.32M |0.802 |0.0844s |
-|yolov3tiny(微调)   |8.27M    |0.708   |0.0144s   |0.5    |1.13M  |0.641 |0.0116s |
+|yolov3(不微调)           |58.67M   |0.806   |0.1139s   |0.8    |10.32M |0.802 |0.0844s |
+|yolov3-mobilenet(微调)   |22.75M   |0.812   |0.0345s   |0.97   |2.72M  |0.795 |0.0211s |
+|yolov3tiny(微调)         |8.27M    |0.708   |0.0144s   |0.5    |1.13M  |0.641 |0.0116s |
 
 2、规则剪植
 oxfordhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
 
 |<center>模型</center> |<center>剪植前参数量</center> |<center>剪植前mAP</center>|<center>剪植前推理时间</center>|<center>剪植率</center> |<center>剪植后参数量</center> |<center>剪植后mAP</center> |<center>剪植后推理时间</center>
 | --- | --- | --- | --- | --- | --- | --- | --- |
-|yolov3(不微调)     |58.67M   |0.806   |0.1139s   |0.8    |12.15M |0.805 |0.0874s |
-|yolov3tiny(微调)   |8.27M    |0.708   |0.0144s   |0.5    |1.82M  |0.703 |0.0122s |
+|yolov3(不微调)           |58.67M   |0.806   |0.1139s   |0.8    |12.15M |0.805 |0.0874s |
+|yolov3-mobilenet(微调)   |22.75M   |0.812   |0.0345s   |0.97   |2.75M  |0.803 |0.0208s |
+|yolov3tiny(微调)         |8.27M    |0.708   |0.0144s   |0.5    |1.82M  |0.703 |0.0122s |
 
 ## 2、量化
 
@@ -412,7 +414,7 @@ python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size .
 Distilling the Knowledge in a Neural Network
 [参考论文](https://arxiv.org/abs/1503.02531)
 
-`--t_cfg --t_weights` 在命令中加入这两个选项即可以开始蒸馏训练。
+`--t_cfg --t_weights --KDstr` 在命令中加入这两个选项即可以开始蒸馏训练。
 
 其中：
 
@@ -420,6 +422,10 @@ Distilling the Knowledge in a Neural Network
 
 `--t_weights`表示教师网络权重文件。
 
+`--KDstr`表示使用的蒸馏策略。
+
+    `--KDstr 1` 直接在tencher网络的输出和student网络的输出求KLloss并加入到整体的loss中
+    `--KDstr 2` 对boxloss和classloss有所区分
 蒸馏指令范例：
 
 ```bash
@@ -427,3 +433,4 @@ python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size .
 ```
 
 该指令将量化与蒸馏相结合，通过未量化的教师网络提升量化的学生网络，提高学生网络的mAP。
+

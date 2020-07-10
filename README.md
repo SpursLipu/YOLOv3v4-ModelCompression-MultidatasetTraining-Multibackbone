@@ -442,8 +442,9 @@ python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size .
 通常以压缩前模型为teacher模型，压缩后模型为student模型进行蒸馏训练，提高学生网络的mAP。
 
 ### 蒸馏实验
-oxfordhand数据集，img_size = 512，使用yolov3tiny作为teacher网络，normal剪植后的yolov3tiny作为学生网络
+oxfordhand数据集，使用yolov3tiny作为teacher网络，normal剪植后的yolov3tiny作为学生网络
 
-|<center>teacher模型</center> |<center>teacher模型mAP</center> |<center>student模型</center>|<center>直接微调</center>|<center>KDstr 1</center> |<center>KDstr 2</center> |<center>KDstr 3</center> |<center>KDstr 4</center> |<center>KDstr 5</center> |
-| --- | --- | --- | --- | --- | --- | --- |--- |--- |
-|yolov3tiny   |0.708    |normal剪植yolov3tiny    |0.637     |0.644    |0.648  |0.652   |0.655    |0.643   |
+|<center>teacher模型</center> |<center>teacher模型mAP</center> |<center>student模型</center>|<center>直接微调</center>|<center>KDstr 1</center> |<center>KDstr 2</center> |<center>KDstr 3</center> |<center>KDstr 4(L1)</center> |<center>KDstr 4(L2)</center> |<center>KDstr 5</center> |
+| --- | --- | --- | --- | --- | --- | --- |--- |--- |--- |
+|yolov3tiny512   |0.708    |normal剪植yolov3tiny512    |0.637     |0.644    |0.648  |0.652   |0.655    |    |0.643   |
+|yolov3tiny608   |0.708    |normal剪植yolov3tiny608    |0.641     |0.660    |0.661  |0.670   |         |    |        |

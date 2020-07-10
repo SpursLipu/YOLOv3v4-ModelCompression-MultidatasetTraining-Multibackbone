@@ -563,7 +563,9 @@ def compute_lost_KD4(model, targets, output_s, output_t, feature_s, feature_t, b
         exit()
     for i in range(len(feature_t)):
         feature_t[i] = feature_t[i].pow(2).sum(1)
+        # feature_t[i] = feature_t[i].abs().sum(1)
         feature_s[i] = feature_s[i].pow(2).sum(1)
+        # feature_s[i] = feature_s[i].abs().sum(1)
         lfeature += L1(feature_s[i], feature_t[i]) / batch_size
     return lcls * Lambda_cls + lbox * Lambda_box + lfeature * Lambda_feature
 

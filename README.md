@@ -385,7 +385,6 @@ XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
 #### stage-wise 训练策略
 `--qlayers`可以用于选取Darknet中的量化区间，默认为自深层到浅层, 默认值为-1表示无量化层，有效范围为0-74，取0时表示量化所有层，取74时表示无量化层，大于74则无意义。
 
-![Darknet](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining/blob/master/image_in_readme/Darknet-YOLOv3.jpg)
 如：
 
 `--qlayers 63` 表示量化Darknet主体网络中最后四个重复的残差块。
@@ -400,8 +399,13 @@ XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
 python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 1 --qlayers 72
 ```
 ### 定点量化
+`--quantized 2` 使用Dorefa8位定点量化方法
 
-`--quantized 3` 使用8位定点量化方法
+```bash
+python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 2
+```
+
+`--quantized 3` 使用Google白皮书8位定点量化方法
 
 ```bash
 python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 3
@@ -425,12 +429,21 @@ Distilling the Knowledge in a Neural Network
 `--KDstr`表示使用的蒸馏策略。
 
     `--KDstr 1` 直接在tencher网络的输出和student网络的输出求KLloss并加入到整体的loss中
-    `--KDstr 2` 对boxloss和classloss有所区分
+    `--KDstr 2` 对boxloss和classloss有所区分，student不直接向teacher学习。student，teacher和GT分别求l2距离，当student大于teacher时附加一项student和gt的loss。
+    `--KDstr 3` 对boxloss和classloss有所区分，student直接向teacher学习。
+    `--KDstr 4` 将KDloss分为三项，boxloss，classloss和featureloss。
+    `--KDstr 5` 在feature中加入Fine-grain-mask
 蒸馏指令范例：
 
 ```bash
-python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 1 --qlayers 72 --t_cfg ... --t_weights ...
+python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --t_cfg ... --t_weights ...
 ```
 
-该指令将量化与蒸馏相结合，通过未量化的教师网络提升量化的学生网络，提高学生网络的mAP。
+通常以压缩前模型为teacher模型，压缩后模型为student模型进行蒸馏训练，提高学生网络的mAP。
 
+### 蒸馏实验
+oxfordhand数据集，img_size = 512，使用yolov3tiny作为teacher网络，normal剪植后的yolov3tiny作为学生网络
+
+|<center>teacher模型</center> |<center>teacher模型mAP</center> |<center>student模型</center>|<center>直接微调</center>|<center>KDstr 1</center> |<center>KDstr 2</center> |<center>KDstr 3</center> |<center>KDstr 4</center> |<center>KDstr 5</center> |
+| --- | --- | --- | --- | --- | --- | --- |--- |--- |
+|yolov3tiny   |0.708    |normal剪植yolov3tiny    |0.637     |0.644    |0.648  |0.652   |0.655    |0.643   |

@@ -304,7 +304,7 @@ def train(hyp):
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
             # Forward
-            pred = model(imgs)
+            pred, feature_s = model(imgs)
 
             # Loss
             loss, loss_items = compute_loss(pred, targets, model)
@@ -317,19 +317,19 @@ def train(hyp):
             if t_cfg:
                 if mixed_precision:
                     with torch.no_grad():
-                        output_t = t_model(imgs)
+                        output_t, feature_t = t_model(imgs)
                 else:
-                    _, output_t = t_model(imgs)
+                    _, output_t, feature_t = t_model(imgs)
                 if opt.KDstr == 1:
                     soft_target = compute_lost_KD(pred, output_t, model.nc, imgs.size(0))
                 elif opt.KDstr == 2:
                     soft_target, reg_ratio = compute_lost_KD2(model, targets, pred, output_t)
                 elif opt.KDstr == 3:
-                    soft_target = compute_lost_KD3(model, targets, pred, output_t, imgs.size(0))
+                    soft_target = compute_lost_KD3(model, targets, pred, output_t)
                 elif opt.KDstr == 4:
-                    soft_target = compute_lost_KD4(model, targets, pred, output_t)
+                    soft_target = compute_lost_KD4(model, targets, pred, output_t, feature_s, feature_t, imgs.size(0))
                 elif opt.KDstr == 5:
-                    soft_target = compute_lost_KD5(model, targets, pred, output_t,imgs.size(0))
+                    soft_target = compute_lost_KD5(model, targets, pred, output_t, imgs.size(0))
                 else:
                     print("please select KD strategy!")
                 loss += soft_target

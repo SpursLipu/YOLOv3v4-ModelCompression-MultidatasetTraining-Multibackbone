@@ -494,64 +494,7 @@ def compute_lost_KD2(model, targets, output_s, output_t):
     return lcls * Lambda_cls + lbox * Lambda_box, reg_ratio
 
 
-def compute_lost_KD3(model, targets, output_s, output_t, batch_size):
-    T = 3.0
-    Lambda_cls, Lambda_box, Lambda_feature = 0.0001, 0.001, 0.001
-    criterion_st = torch.nn.KLDivLoss(reduction='sum')
-    ft = torch.cuda.FloatTensor if output_s[0].is_cuda else torch.Tensor
-    lcls, lbox = ft([0]), ft([0])
-    feature_s = list(output_s)
-    feature_t = list(output_t)
-    tcls, tbox, indices, anchor_vec = build_targets(output_s, targets, model)
-    mask = fine_grained_imitation_mask(feature_s, feature_t, indices)
-    for i, (ps, pt) in enumerate(zip(output_s, output_t)):  # layer index, layer predictions
-        b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
-
-        nb = len(b)
-        if nb:  # number of targets
-            pss = ps[b, a, gj, gi]  # prediction subset corresponding to targets
-            pts = pt[b, a, gj, gi]
-
-            psxy = torch.sigmoid(pss[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
-            psbox = torch.cat((psxy, torch.exp(pss[:, 2:4]) * anchor_vec[i]), 1).view(-1, 4)  # predicted box
-
-            ptxy = torch.sigmoid(pts[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
-            ptbox = torch.cat((ptxy, torch.exp(pts[:, 2:4]) * anchor_vec[i]), 1).view(-1, 4)  # predicted box
-
-            l2_dis = (psbox - ptbox).pow(2).sum(1)
-            lbox += l2_dis.sum()
-        # cls loss
-        output_s_i = ps[..., 4:].view(-1, model.nc + 1)
-        output_t_i = pt[..., 4:].view(-1, model.nc + 1)
-        lcls += criterion_st(nn.functional.log_softmax(output_s_i / T, dim=1),
-                             nn.functional.softmax(output_t_i / T, dim=1)) * (T * T) / ps.size(0)
-    # feature loss
-    for i in range(len(mask)):
-        mask[i] = mask[i].cuda()
-        feature_t[i] = feature_t[i] * mask[i]
-        feature_s[i] = feature_s[i] * mask[i]
-    feature_s = torch.cat([i.view(-1, 3 * (model.nc + 5)) for i in feature_s])
-    feature_t = torch.cat([i.view(-1, 3 * (model.nc + 5)) for i in feature_t])
-    lfeature = criterion_st(nn.functional.log_softmax(feature_s / T, dim=1),
-                            nn.functional.softmax(feature_t / T, dim=1)) * (T * T) / batch_size
-    return lcls * Lambda_cls + lbox * Lambda_box + lfeature * Lambda_feature
-
-
-def fine_grained_imitation_mask(feature_s, feature_t, indices):
-    if len(feature_t) != len(feature_s):
-        print("feature mismatch!")
-        exit()
-    mask = []
-    for i in range(len(feature_t)):
-        temp = torch.zeros(feature_s[i].size())
-        b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
-        temp[b, a, gj, gi] = 1
-        mask.append(temp)
-    return mask
-
-
-def compute_lost_KD4(model, targets, output_s, output_t):
-    reg_m = 0.0
+def compute_lost_KD3(model, targets, output_s, output_t):
     T = 3.0
     Lambda_cls, Lambda_box = 0.0001, 0.001
 
@@ -585,6 +528,60 @@ def compute_lost_KD4(model, targets, output_s, output_t):
     return lcls * Lambda_cls + lbox * Lambda_box
 
 
+def compute_lost_KD4(model, targets, output_s, output_t, feature_s, feature_t, batch_size):
+    T = 3.0
+    Lambda_cls, Lambda_box, Lambda_feature = 0.0001, 0.001, 0.0001
+    criterion_st = torch.nn.KLDivLoss(reduction='sum')
+    L1 = torch.nn.L1Loss(reduction='mean')
+    ft = torch.cuda.FloatTensor if output_s[0].is_cuda else torch.Tensor
+    lcls, lbox, lfeature = ft([0]), ft([0]), ft([0])
+    tcls, tbox, indices, anchor_vec = build_targets(output_s, targets, model)
+    for i, (ps, pt) in enumerate(zip(output_s, output_t)):  # layer index, layer predictions
+        b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
+
+        nb = len(b)
+        if nb:  # number of targets
+            pss = ps[b, a, gj, gi]  # prediction subset corresponding to targets
+            pts = pt[b, a, gj, gi]
+
+            psxy = torch.sigmoid(pss[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
+            psbox = torch.cat((psxy, torch.exp(pss[:, 2:4]) * anchor_vec[i]), 1).view(-1, 4)  # predicted box
+
+            ptxy = torch.sigmoid(pts[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
+            ptbox = torch.cat((ptxy, torch.exp(pts[:, 2:4]) * anchor_vec[i]), 1).view(-1, 4)  # predicted box
+
+            l2_dis = (psbox - ptbox).pow(2).sum(1)
+            lbox += l2_dis.sum()
+        # cls loss
+        output_s_i = ps[..., 4:].view(-1, model.nc + 1)
+        output_t_i = pt[..., 4:].view(-1, model.nc + 1)
+        lcls += criterion_st(nn.functional.log_softmax(output_s_i / T, dim=1),
+                             nn.functional.softmax(output_t_i / T, dim=1)) * (T * T) / ps.size(0)
+    # feature loss
+    if len(feature_t) != len(feature_s):
+        print("feature mismatch!")
+        exit()
+    for i in range(len(feature_t)):
+        feature_t[i] = feature_t[i].pow(2).sum(1)
+        feature_s[i] = feature_s[i].pow(2).sum(1)
+        lfeature += L1(feature_s[i], feature_t[i]) / batch_size
+    return lcls * Lambda_cls + lbox * Lambda_box + lfeature * Lambda_feature
+
+
+def fine_grained_imitation_mask(feature_s, feature_t, indices):
+    if len(feature_t) != len(feature_s):
+        print("feature mismatch!")
+        exit()
+    mask = []
+    for i in range(len(feature_t)):
+        temp = torch.zeros(feature_s[i].size())
+        b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
+        temp[b, a, gj, gi] = 1
+        mask.append(temp)
+    return mask
+
+
+# FineGrainedmask
 def compute_lost_KD5(model, targets, output_s, output_t, batch_size):
     T = 3.0
     Lambda_feature = 0.001

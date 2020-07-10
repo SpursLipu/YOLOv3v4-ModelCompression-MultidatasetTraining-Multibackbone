@@ -380,7 +380,7 @@ class Darknet(nn.Module):
 
     def forward_once(self, x, augment=False, verbose=False):
         img_size = x.shape[-2:]  # height, width
-        yolo_out, out = [], []
+        yolo_out, out, feature_out = [], [], []
         if verbose:
             print('0', x.shape)
             str = ''
@@ -406,6 +406,8 @@ class Darknet(nn.Module):
                 yolo_out.append(module(x, out))
             else:  # run module directly, i.e. mtype = 'convolutional', 'upsample', 'maxpool', 'batchnorm2d' etc.
                 x = module(x)
+                if name == "Sequential" and self.module_list[i + 1].__class__.__name__ != 'YOLOLayer':
+                    feature_out.append(x)
 
             out.append(x if self.routs[i] else [])
             if verbose:
@@ -413,7 +415,7 @@ class Darknet(nn.Module):
                 str = ''
 
         if self.training:  # train
-            return yolo_out
+            return yolo_out, feature_out
         elif ONNX_EXPORT:  # export
             x = [torch.cat(x, 0) for x in zip(*yolo_out)]
             return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4
@@ -426,7 +428,7 @@ class Darknet(nn.Module):
                 x[1][..., 0] = img_size[1] - x[1][..., 0]  # flip lr
                 x[2][..., :4] /= s[1]  # scale
                 x = torch.cat(x, 1)
-            return x, p
+            return x, p, feature_out
 
     def fuse(self):
         # Fuse Conv2d + BatchNorm2d layers throughout model

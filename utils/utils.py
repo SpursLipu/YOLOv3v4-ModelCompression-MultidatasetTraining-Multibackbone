@@ -570,6 +570,137 @@ def compute_lost_KD4(model, targets, output_s, output_t, feature_s, feature_t, b
     return lcls * Lambda_cls + lbox * Lambda_box + lfeature * Lambda_feature
 
 
+def compute_lost_KD5(model, targets, output_s, output_t, feature_s, feature_t, batch_size):
+    T = 3.0
+    Lambda_cls, Lambda_box, Lambda_feature = 0.0001, 0.001, 0.001
+    criterion_st = torch.nn.KLDivLoss(reduction='sum')
+    criterion_stf = torch.nn.KLDivLoss(reduction='mean')
+    ft = torch.cuda.FloatTensor if output_s[0].is_cuda else torch.Tensor
+    lcls, lbox, lfeature = ft([0]), ft([0]), ft([0])
+    tcls, tbox, indices, anchor_vec = build_targets(output_s, targets, model)
+    for i, (ps, pt) in enumerate(zip(output_s, output_t)):  # layer index, layer predictions
+        b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
+
+        nb = len(b)
+        if nb:  # number of targets
+            pss = ps[b, a, gj, gi]  # prediction subset corresponding to targets
+            pts = pt[b, a, gj, gi]
+
+            psxy = torch.sigmoid(pss[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
+            psbox = torch.cat((psxy, torch.exp(pss[:, 2:4]) * anchor_vec[i]), 1).view(-1, 4)  # predicted box
+
+            ptxy = torch.sigmoid(pts[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
+            ptbox = torch.cat((ptxy, torch.exp(pts[:, 2:4]) * anchor_vec[i]), 1).view(-1, 4)  # predicted box
+
+            l2_dis = (psbox - ptbox).pow(2).sum(1)
+            lbox += l2_dis.sum()
+        # cls loss
+        output_s_i = ps[..., 4:].view(-1, model.nc + 1)
+        output_t_i = pt[..., 4:].view(-1, model.nc + 1)
+        lcls += criterion_st(nn.functional.log_softmax(output_s_i / T, dim=1),
+                             nn.functional.softmax(output_t_i / T, dim=1)) * (T * T) / ps.size(0)
+    # feature loss
+    if len(feature_t) != len(feature_s):
+        print("feature mismatch!")
+        exit()
+    for i in range(len(feature_t)):
+        feature_t[i] = feature_t[i].pow(2).sum(1)
+        # feature_t[i] = feature_t[i].abs().sum(1)
+        feature_s[i] = feature_s[i].pow(2).sum(1)
+        # feature_s[i] = feature_s[i].abs().sum(1)
+        lfeature += criterion_stf(nn.functional.log_softmax(feature_s[i] / T),
+                                  nn.functional.softmax(feature_t[i] / T)) * (T * T) / batch_size
+    return lcls * Lambda_cls + lbox * Lambda_box + lfeature * Lambda_feature
+
+
+def indices_merge(indices):
+    indices_merge = []
+
+    for i in range(len(indices)):
+        temp = list(indices[i])
+        temp[2] = temp[2] * (2 ** (5 - i))
+        temp[3] = temp[3] * (2 ** (5 - i))
+        indices_merge.append(temp)
+    return indices_merge
+
+
+def fine_grained_imitation_feature_mask(feature_s, feature_t, indices, img_size):
+    if feature_t.size() != feature_s.size():
+        print("feature mismatch!")
+        exit()
+    B, Gj, Gi = torch.Tensor(0).long().cuda(), torch.Tensor(0).long().cuda(), torch.Tensor(0).long().cuda()
+    feature_size = feature_s.size()[1]
+    scale = img_size / feature_size
+    for j in range(len(indices)):
+        if 2 ** (5 - j) < scale:
+            break
+        b, _, gj, gi = indices[j]  # image, gridy, gridx
+        gj, gi = (gj / scale).long(), (gi / scale).long()
+        for i in range(gj.size()[0]):
+            if 2 ** (5 - j) == scale:
+                break
+            b_temp = (torch.ones(int(2 ** (5 - j) / scale - 1)) * b[i]).long().cuda()
+            gj_temp = torch.arange(int(gj[i].item()) + 1, int(gj[i].item() + 2 ** (5 - j) / scale)).cuda()
+            gi_temp = torch.arange(int(gi[i].item()) + 1, int(gi[i].item() + 2 ** (5 - j) / scale)).cuda()
+            b = torch.cat((b, b_temp))
+            gj = torch.cat((gj, gj_temp))
+            gi = torch.cat((gi, gi_temp))
+        B = torch.cat((B, b))
+        Gj = torch.cat((Gj, gj))
+        Gi = torch.cat((Gi, gi))
+    mask = torch.zeros(feature_s.size())
+    mask[B, Gj, Gi] = 1
+    return mask
+
+
+def compute_lost_KD6(model, targets, output_s, output_t, feature_s, feature_t, batch_size, img_size):
+    T = 3.0
+    Lambda_cls, Lambda_box, Lambda_feature = 0.0001, 0.001, 1
+    criterion_st = torch.nn.KLDivLoss(reduction='sum')
+    criterion_stf = torch.nn.KLDivLoss(reduction='mean')
+    ft = torch.cuda.FloatTensor if output_s[0].is_cuda else torch.Tensor
+    lcls, lbox, lfeature = ft([0]), ft([0]), ft([0])
+    tcls, tbox, indices, anchor_vec = build_targets(output_s, targets, model)
+    for i, (ps, pt) in enumerate(zip(output_s, output_t)):  # layer index, layer predictions
+        b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
+
+        nb = len(b)
+        if nb:  # number of targets
+            pss = ps[b, a, gj, gi]  # prediction subset corresponding to targets
+            pts = pt[b, a, gj, gi]
+
+            psxy = torch.sigmoid(pss[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
+            psbox = torch.cat((psxy, torch.exp(pss[:, 2:4]) * anchor_vec[i]), 1).view(-1, 4)  # predicted box
+
+            ptxy = torch.sigmoid(pts[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
+            ptbox = torch.cat((ptxy, torch.exp(pts[:, 2:4]) * anchor_vec[i]), 1).view(-1, 4)  # predicted box
+
+            l2_dis = (psbox - ptbox).pow(2).sum(1)
+            lbox += l2_dis.sum()
+        # cls loss
+        output_s_i = ps[..., 4:].view(-1, model.nc + 1)
+        output_t_i = pt[..., 4:].view(-1, model.nc + 1)
+        lcls += criterion_st(nn.functional.log_softmax(output_s_i / T, dim=1),
+                             nn.functional.softmax(output_t_i / T, dim=1)) * (T * T) / ps.size(0)
+    # feature loss
+    if len(feature_t) != len(feature_s):
+        print("feature mismatch!")
+        exit()
+    merge = indices_merge(indices)
+    for i in range(len(feature_t)):
+        #feature_t[i] = feature_t[i].pow(2).sum(1)
+        feature_t[i] = feature_t[i].abs().sum(1)
+        #feature_s[i] = feature_s[i].pow(2).sum(1)
+        feature_s[i] = feature_s[i].abs().sum(1)
+        mask = fine_grained_imitation_feature_mask(feature_s[i], feature_t[i], merge, img_size)
+        mask = mask.to(targets.device)
+        feature_t[i] = feature_t[i] * mask
+        feature_s[i] = feature_s[i] * mask
+        lfeature += criterion_stf(nn.functional.log_softmax(feature_s[i] / T),
+                                 nn.functional.softmax(feature_t[i] / T)) * (T * T) / batch_size
+    return lcls * Lambda_cls + lbox * Lambda_box + lfeature * Lambda_feature
+
+
 def fine_grained_imitation_mask(feature_s, feature_t, indices):
     if len(feature_t) != len(feature_s):
         print("feature mismatch!")
@@ -584,7 +715,7 @@ def fine_grained_imitation_mask(feature_s, feature_t, indices):
 
 
 # FineGrainedmask
-def compute_lost_KD5(model, targets, output_s, output_t, batch_size):
+def compute_lost_KD7(model, targets, output_s, output_t, batch_size):
     T = 3.0
     Lambda_feature = 0.001
     criterion_st = torch.nn.KLDivLoss(reduction='sum')
@@ -592,9 +723,10 @@ def compute_lost_KD5(model, targets, output_s, output_t, batch_size):
     feature_t = list(output_t)
     tcls, tbox, indices, anchor_vec = build_targets(output_s, targets, model)
     mask = fine_grained_imitation_mask(feature_s, feature_t, indices)
+    test = indices_merge(indices)
     # feature loss
     for i in range(len(mask)):
-        mask[i] = mask[i].cuda()
+        mask[i] = mask[i].to(targets.device)
         feature_t[i] = feature_t[i] * mask[i]
         feature_s[i] = feature_s[i] * mask[i]
     feature_s = torch.cat([i.view(-1, 3 * (model.nc + 5)) for i in feature_s])

@@ -329,7 +329,12 @@ def train(hyp):
                 elif opt.KDstr == 4:
                     soft_target = compute_lost_KD4(model, targets, pred, output_t, feature_s, feature_t, imgs.size(0))
                 elif opt.KDstr == 5:
-                    soft_target = compute_lost_KD5(model, targets, pred, output_t, imgs.size(0))
+                    soft_target = compute_lost_KD5(model, targets, pred, output_t, feature_s, feature_t, imgs.size(0))
+                elif opt.KDstr == 6:
+                    soft_target = compute_lost_KD6(model, targets, pred, output_t, feature_s, feature_t, imgs.size(0),
+                                                   img_size)
+                elif opt.KDstr == 7:
+                    soft_target = compute_lost_KD7(model, targets, pred, output_t, imgs.size(0))
                 else:
                     print("please select KD strategy!")
                 loss += soft_target

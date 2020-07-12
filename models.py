@@ -150,6 +150,8 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                 modules.add_module('activation', HardSwish())
             if mdef['activation'] == 'relu':
                 modules.add_module('activation', nn.ReLU())
+            if mdef['activation'] == 'mish':
+                modules.add_module('activation', Mish())
 
         elif mdef['type'] == 'BatchNorm2d':
             filters = output_filters[-1]

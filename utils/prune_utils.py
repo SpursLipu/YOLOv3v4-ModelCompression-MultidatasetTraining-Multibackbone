@@ -3,6 +3,7 @@ from terminaltables import AsciiTable
 from copy import deepcopy
 import numpy as np
 import torch.nn.functional as F
+import torch.nn as nn
 
 
 def get_sr_flag(epoch, sr):
@@ -206,7 +207,7 @@ def init_weights_from_loose_model(compact_model, loose_model, CBL_idx, Other_idx
         # 拷贝非剪植层的时候包括三种情况
         # 情况1：卷积层，需要拷贝bias
         # 情况2：se层，需要分别拷贝fc1和fc2
-        # 情况3：depthwise层，直接拷贝卷积
+        # 情况3：depthwise层，直接拷贝卷积和BN
         if loose_model.module_defs[idx]['type'] == 'convolutional':
             compact_conv.weight.data = loose_conv.weight.data[:, in_channel_idx, :, :].clone()
             compact_conv.bias.data = loose_conv.bias.data.clone()
@@ -220,10 +221,18 @@ def init_weights_from_loose_model(compact_model, loose_model, CBL_idx, Other_idx
         else:
             compact_conv.weight.data = loose_conv.weight.data.clone()
 
+            compact_bn = compact_model.module_list[idx][1]
+            loose_bn = loose_model.module_list[idx][1]
+            compact_bn.weight.data = loose_bn.weight.data.clone()
+            compact_bn.bias.data = loose_bn.bias.data.clone()
+            compact_bn.running_mean.data = loose_bn.running_mean.data.clone()
+            compact_bn.running_var.data = loose_bn.running_var.data.clone()
+
 
 def prune_model_keep_size(model, prune_idx, CBL_idx, CBLidx2mask):
     pruned_model = deepcopy(model)
     maxpool = set()
+    route = set()
     upsample = set()
     module_defs = model.module_defs
 
@@ -235,23 +244,38 @@ def prune_model_keep_size(model, prune_idx, CBL_idx, CBLidx2mask):
     for i, module_def in enumerate(module_defs):
         if module_def['type'] == 'maxpool':
             maxpool.add(i - 1)
+    # 生成下一层为route的卷积集合
+    for i, module_def in enumerate(module_defs):
+        if module_def['type'] == 'route':
+            route.add(i - 1)
 
     for idx in prune_idx:
         mask = torch.from_numpy(CBLidx2mask[idx]).cuda()
         bn_module = pruned_model.module_list[idx][1]
+        ac_module = pruned_model.module_list[idx][2]
 
         bn_module.weight.data.mul_(mask)
+        if ac_module.__class__.__name__ == "LeakyReLU":
+            activation = F.leaky_relu((1 - mask) * bn_module.bias.data, 0.1)
+        elif ac_module.__class__.__name__ == "ReLU6":
+            activation = F.relu6((1 - mask) * bn_module.bias.data, inplace=True)
+        elif ac_module.__class__.__name__ == "HardSwish":
+            x = (1 - mask) * bn_module.bias.data
+            activation = x * (F.relu6(x + 3.0, inplace=True) / 6.0)
+        elif ac_module.__class__.__name__ == "ReLU":
+            activation = F.relu((1 - mask) * bn_module.bias.data, 0.1)
+        elif ac_module.__class__.__name__ == "Mish":
+            x = (1 - mask) * bn_module.bias.data
+            activation = x * F.softplus(x).tanh()
+        else:
+            activation = (1 - mask) * bn_module.bias.data
 
-        activation = F.leaky_relu((1 - mask) * bn_module.bias.data, 0.1)
         if idx in maxpool:
+            next_idx_list = [idx + 2]
+        elif idx in route:
             next_idx_list = [idx + 2]
         else:
             next_idx_list = [idx + 1]
-        # 两个上采样层前的卷积层
-        # if idx == 79:
-        #     next_idx_list.append(84)
-        # elif idx == 91:
-        #     next_idx_list.append(96)
 
         # 更通用的方法
         if idx in upsample:

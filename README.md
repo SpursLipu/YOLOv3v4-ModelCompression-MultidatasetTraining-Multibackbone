@@ -283,10 +283,10 @@ python3 train.py --data data/... --batch-size ... -pt --weights weights/yolov4.w
 ### 剪植特点
 |<center>剪枝方案</center> |<center>优点</center>|<center>缺点</center> |
 | --- | --- | --- |
-|正常剪枝   |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调。  |压缩率达不到极致。  |
+|正常剪枝   |不对shortcut剪枝，拥有可观且稳定的压缩率，无需微调，支持tiny-yolov3和mobilenet系列。  |压缩率达不到极致。  |
 |极限剪枝   |极高的压缩率。  |需要微调。  |
 |极限剪枝2  |采用shortcut融合的方法提升剪植精度。  |针对shortcut最优的方法。|
-|规整剪枝   |专为硬件部署设计，剪枝后filter个数均为8的倍数，无需微调。 |为规整牺牲了部分压缩率。 |
+|规整剪枝   |专为硬件部署设计，剪枝后filter个数均为8的倍数，无需微调，支持tiny-yolov3和mobilenet系列。 |为规整牺牲了部分压缩率。 |
 |层剪枝     |以ResBlock为基本单位剪植，利于硬件部署。 |但是只能剪backbone，剪植率有限。 |
 |层通道剪植 |先进行通道剪植再进行层剪植，剪植率非常高。 |可能会影响精度。 |
 

@@ -3,7 +3,6 @@ from terminaltables import AsciiTable
 from copy import deepcopy
 import numpy as np
 import torch.nn.functional as F
-import torch.nn as nn
 
 
 def get_sr_flag(epoch, sr):
@@ -13,7 +12,7 @@ def get_sr_flag(epoch, sr):
 
 def parse_module_defs2(module_defs):
     CBL_idx = []
-    Conv_idx = []
+    Other_idx = []
     shortcut_idx = dict()
     shortcut_all = set()
     for i, module_def in enumerate(module_defs):
@@ -21,7 +20,9 @@ def parse_module_defs2(module_defs):
             if module_def['batch_normalize']:
                 CBL_idx.append(i)
             else:
-                Conv_idx.append(i)
+                Other_idx.append(i)
+        elif module_def['type'] == 'depthwise' or module_def['type'] == 'se':
+            Other_idx.append(i)
 
     ignore_idx = set()
     for i, module_def in enumerate(module_defs):
@@ -38,13 +39,16 @@ def parse_module_defs2(module_defs):
                 shortcut_idx[i - 1] = identity_idx - 1
                 shortcut_all.add(identity_idx - 1)
             shortcut_all.add(i - 1)
+        # 深度可分离卷积层的其前一层不剪
+        if module_def['type'] == 'depthwise':
+            ignore_idx.add(i - 1)
         # 上采样层前的卷积层不裁剪
         if module_def['type'] == 'upsample':
             ignore_idx.add(i - 1)
 
     prune_idx = [idx for idx in CBL_idx if idx not in ignore_idx]
 
-    return CBL_idx, Conv_idx, prune_idx, shortcut_idx, shortcut_all
+    return CBL_idx, Other_idx, prune_idx, shortcut_idx, shortcut_all
 
 
 def parse_module_defs(module_defs):
@@ -302,13 +306,30 @@ def prune_model_keep_size2(model, prune_idx, CBL_idx, CBLidx2mask):
     activations = []
     for i, model_def in enumerate(model.module_defs):
 
-        if model_def['type'] == 'convolutional':
+        if model_def['type'] == 'convolutional' or model_def['type'] == 'depthwise' or model_def['type'] == 'se':
             activation = torch.zeros(int(model_def['filters'])).cuda()
             if i in prune_idx:
                 mask = torch.from_numpy(CBLidx2mask[i]).cuda()
                 bn_module = pruned_model.module_list[i][1]
                 bn_module.weight.data.mul_(mask)
-                activation = F.leaky_relu((1 - mask) * bn_module.bias.data, 0.1)
+                if hasattr(pruned_model.module_list[i], 'activation'):
+                    ac_module = pruned_model.module_list[i][2]
+                    if ac_module.__class__.__name__ == "LeakyReLU":
+                        activation = F.leaky_relu((1 - mask) * bn_module.bias.data, 0.1)
+                    elif ac_module.__class__.__name__ == "ReLU6":
+                        activation = F.relu6((1 - mask) * bn_module.bias.data, inplace=True)
+                    elif ac_module.__class__.__name__ == "HardSwish":
+                        x = (1 - mask) * bn_module.bias.data
+                        activation = x * (F.relu6(x + 3.0, inplace=True) / 6.0)
+                    elif ac_module.__class__.__name__ == "ReLU":
+                        activation = F.relu((1 - mask) * bn_module.bias.data, 0.1)
+                    elif ac_module.__class__.__name__ == "Mish":
+                        x = (1 - mask) * bn_module.bias.data
+                        activation = x * F.softplus(x).tanh()
+                    else:
+                        activation = (1 - mask) * bn_module.bias.data
+                else:
+                    activation = (1 - mask) * bn_module.bias.data
                 update_activation(i, pruned_model, activation, CBL_idx)
                 bn_module.bias.data.mul_(mask)
             activations.append(activation)

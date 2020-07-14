@@ -437,7 +437,7 @@ class Darknet(nn.Module):
         print('Fusing layers...')
         fused_list = nn.ModuleList()
         for a in list(self.children())[0]:
-            if isinstance(a, nn.Sequential) and not hasattr(a, "DepthWise2d"):
+            if isinstance(a, nn.Sequential):
                 for i, b in enumerate(a):
                     if isinstance(b, nn.modules.batchnorm.BatchNorm2d):
                         # fuse this bn layer with the previous conv2d layer

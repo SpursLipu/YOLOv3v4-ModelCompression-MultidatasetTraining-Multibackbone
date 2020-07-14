@@ -39,6 +39,7 @@ This project mainly include three parts.
  
  2020年7月12日 修复了YOLOv3-mobilenet剪植后map归0的问题，详见issue#41。
 
+ 2020年7月14日 更新mobilenet支持基于shortcut的两种极限剪植方法和depthwise卷积的bn融合方法。
 # 环境部署
 1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建详见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里简要说明：
 
@@ -449,4 +450,4 @@ oxfordhand数据集，使用yolov3tiny作为teacher网络，normal剪植后的yo
 |<center>teacher模型</center> |<center>teacher模型mAP</center> |<center>student模型</center>|<center>直接微调</center>|<center>KDstr 1</center> |<center>KDstr 2</center> |<center>KDstr 3</center> |<center>KDstr 4(L1)</center> |<center>KDstr 4(L2)</center> |<center>KDstr 5(L1)</center> |<center>KDstr 5(L2)</center> |<center>KDstr 6(L1)</center> |<center>KDstr 6(L2)</center> |<center>KDstr 7</center> |
 | --- | --- | --- | --- | --- | --- | --- |--- |--- |--- |--- |--- |--- |--- |
 |yolov3tiny512   |0.708    |normal剪植yolov3tiny512    |0.637     |0.644    |0.648  |0.652   |0.655   |0.640   |  |
-|yolov3tiny608   |0.708    |normal剪植yolov3tiny608    |0.641     |0.660    |0.661  |0.672   |0.669   |0.665   |0.673   |0.670   |
+|yolov3tiny608   |0.708    |normal剪植yolov3tiny608    |0.658     |0.666    |0.661  |0.672   |0.669   |0.665   |0.673   |0.670   |0.674   |0.660   |

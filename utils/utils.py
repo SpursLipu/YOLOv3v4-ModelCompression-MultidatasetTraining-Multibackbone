@@ -604,10 +604,10 @@ def compute_lost_KD5(model, targets, output_s, output_t, feature_s, feature_t, b
         print("feature mismatch!")
         exit()
     for i in range(len(feature_t)):
-        feature_t[i] = feature_t[i].pow(2).sum(1)
-        # feature_t[i] = feature_t[i].abs().sum(1)
-        feature_s[i] = feature_s[i].pow(2).sum(1)
-        # feature_s[i] = feature_s[i].abs().sum(1)
+        # feature_t[i] = feature_t[i].pow(2).sum(1)
+        feature_t[i] = feature_t[i].abs().sum(1)
+        # feature_s[i] = feature_s[i].pow(2).sum(1)
+        feature_s[i] = feature_s[i].abs().sum(1)
         lfeature += criterion_stf(nn.functional.log_softmax(feature_s[i] / T),
                                   nn.functional.softmax(feature_t[i] / T)) * (T * T) / batch_size
     return lcls * Lambda_cls + lbox * Lambda_box + lfeature * Lambda_feature
@@ -655,9 +655,8 @@ def fine_grained_imitation_feature_mask(feature_s, feature_t, indices, img_size)
 
 def compute_lost_KD6(model, targets, output_s, output_t, feature_s, feature_t, batch_size, img_size):
     T = 3.0
-    Lambda_cls, Lambda_box, Lambda_feature = 0.0001, 0.001, 1
+    Lambda_cls, Lambda_box, Lambda_feature = 0.0001, 0.001, 0.0005
     criterion_st = torch.nn.KLDivLoss(reduction='sum')
-    criterion_stf = torch.nn.KLDivLoss(reduction='mean')
     ft = torch.cuda.FloatTensor if output_s[0].is_cuda else torch.Tensor
     lcls, lbox, lfeature = ft([0]), ft([0]), ft([0])
     tcls, tbox, indices, anchor_vec = build_targets(output_s, targets, model)
@@ -688,16 +687,16 @@ def compute_lost_KD6(model, targets, output_s, output_t, feature_s, feature_t, b
         exit()
     merge = indices_merge(indices)
     for i in range(len(feature_t)):
-        #feature_t[i] = feature_t[i].pow(2).sum(1)
+        # feature_t[i] = feature_t[i].pow(2).sum(1)
         feature_t[i] = feature_t[i].abs().sum(1)
-        #feature_s[i] = feature_s[i].pow(2).sum(1)
+        # feature_s[i] = feature_s[i].pow(2).sum(1)
         feature_s[i] = feature_s[i].abs().sum(1)
         mask = fine_grained_imitation_feature_mask(feature_s[i], feature_t[i], merge, img_size)
         mask = mask.to(targets.device)
         feature_t[i] = feature_t[i] * mask
         feature_s[i] = feature_s[i] * mask
-        lfeature += criterion_stf(nn.functional.log_softmax(feature_s[i] / T),
-                                 nn.functional.softmax(feature_t[i] / T)) * (T * T) / batch_size
+        lfeature += criterion_st(nn.functional.log_softmax(feature_s[i] / T),
+                                  nn.functional.softmax(feature_t[i] / T)) * (T * T) / batch_size
     return lcls * Lambda_cls + lbox * Lambda_box + lfeature * Lambda_feature
 
 

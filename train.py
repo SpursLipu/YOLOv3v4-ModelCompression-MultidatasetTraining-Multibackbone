@@ -242,7 +242,12 @@ def train(hyp):
                                              num_workers=nw,
                                              pin_memory=True,
                                              collate_fn=dataset.collate_fn)
-
+    for idx in prune_idx:
+        if hasattr(model, 'module'):
+            bn_weights = gather_bn_weights(model.module.module_list, [idx])
+        else:
+            bn_weights = gather_bn_weights(model.module_list, [idx])
+        tb_writer.add_histogram('before_train_perlayer_bn_weights/hist', bn_weights.numpy(), idx, bins='doane')
     # Model parameters
     model.nc = nc  # attach number of classes to model
     model.hyp = hyp  # attach hyperparameters to model
@@ -410,6 +415,11 @@ def train(hyp):
                     'val/giou_loss', 'val/obj_loss', 'val/cls_loss']
             for x, tag in zip(list(mloss[:-1]) + list(results), tags):
                 tb_writer.add_scalar(tag, x, epoch)
+            if hasattr(model, 'module'):
+                bn_weights = gather_bn_weights(model.module.module_list, [idx])
+            else:
+                bn_weights = gather_bn_weights(model.module_list, [idx])
+            tb_writer.add_histogram('bn_weights/hist', bn_weights.numpy(), epoch, bins='doane')
 
         # Update best mAP
         fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]

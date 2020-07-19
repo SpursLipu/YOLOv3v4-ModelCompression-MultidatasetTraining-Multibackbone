@@ -1,17 +1,20 @@
-# pip3 install -U -r requirements.txt
-numpy
+# pip install -U -r requirements.txt
+Cython
+numpy==1.17
 opencv-python
-torch >= 1.2
+torch>=1.5.1
 matplotlib
-pycocotools
+pillow
+tensorboard
+torchvision
+scipy
 tqdm
-tb-nightly
-future
-Pillow
+git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI
 
-# Equivalent conda commands ----------------------------------------------------
-# conda update -n base -c defaults conda
-# conda install -yc anaconda future numpy opencv matplotlib tqdm pillow
-# conda install -yc conda-forge scikit-image tensorboard pycocotools
+# Conda commands (in lieu of pip) ---------------------------------------------
+# conda update -yn base -c defaults conda
+# conda install -yc anaconda numpy opencv matplotlib tqdm pillow ipython
+# conda install -yc conda-forge scikit-image pycocotools tensorboard
 # conda install -yc spyder-ide spyder-line-profiler
 # conda install -yc pytorch pytorch torchvision
+# conda install -yc conda-forge protobuf numpy && pip install onnx==1.6.0  # https://github.com/onnx/onnx#linux-and-macos

@@ -139,7 +139,7 @@ if __name__ == '__main__':
     parser.add_argument('--data', type=str, default='cfg/coco2017.data', help='*.data file path')
     parser.add_argument('--weights', type=str, default='weights/last.pt', help='sparse model weights')
     parser.add_argument('--percent', type=float, default=0.6, help='channel prune percent')
-    parser.add_argument('--img_size', type=int, default=608, help='inference size (pixels)')
+    parser.add_argument('--img-size', type=int, default=608, help='inference size (pixels)')
     opt = parser.parse_args()
     print(opt)
 
@@ -198,7 +198,7 @@ if __name__ == '__main__':
     # CBLidx2mask存储CBL_idx中，每一层BN层对应的mask
     CBLidx2mask = {idx: mask for idx, mask in zip(CBL_idx, filters_mask)}
 
-    pruned_model = prune_model_keep_size2(model, prune_idx, CBL_idx, CBLidx2mask)
+    pruned_model = prune_model_keep_size(model, prune_idx, CBL_idx, CBLidx2mask)
 
     with torch.no_grad():
         mAP = eval_model(pruned_model)[0][2]

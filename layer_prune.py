@@ -60,7 +60,7 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str, default='weights/last.pt', help='sparse model weights')
     parser.add_argument('--shortcuts', type=int, default=8, help='how many shortcut layers will be pruned,\
         pruning one shortcut will also prune two CBL,yolov3 has 23 shortcuts')
-    parser.add_argument('--img_size', type=int, default=416, help='inference size (pixels)')
+    parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
     opt = parser.parse_args()
     print(opt)
 
@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
     CBLidx2mask = obtain_filters_mask(model, CBL_idx, prune_shortcuts)
 
-    pruned_model = prune_model_keep_size2(model, CBL_idx, CBL_idx, CBLidx2mask)
+    pruned_model = prune_model_keep_size(model, CBL_idx, CBL_idx, CBLidx2mask)
 
     with torch.no_grad():
         mAP = eval_model(pruned_model)[0][2]

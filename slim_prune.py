@@ -79,7 +79,7 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str, default='weights/last.pt', help='sparse model weights')
     parser.add_argument('--percent', type=float, default=0.8, help='global channel prune percent')
     parser.add_argument('--layer_keep', type=float, default=0.01, help='channel keep percent per layer')
-    parser.add_argument('--img_size', type=int, default=416, help='inference size (pixels)')
+    parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
     opt = parser.parse_args()
     print(opt)
 
@@ -128,7 +128,7 @@ if __name__ == '__main__':
     for i in CBLidx2mask:
         CBLidx2mask[i] = CBLidx2mask[i].clone().cpu().numpy()
 
-    pruned_model = prune_model_keep_size2(model, prune_idx, CBL_idx, CBLidx2mask)
+    pruned_model = prune_model_keep_size(model, prune_idx, CBL_idx, CBLidx2mask)
     print(
         "\nnow prune the model but keep size,(actually add offset of BN beta to following layers), let's see how the mAP goes")
 

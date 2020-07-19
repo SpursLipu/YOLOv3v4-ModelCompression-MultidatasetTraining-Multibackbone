@@ -40,7 +40,7 @@ def parse_model_cfg(path):
     supported = ['type', 'batch_normalize', 'filters', 'size', 'stride', 'pad', 'activation', 'layers', 'groups',
                  'reduction', 'from', 'mask', 'anchors', 'classes', 'num', 'jitter', 'ignore_thresh', 'truth_thresh',
                  'random', 'stride_x', 'stride_y', 'weights_type', 'weights_normalization', 'scale_x_y', 'beta_nms',
-                 'nms_kind', 'iou_loss', 'iou_normalizer', 'cls_normalizer', 'iou_thresh']
+                 'nms_kind', 'iou_loss', 'iou_normalizer', 'cls_normalizer', 'iou_thresh', 'group_id', 'resize']
 
     f = []  # fields
     for x in mdefs[1:]:

@@ -112,7 +112,7 @@ if __name__ == '__main__':
         pruning one shortcut will also prune two CBL,yolov3 has 23 shortcuts')
     parser.add_argument('--global_percent', type=float, default=0.6, help='global channel prune percent')
     parser.add_argument('--layer_keep', type=float, default=0.01, help='channel keep percent per layer')
-    parser.add_argument('--img_size', type=int, default=416, help='inference size (pixels)')
+    parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
     opt = parser.parse_args()
     print(opt)
 
@@ -165,7 +165,7 @@ if __name__ == '__main__':
     for i in CBLidx2mask:
         CBLidx2mask[i] = CBLidx2mask[i].clone().cpu().numpy()
 
-    pruned_model = prune_model_keep_size2(model, prune_idx, CBL_idx, CBLidx2mask)
+    pruned_model = prune_model_keep_size(model, prune_idx, CBL_idx, CBLidx2mask)
     print(
         "\nnow prune the model but keep size,(actually add offset of BN beta to following layers), let's see how the mAP goes")
 
@@ -227,7 +227,7 @@ if __name__ == '__main__':
 
     CBLidx2mask = obtain_filters_mask2(compact_model1, CBL_idx, prune_shortcuts)
 
-    pruned_model = prune_model_keep_size2(compact_model1, CBL_idx, CBL_idx, CBLidx2mask)
+    pruned_model = prune_model_keep_size(compact_model1, CBL_idx, CBL_idx, CBLidx2mask)
 
     with torch.no_grad():
         mAP = eval_model(pruned_model)[0][2]

@@ -188,8 +188,13 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
         elif mdef['type'] == 'route':  # nn.Sequential() placeholder for 'route' layer
             layers = mdef['layers']
             filters = sum([output_filters[l + 1 if l > 0 else l] for l in layers])
+            if 'groups' in mdef:
+                filters = filters // 2
             routs.extend([i + l if l < 0 else l for l in layers])
-            modules = FeatureConcat(layers=layers)
+            if 'groups' in mdef:
+                modules = FeatureConcat(layers=layers, groups=True)
+            else:
+                modules = FeatureConcat(layers=layers, groups=False)
 
         elif mdef['type'] == 'shortcut':  # nn.Sequential() placeholder for 'shortcut' layer
             layers = mdef['from']
@@ -648,7 +653,7 @@ def convert(cfg='cfg/yolov3-spp.cfg', weights='weights/yolov3-spp.weights'):
 
 def attempt_download(weights):
     # Attempt to download pretrained weights if not found locally
-    weights = weights.strip()
+    weights = weights.strip().replace("'", '')
     msg = weights + ' missing, try downloading from https://drive.google.com/open?id=1LezFG5g3BCW6iYaV89B2i64cqEUZD7e0'
 
     if len(weights) > 0 and not os.path.isfile(weights):

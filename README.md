@@ -222,6 +222,7 @@ VisDrone2019数据集由中国天津大学机器学习和数据挖掘实验室�
 |YOLOv3tiny-mobilenetv3-small|0.92M   |2.00M   |2.92M   |2.9     |0.379  |0.214  |5.2/1.9/7.1 ms  |140.8fps |
 |YOLOv4                      |-       |-       |61.35M  |107.1   |0.650  |0.438  |13.5/1.8/15.3 ms|65.4fps  |
 |YOLOv4-tiny                 |-       |-       |5.78M   |12.3    |0.435  |0.225  |4.1/1.7/5.8 ms  |172.4fps  |
+
 注：
 
 1、YOLOv3,YOLOv3tiny和YOLOv4是在coco2014上训练和测试的，YOLOv3-mobilenetv3和YOLOv3tiny-mobilenetv3-small是在coco2017上训练和测试的。

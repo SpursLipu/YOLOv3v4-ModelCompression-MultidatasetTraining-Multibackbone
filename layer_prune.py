@@ -85,10 +85,6 @@ if __name__ == '__main__':
     CBL_idx, Conv_idx, shortcut_idx = parse_module_defs4(model.module_defs)
     print('all shortcut_idx:', [i + 1 for i in shortcut_idx])
 
-    bn_weights = gather_bn_weights(model.module_list, shortcut_idx)
-
-    sorted_bn = torch.sort(bn_weights)[0]
-
     # highest_thre = torch.zeros(len(shortcut_idx))
     # for i, idx in enumerate(shortcut_idx):
     #     highest_thre[i] = model.module_list[idx][1].weight.data.abs().max().clone()

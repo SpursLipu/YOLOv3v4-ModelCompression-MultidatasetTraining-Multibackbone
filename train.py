@@ -200,27 +200,28 @@ def train(hyp):
     # 获得要剪枝的层
     if hasattr(model, 'module'):
         print('muti-gpus sparse')
-        if opt.prune == 1:
+        if opt.prune == 0:
+            print('normal sparse training ')
+            _, _, prune_idx = parse_module_defs(model.module.module_defs)
+        elif opt.prune == 1:
             print('shortcut sparse training')
             _, _, prune_idx, _, _ = parse_module_defs2(model.module.module_defs)
         elif opt.prune == 2:
             print('layer sparse training')
             _, _, prune_idx = parse_module_defs4(model.module.module_defs)
-        elif opt.prune == 0:
-            print('normal sparse training ')
-            _, _, prune_idx = parse_module_defs(model.module.module_defs)
+
 
     else:
         print('single-gpu sparse')
-        if opt.prune == 1:
+        if opt.prune == 0:
+            print('normal sparse training')
+            _, _, prune_idx = parse_module_defs(model.module_defs)
+        elif opt.prune == 1:
             print('shortcut sparse training')
             _, _, prune_idx, _, _ = parse_module_defs2(model.module_defs)
         elif opt.prune == 2:
             print('layer sparse training')
             _, _, prune_idx = parse_module_defs4(model.module_defs)
-        elif opt.prune == 0:
-            print('normal sparse training')
-            _, _, prune_idx = parse_module_defs(model.module_defs)
 
     # Dataloader
     batch_size = min(batch_size, len(dataset))

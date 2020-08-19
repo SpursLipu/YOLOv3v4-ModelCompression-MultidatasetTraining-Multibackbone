@@ -78,7 +78,7 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                                                               padding=pad,
                                                               groups=mdef['groups'] if 'groups' in mdef else 1,
                                                               bias=not bn))
-                if quantized == 3:
+                elif quantized == 3:
                     modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
                                                                  out_channels=filters,
                                                                  kernel_size=kernel_size,

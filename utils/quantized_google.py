@@ -79,12 +79,17 @@ class Round(Function):
 
 
 class Quantizer(nn.Module):
-    def __init__(self, bits, range_tracker):
+    def __init__(self, bits, range_tracker, out_channels):
         super().__init__()
         self.bits = bits
         self.range_tracker = range_tracker
-        self.register_buffer('scale', None)  # 量化比例因子
-        self.register_buffer('zero_point', None)  # 量化零点
+        if out_channels == -1:
+            self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
+            self.register_buffer('zero_point', torch.zeros(1))  # 量化零点
+
+        else:
+            self.register_buffer('scale', torch.zeros(out_channels, 1, 1, 1))  # 量化比例因子
+            self.register_buffer('zero_point', torch.zeros(out_channels, 1, 1, 1))  # 量化零点
 
     def update_params(self):
         raise NotImplementedError
@@ -125,15 +130,15 @@ class Quantizer(nn.Module):
 
 
 class SignedQuantizer(Quantizer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, bits, range_tracker, out_channels):
+        super().__init__(bits, range_tracker, out_channels)
         self.register_buffer('min_val', torch.tensor(-(1 << (self.bits - 1))))
         self.register_buffer('max_val', torch.tensor((1 << (self.bits - 1)) - 1))
 
 
 class UnsignedQuantizer(Quantizer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, bits, range_tracker, out_channels):
+        super().__init__(bits, range_tracker, out_channels)
         self.register_buffer('min_val', torch.tensor(0))
         self.register_buffer('max_val', torch.tensor((1 << self.bits) - 1))
 
@@ -187,14 +192,18 @@ class QuantizedConv2d(nn.Conv2d):
         )
         # 实例化量化器（A-layer级，W-channel级）
         if q_type == 0:
-            self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L'))
+            self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L'),
+                                                           out_channels=-1)
             self.weight_quantizer = SymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
-                                                                                                     out_channels=out_channels))
+                                                                                                     out_channels=out_channels),
+                                                       out_channels=out_channels)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
-                                                            range_tracker=AveragedRangeTracker(q_level='L'))
+                                                            range_tracker=AveragedRangeTracker(q_level='L'),
+                                                            out_channels=-1)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
-                                                                                                      out_channels=out_channels))
+                                                                                                      out_channels=out_channels),
+                                                        out_channels=out_channels)
         self.first_layer = first_layer
 
     def forward(self, input):
@@ -269,14 +278,18 @@ class BNFold_Conv2d_Q(QuantizedConv2d):
 
         # 实例化量化器（A-layer级，W-channel级）
         if q_type == 0:
-            self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L'))
+            self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L'),
+                                                           out_channels=-1)
             self.weight_quantizer = SymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
-                                                                                                     out_channels=out_channels))
+                                                                                                     out_channels=out_channels),
+                                                       out_channels=out_channels)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
-                                                            range_tracker=AveragedRangeTracker(q_level='L'))
+                                                            range_tracker=AveragedRangeTracker(q_level='L'),
+                                                            out_channels=-1)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
-                                                                                                      out_channels=out_channels))
+                                                                                                      out_channels=out_channels),
+                                                        out_channels=out_channels)
         self.first_layer = first_layer
 
     def forward(self, input):

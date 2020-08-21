@@ -43,7 +43,7 @@ def test(cfg,
             load_darknet_weights(model, weights)
 
         # Fuse
-        model.fuse()
+        model.fuse(quantized=quantized)
         model.to(device)
 
         if device.type != 'cpu' and torch.cuda.device_count() > 1:
@@ -268,7 +268,9 @@ if __name__ == '__main__':
              opt.iou_thres,
              opt.save_json,
              opt.single_cls,
-             opt.augment)
+             opt.augment,
+             quantized=opt.quantized,
+             qlayers=opt.qlayers)
 
     elif opt.task == 'benchmark':  # mAPs at 256-640 at conf 0.5 and 0.7
         y = []

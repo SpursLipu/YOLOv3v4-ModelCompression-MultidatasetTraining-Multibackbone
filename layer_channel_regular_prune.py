@@ -8,79 +8,124 @@ import time
 from utils.prune_utils import *
 import argparse
 
-filter_switch = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
+filter_switch = [each for each in range(1024) if not (each % 2 == 1)]
 
 
 # %%
-def obtain_filters_mask(model, thre, CBL_idx, prune_idx):
+def obtain_filters_mask(model, thre, CBL_idx, shortcut_idx, prune_idx):
     pruned = 0
     total = 0
     num_filters = []
     filters_mask = []
+    idx_new = dict()
+    # CBL_idx存储的是所有带BN的卷积层（YOLO层的前一层卷积层是不带BN的）
     for idx in CBL_idx:
         bn_module = model.module_list[idx][1]
         if idx in prune_idx:
+            if idx not in shortcut_idx:
 
-            weight_copy = bn_module.weight.data.abs().clone()
+                mask = obtain_bn_mask(bn_module, thre).cpu().numpy()
 
-            channels = weight_copy.shape[0]  #
-            min_channel_num = int(channels * opt.layer_keep) if int(channels * opt.layer_keep) > 0 else 1
-            mask = weight_copy.gt(thresh).float()
+                # 保证通道数为的倍数
+                mask_cnt = int(mask.sum())
+                if mask_cnt == 0:
+                    this_layer_sort_bn = bn_module.weight.data.abs().clone()
+                    sort_bn_values = torch.sort(this_layer_sort_bn)[0]
+                    bn_cnt = bn_module.weight.shape[0]
+                    this_layer_thre = sort_bn_values[bn_cnt - 8]
+                    mask = obtain_bn_mask(bn_module, this_layer_thre).cpu().numpy()
+                else:
+                    for i in range(len(filter_switch)):
+                        if mask_cnt <= filter_switch[i]:
+                            mask_cnt = filter_switch[i]
+                            break
+                    this_layer_sort_bn = bn_module.weight.data.abs().clone()
+                    sort_bn_values = torch.sort(this_layer_sort_bn)[0]
+                    bn_cnt = bn_module.weight.shape[0]
+                    this_layer_thre = sort_bn_values[bn_cnt - mask_cnt]
+                    mask = obtain_bn_mask(bn_module, this_layer_thre).cpu().numpy()
 
-            if int(torch.sum(mask)) < min_channel_num:
-                _, sorted_index_weights = torch.sort(weight_copy, descending=True)
-                mask[sorted_index_weights[:min_channel_num]] = 1.
+                idx_new[idx] = mask
+                remain = int(mask.sum())
+                pruned = pruned + mask.shape[0] - remain
 
-            # 保证通道数为8的倍数
-            mask_cnt = int(mask.sum())
-            if mask_cnt == 0:
-                this_layer_sort_bn = bn_module.weight.data.abs().clone()
-                sort_bn_values = torch.sort(this_layer_sort_bn)[0]
-                bn_cnt = bn_module.weight.shape[0]
-                this_layer_thre = sort_bn_values[bn_cnt - 8]
-                mask = obtain_bn_mask(bn_module, this_layer_thre)
+                # if remain == 0:
+                #     print("Channels would be all pruned!")
+                #     raise Exception
+
+                # print(f'layer index: {idx:>3d} \t total channel: {mask.shape[0]:>4d} \t '
+                #     f'remaining channel: {remain:>4d}')
             else:
-                for i in range(len(filter_switch)):
-                    if mask_cnt <= filter_switch[i]:
-                        mask_cnt = filter_switch[i]
-                        break
-                this_layer_sort_bn = bn_module.weight.data.abs().clone()
-                sort_bn_values = torch.sort(this_layer_sort_bn)[0]
-                bn_cnt = bn_module.weight.shape[0]
-                this_layer_thre = sort_bn_values[bn_cnt - mask_cnt]
-                mask = obtain_bn_mask(bn_module, this_layer_thre)
+                # 如果idx在shortcut_idx之中，则试跳连层的两层的mask相等
+                mask = idx_new[shortcut_idx[idx]]
+                idx_new[idx] = mask
+                remain = int(mask.sum())
+                pruned = pruned + mask.shape[0] - remain
 
-            remain = int(mask.sum())
-            pruned = pruned + mask.shape[0] - remain
+            if remain == 0:
+                print("Channels would be all pruned!")
+                raise Exception
 
             print(f'layer index: {idx:>3d} \t total channel: {mask.shape[0]:>4d} \t '
                   f'remaining channel: {remain:>4d}')
         else:
-            mask = torch.ones(bn_module.weight.data.shape)
+            mask = np.ones(bn_module.weight.data.shape)
             remain = mask.shape[0]
 
         total += mask.shape[0]
         num_filters.append(remain)
-        filters_mask.append(mask.clone())
+        filters_mask.append(mask.copy())
 
+    # 因此，这里求出的prune_ratio,需要裁剪的α参数/cbl_idx中所有的α参数
     prune_ratio = pruned / total
     print(f'Prune channels: {pruned}\tPrune ratio: {prune_ratio:.3f}')
 
     return num_filters, filters_mask
 
 
-def prune_and_eval(model, CBL_idx, CBLidx2mask):
+def prune_and_eval(model, sorted_bn, shortcut_idx, percent=.0):
     model_copy = deepcopy(model)
+    thre_index = int(len(sorted_bn) * percent)
+    # 获得α参数的阈值，小于该值的α参数对应的通道，全部裁剪掉
+    thre1 = sorted_bn[thre_index]
 
-    for idx in CBL_idx:
-        bn_module = model_copy.module_list[idx][1]
-        mask = CBLidx2mask[idx].cuda()
-        bn_module.weight.data.mul_(mask)
+    print(f'Channels with Gamma value less than {thre1:.8f} are pruned!')
 
-    with torch.no_grad():
-        mAP = eval_model(model_copy)[0][2]
+    remain_num = 0
+    idx_new = dict()
+    for idx in prune_idx:
 
-    print(f'mask the gamma as zero, mAP of the model is {mAP:.4f}')
+        if idx not in shortcut_idx:
+
+            bn_module = model_copy.module_list[idx][1]
+
+            mask = obtain_bn_mask(bn_module, thre1)
+            # 记录剪枝后，每一层卷积层对应的mask
+            # idx_new[idx]=mask.cpu().numpy()
+            idx_new[idx] = mask
+            remain_num += int(mask.sum())
+            bn_module.weight.data.mul_(mask)
+            # bn_module.bias.data.mul_(mask*0.0001)
+        else:
+
+            bn_module = model_copy.module_list[idx][1]
+
+            mask = idx_new[shortcut_idx[idx]]
+            idx_new[idx] = mask
+
+            remain_num += int(mask.sum())
+            bn_module.weight.data.mul_(mask)
+
+        # print(int(mask.sum()))
+
+    # with torch.no_grad():
+    #     mAP = eval_model(model_copy)[0][2]
+
+    print(f'Number of channels has been reduced from {len(sorted_bn)} to {remain_num}')
+    print(f'Prune ratio: {1 - remain_num / len(sorted_bn):.3f}')
+    # print(f'mAP of the pruned model is {mAP:.4f}')
+
+    return thre1
 
 
 def prune_and_eval2(model, prune_shortcuts=[]):
@@ -158,52 +203,54 @@ if __name__ == '__main__':
 
     ##############################################################
     # 先剪通道
-    print("we will prune the channels first")
+    # 与normal_prune不同的是这里需要获得shortcu_idx和short_all
+    # 其中shortcut_idx存储的是对应关系，故shortcut[x]就对应的是与第x-1卷积层相加层的索引值
+    # shortcut_all存储的是所有相加层
+    CBL_idx, Conv_idx, prune_idx, shortcut_idx, shortcut_all = parse_module_defs2(model.module_defs)
 
-    CBL_idx, Conv_idx, prune_idx, _, _ = parse_module_defs2(model.module_defs)
-
+    # 将所有要剪枝的BN层的γ参数，拷贝到bn_weights列表
     bn_weights = gather_bn_weights(model.module_list, prune_idx)
-
+    # 对BN中的γ参数排序
+    # torch.sort返回二维列表，第一维是排序后的值列表，第二维是排序后的值列表对应的索引
     sorted_bn = torch.sort(bn_weights)[0]
-    sorted_bn, sorted_index = torch.sort(bn_weights)
-    thresh_index = int(len(bn_weights) * opt.percent)
-    thresh = sorted_bn[thresh_index].cuda()
 
-    print(f'Global Threshold should be less than {thresh:.4f}.')
+    # 避免剪掉一层中的所有channel的最高阈值(每个BN层中gamma的最大值在所有层中最小值即为阈值上限)
+    highest_thre = []
+    for idx in prune_idx:
+        # .item()可以得到张量里的元素值
+        highest_thre.append(model.module_list[idx][1].weight.data.abs().max().item())
+    highest_thre = min(highest_thre)
 
-    num_filters, filters_mask = obtain_filters_mask(model, thresh, CBL_idx, prune_idx)
+    # 找到highest_thre对应的下标对应的百分比
+    percent_limit = (sorted_bn == highest_thre).nonzero().item() / len(bn_weights)
+
+    print(f'Threshold should be less than {highest_thre:.8f}.')
+    print(f'The corresponding prune ratio is {percent_limit:.3f}.')
+
+    percent = opt.percent
+    threshold = prune_and_eval(model, sorted_bn, shortcut_idx, percent)
+
+    num_filters, filters_mask = obtain_filters_mask(model, threshold, CBL_idx, shortcut_idx, prune_idx)
+
+    # CBLidx2mask存储CBL_idx中，每一层BN层对应的mask
     CBLidx2mask = {idx: mask for idx, mask in zip(CBL_idx, filters_mask)}
-    CBLidx2filters = {idx: filters for idx, filters in zip(CBL_idx, num_filters)}
-
-    for i in model.module_defs:
-        if i['type'] == 'shortcut':
-            i['is_access'] = False
-
-    print('merge the mask of layers connected to shortcut!')
-    merge_mask(model, CBLidx2mask, CBLidx2filters)
-
-    prune_and_eval(model, CBL_idx, CBLidx2mask)
-
-    for i in CBLidx2mask:
-        CBLidx2mask[i] = CBLidx2mask[i].clone().cpu().numpy()
 
     pruned_model = prune_model_keep_size(model, prune_idx, CBL_idx, CBLidx2mask)
-    print(
-        "\nnow prune the model but keep size,(actually add offset of BN beta to following layers), let's see how the mAP goes")
 
     with torch.no_grad():
-        eval_model(pruned_model)
+        mAP = eval_model(pruned_model)[0][2]
+    print('after prune_model_keep_size map is {}'.format(mAP))
 
-    for i in model.module_defs:
-        if i['type'] == 'shortcut':
-            i.pop('is_access')
-
+    # 获得原始模型的module_defs，并修改该defs中的卷积核数量
     compact_module_defs = deepcopy(model.module_defs)
-    for idx in CBL_idx:
+    for idx, num in zip(CBL_idx, num_filters):
         assert compact_module_defs[idx]['type'] == 'convolutional'
-        compact_module_defs[idx]['filters'] = str(CBLidx2filters[idx])
+        compact_module_defs[idx]['filters'] = str(num)
 
-    compact_model1 = Darknet([model.hyperparams.copy()] + compact_module_defs, (img_size, img_size)).to(device)
+    # for item_def in compact_module_defs:
+    #     print(item_def)
+
+    compact_model1 = Darknet([model.hyperparams.copy()] + compact_module_defs).to(device)
     compact_nparameters1 = obtain_num_parameters(compact_model1)
 
     init_weights_from_loose_model(compact_model1, pruned_model, CBL_idx, Conv_idx, CBLidx2mask)

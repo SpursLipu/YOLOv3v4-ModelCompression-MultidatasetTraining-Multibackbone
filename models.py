@@ -438,8 +438,10 @@ class Darknet(nn.Module):
                 x = torch.cat(x, 1)
             return x, p, feature_out
 
-    def fuse(self):
+    def fuse(self, quantized=-1):
         # Fuse Conv2d + BatchNorm2d layers throughout model
+        if quantized == 2:
+            return
         print('Fusing layers...')
         fused_list = nn.ModuleList()
         for a in list(self.children())[0]:
@@ -448,7 +450,7 @@ class Darknet(nn.Module):
                     if isinstance(b, nn.modules.batchnorm.BatchNorm2d):
                         # fuse this bn layer with the previous conv2d layer
                         conv = a[i - 1]
-                        fused = torch_utils.fuse_conv_and_bn(conv, b)
+                        fused = torch_utils.fuse_conv_and_bn(conv, b, quantized)
                         a = nn.Sequential(fused, *list(a.children())[i + 1:])
                         break
             fused_list.append(a)

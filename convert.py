@@ -1,14 +1,14 @@
 import argparse
-from sys import platform
+import struct
 
 from models import *  # set ONNX_EXPORT in models.py
-from utils.datasets import *
+
 from utils.utils import *
 
 
 def convert():
     img_size = (320, 192) if ONNX_EXPORT else opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
-    weights, half, view_img = opt.weights, opt.half, opt.view_img
+    weights, half = opt.weights, opt.half
 
     # Initialize
     device = torch_utils.select_device(device='cpu' if ONNX_EXPORT else opt.device)
@@ -23,16 +23,30 @@ def convert():
     else:  # darknet format
         _ = load_darknet_weights(model, weights)
 
-    # Second-stage classifier
-    classify = False
-    if classify:
-        modelc = torch_utils.load_classifier(name='resnet101', n=2)  # initialize
-        modelc.load_state_dict(torch.load('weights/resnet101.pt', map_location=device)['model'])  # load weights
-        modelc.to(device).eval()
+    save_weights(model, path='weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '.weights')
 
     # Fuse Conv2d + BatchNorm2d layers
-    # model.fuse()
+    model.fuse()
 
+    w_file = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_weights.bin', 'wb')
+    b_file = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_bias.bin', 'wb')
+    stat = model.state_dict()
+    for name in stat:
+        print(name)
+        para = stat[name]
+        print(para.shape)
+        para_flatten = para.cpu().data.numpy().flatten()  # 展开
+        if name.find('weight') >= 0:
+            file = w_file
+        else:
+            file = b_file
+
+        for i in para_flatten:
+            a = struct.pack('<f', i)  # 小端浮点                 大端，浮点32>f
+            file.write(a)
+
+    w_file.close()
+    b_file.close()
     # Eval mode
     model.to(device).eval()
 
@@ -46,7 +60,6 @@ def convert():
     half = half and device.type != 'cpu'  # half precision only supported on CUDA
     if half:
         model.half()
-    save_weights(model, path='weights/best.weights')
 
 
 if __name__ == '__main__':
@@ -59,10 +72,8 @@ if __name__ == '__main__':
     parser.add_argument('--img_size', type=int, default=416, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.6, help='object confidence threshold')
     parser.add_argument('--nms-thres', type=float, default=0.8, help='iou threshold for non-maximum suppression')
-    parser.add_argument('--fourcc', type=str, default='mp4v', help='output video codec (verify ffmpeg support)')
     parser.add_argument('--half', action='store_true', help='half precision FP16 inference')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
-    parser.add_argument('--view-img', action='store_true', help='display results')
     opt = parser.parse_args()
     print(opt)
 

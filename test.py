@@ -22,7 +22,9 @@ def test(cfg,
          dataloader=None,
          multi_label=True,
          quantized=-1,
-         qlayers=-1):
+         a_bit=8,
+         w_bit=8,
+         ):
     # Initialize/load model and set device
     if model is None:
         device = torch_utils.select_device(opt.device, batch_size=batch_size)
@@ -33,14 +35,14 @@ def test(cfg,
             os.remove(f)
 
         # Initialize model
-        model = Darknet(cfg, imgsz, quantized=quantized, qlayers=qlayers)
+        model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit)
 
         # Load weights
         attempt_download(weights)
         if weights.endswith('.pt'):  # pytorch format
             model.load_state_dict(torch.load(weights, map_location=device)['model'])
         else:  # darknet format
-            load_darknet_weights(model, weights)
+            load_darknet_weights(model, weights, quantized=quantized)
 
         # Fuse
         model.fuse(quantized=quantized)
@@ -250,6 +252,10 @@ if __name__ == '__main__':
                         help='0:quantization way one Ternarized weight and 8bit activation')
     parser.add_argument('--qlayers', type=int, default=-1,
                         help='0:no quantization , x:The shallow layer of current quantized layers(from deep to shallow)')
+    parser.add_argument('--a-bit', type=int, default=8,
+                        help='a-bit')
+    parser.add_argument('--w-bit', type=int, default=8,
+                        help='w-bit')
     opt = parser.parse_args()
     opt.save_json = opt.save_json or any([x in opt.data for x in ['coco.data', 'coco2014.data', 'coco2017.data']])
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
@@ -270,7 +276,8 @@ if __name__ == '__main__':
              opt.single_cls,
              opt.augment,
              quantized=opt.quantized,
-             qlayers=opt.qlayers)
+             a_bit=opt.a_bit,
+             w_bit=opt.w_bit)
 
     elif opt.task == 'benchmark':  # mAPs at 256-640 at conf 0.5 and 0.7
         y = []

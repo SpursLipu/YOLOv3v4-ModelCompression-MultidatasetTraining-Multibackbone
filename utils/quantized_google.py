@@ -86,7 +86,6 @@ class Quantizer(nn.Module):
         if out_channels == -1:
             self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
             self.register_buffer('zero_point', torch.zeros(1))  # 量化零点
-
         else:
             self.register_buffer('scale', torch.zeros(out_channels, 1, 1, 1))  # 量化比例因子
             self.register_buffer('zero_point', torch.zeros(out_channels, 1, 1, 1))  # 量化零点
@@ -154,7 +153,7 @@ class SymmetricQuantizer(SignedQuantizer):
 
 
 # 非对称量化
-class AsymmetricQuantizer(UnsignedQuantizer):
+class AsymmetricQuantizer(SignedQuantizer):
 
     def update_params(self):
         quantized_range = self.max_val - self.min_val  # 量化后范围
@@ -177,9 +176,7 @@ class QuantizedConv2d(nn.Conv2d):
             bias=True,
             a_bits=8,
             w_bits=8,
-            q_type=1,
-            first_layer=0,
-    ):
+            q_type=0):
         super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -204,11 +201,10 @@ class QuantizedConv2d(nn.Conv2d):
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
                                                                                                       out_channels=out_channels),
                                                         out_channels=out_channels)
-        self.first_layer = first_layer
 
     def forward(self, input):
         # 量化A和W
-        if not self.first_layer:
+        if input.shape[1] != 3:
             input = self.activation_quantizer(input)
         q_input = input
         q_weight = self.weight_quantizer(self.weight)

@@ -740,6 +740,87 @@ def cutout(image, labels):
     return labels
 
 
+class Fence(object):
+
+    def __init__(self, l, m, ll, lm, mean, probability=0.8):
+        # x为竖线的宽度，
+        # y为横线的宽度
+        # l1为竖线的间距
+        # l2为横线的间距
+        # mean为从随机擦除借鉴
+        # probability为是否mask的概率
+
+        self.mean = mean
+        self.x = random.randint(l, m)
+        self.y = random.randint(l, m)
+        self.l1 = random.randint(ll, lm)
+        self.l2 = random.randint(ll, lm)
+        self.mean = mean
+        self.st_prob = self.prob = probability
+
+    def set_prob(self, epoch, max_epoch):
+        self.prob = self.st_prob * min(1, epoch / max_epoch)
+
+    def __call__(self, img):
+        if random.uniform(0, 1) > self.prob:
+            return img
+
+        sp = img.shape
+        height, width = sp[1], sp[2]
+
+        # mask_1代表横着的条纹，mask_2代表竖着的条纹
+        mask_1 = np.ones(shape=(sp[1], sp[2], 3))
+        mask_2 = np.ones(shape=(sp[1], sp[2], 3))
+        for i in range(1, height // (self.l1 + self.x) + 1):
+            mask_1[i * self.l1 + (i - 1) * self.x:i * (self.l1 + self.x):, 0:, 0] = self.mean[0]
+            mask_1[i * self.l1 + (i - 1) * self.x:i * (self.l1 + self.x):, 0:, 1] = self.mean[1]
+            mask_1[i * self.l1 + (i - 1) * self.x:i * (self.l1 + self.x):, 0:, 2] = self.mean[2]
+        for i in range(1, width // (self.l2 + self.y) + 1):
+            mask_2[0:, i * self.l2 + (i - 1) * self.y:i * (self.l2 + self.y), 0] = self.mean[0]
+            mask_2[0:, i * self.l2 + (i - 1) * self.y:i * (self.l2 + self.y), 1] = self.mean[1]
+            mask_2[0:, i * self.l2 + (i - 1) * self.y:i * (self.l2 + self.y), 2] = self.mean[2]
+
+        # 将生成的两个mask随机旋转一定角度
+        center = (width / 2, height / 2)
+        rotation_1, rotation_2 = random.randint(0, 360), random.randint(0, 360)
+        M_1 = cv2.getRotationMatrix2D(center, rotation_1, 2)
+        M_2 = cv2.getRotationMatrix2D(center, rotation_2, 2)
+        mask_1 = cv2.warpAffine(mask_1, M_1, (width, height))
+        mask_2 = cv2.warpAffine(mask_2, M_2, (width, height))
+
+        mask = (mask_1 * mask_2)
+        # cv2.imwrite('mask.png', mask * 255)
+        mask = mask.transpose(2, 0, 1)
+        mask = torch.from_numpy(mask).float().cuda()
+        img = img * mask
+        return img
+
+
+class FenceMask(torch.nn.Module):
+    def __init__(self, l, m, ll, lm, mean, probability=0.8):
+        super(FenceMask, self).__init__()
+        self.l = l
+        self.m = m
+        self.ll = ll
+        self.lm = lm
+        self.mean = mean
+        self.probability = probability
+        self.Fence = Fence(l, m, ll, lm, mean, probability)
+
+    def set_prob(self, epoch, max_epoch):
+        self.Fence.set_prob(epoch, max_epoch)
+
+    def forward(self, x):
+        if not self.training:
+            return x
+        n, c, h, w = x.size()
+        y = []
+        for i in range(n):
+            y.append(self.Fence(x[i]))
+        y = torch.cat(y).view(n, c, h, w)
+        return y
+
+
 def reduce_img_size(path='../data/sm4/images', img_size=1024):  # from utils.datasets import *; reduce_img_size()
     # creates a new ./images_reduced folder with reduced size images of maximum size img_size
     path_new = path + '_reduced'  # reduced images path

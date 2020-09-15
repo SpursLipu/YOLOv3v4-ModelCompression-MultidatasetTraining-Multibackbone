@@ -91,7 +91,7 @@ def train(hyp):
         os.remove(f)
 
     # Initialize model
-    model = Darknet(cfg, quantized=opt.quantized, qlayers=opt.qlayers).to(device)
+    model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit).to(device)
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
 
@@ -116,6 +116,8 @@ def train(hyp):
     print('Optimizer groups: %g .bias, %g Conv2d.weight, %g other' % (len(pg2), len(pg1), len(pg0)))
     del pg0, pg1, pg2
 
+    # fencemask = FenceMask(8, 24, 32, 128, [0, 0, 0], 0.8)
+    # max_epoch = 160
     start_epoch = 0
     best_fitness = 0.0
     if weights != 'None':
@@ -148,7 +150,7 @@ def train(hyp):
 
         elif len(weights) > 0:  # darknet format
             # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-            load_darknet_weights(model, weights, pt=opt.pt)
+            load_darknet_weights(model, weights, pt=opt.pt, quantized=opt.quantized)
     if t_cfg:
         if t_weights.endswith('.pt'):
             t_model.load_state_dict(torch.load(t_weights, map_location=device)['model'])
@@ -271,6 +273,7 @@ def train(hyp):
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
+        # fencemask.set_prob(epoch, max_epoch)
         model.train()
         # 稀疏化标志
         sr_flag = get_sr_flag(epoch, opt.sr)
@@ -311,6 +314,7 @@ def train(hyp):
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
             # Forward
+            # imgs = fencemask(imgs)
             pred, feature_s = model(imgs)
 
             # Loss
@@ -510,12 +514,13 @@ if __name__ == '__main__':
                         help='0:nomal prune or regular prune 1:shortcut prune 2:layer prune')
     parser.add_argument('--quantized', type=int, default=-1,
                         help='0:quantization way one Ternarized weight and 8bit activation')
-    parser.add_argument('--qlayers', type=int, default=-1,
-                        help='0:no quantization , x:The shallow layer of current quantized layers(from deep to shallow)')
+    parser.add_argument('--a-bit', type=int, default=8,
+                        help='a-bit')
+    parser.add_argument('--w-bit', type=int, default=8,
+                        help='w-bit')
 
     opt = parser.parse_args()
     opt.weights = last if opt.resume else opt.weights
-    check_git_status()
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
     # opt.data = list(glob.iglob('./**/' + opt.data, recursive=True))[0]  # find file
     print(opt)

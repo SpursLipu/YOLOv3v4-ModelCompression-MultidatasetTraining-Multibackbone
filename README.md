@@ -372,36 +372,6 @@ oxfordhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
 |yolov3tiny(微调)         |8.27M    |0.708   |0.0144s   |0.5    |1.82M  |0.703 |0.0122s |
 
 ## 2、量化
-
-### 低比特量化
-`--quantized` 表示选取量化方法，默认值为-1，表示不采用任何量化方法。
-
-`--quantized 0` 使用BNN量化方法。
-
-BinaryNet: Training Deep Neural Networks withWeights and Activations Constrained to +1 or -1
-[参考论文](https://arxiv.org/abs/1602.02830)
-
-`--quantized 1` 使用BWN量化方法
-
-XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks
-[参考论文](https://arxiv.org/abs/1603.05279v4)
-
-#### stage-wise 训练策略
-`--qlayers`可以用于选取Darknet中的量化区间，默认为自深层到浅层, 默认值为-1表示无量化层，有效范围为0-74，取0时表示量化所有层，取74时表示无量化层，大于74则无意义。
-
-如：
-
-`--qlayers 63` 表示量化Darknet主体网络中最后四个重复的残差块。
-
-`--qlayers 38` 表示量化Darknet主体网络中从倒数第二八个重复的残差块开始，量化到Darknet主体网络结束。
-
-以此类推，量化时可根据具体情况选择何是的量化层数，以及量化进度，推荐`--qlayers`值自74逐渐下降。
-
-量化指令范例：
-
-```bash
-python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 1 --qlayers 72
-```
 ### 定点量化
 `--quantized 2` 使用Dorefa8位定点量化方法
 

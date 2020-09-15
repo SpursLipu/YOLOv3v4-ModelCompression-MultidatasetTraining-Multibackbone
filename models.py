@@ -9,7 +9,7 @@ import copy
 ONNX_EXPORT = False
 
 
-def create_modules(module_defs, img_size, cfg, quantized, qlayers):
+def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8):
     # Constructs module list of layer blocks from module configuration in module_defs
 
     img_size = [img_size] * 2 if isinstance(img_size, int) else img_size  # expand if necessary
@@ -27,87 +27,77 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
             filters = int(mdef['filters'])
             kernel_size = int(mdef['size'])
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
-            # 低比特量化
-            if i >= qlayers and i <= 74 and (quantized == 0 or quantized == 1) and qlayers != -1:
-                # BNN量化
-                if quantized == 0:
-                    modules.add_module('Conv2d', BinaryConv2d(in_channels=output_filters[-1],
-                                                              out_channels=filters,
-                                                              kernel_size=kernel_size,
-                                                              stride=int(mdef['stride']),
-                                                              padding=pad,
-                                                              bias=not bn))
-                    if bn:
-                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-                    if mdef['activation'] == 'leaky':
-                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
-                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
-                        # modules.add_module('activation', Swish())
-                    if mdef['activation'] == 'relu6':
-                        modules.add_module('activation', ReLU6())
-                    if mdef['activation'] == 'h_swish':
-                        modules.add_module('activation', HardSwish())
-                    if mdef['activation'] == 'relu':
-                        modules.add_module('activation', nn.ReLU())
-                # BWN量化
-                elif quantized == 1:
-                    modules.add_module('Conv2d', BWNConv2d(in_channels=output_filters[-1],
-                                                           out_channels=filters,
-                                                           kernel_size=kernel_size,
-                                                           stride=int(mdef['stride']),
-                                                           padding=pad,
-                                                           bias=not bn))
-                    if bn:
-                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-                    if mdef['activation'] == 'leaky':
-                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
-                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
-                        # modules.add_module('activation', Swish())
-                    if mdef['activation'] == 'relu6':
-                        modules.add_module('activation', ReLU6())
-                    if mdef['activation'] == 'h_swish':
-                        modules.add_module('activation', HardSwish())
-                    if mdef['activation'] == 'relu':
-                        modules.add_module('activation', nn.ReLU())
-            else:
-                if quantized == 2:
-                    modules.add_module('Conv2d', DorefaConv2d(in_channels=output_filters[-1],
-                                                              out_channels=filters,
-                                                              kernel_size=kernel_size,
-                                                              stride=int(mdef['stride']),
-                                                              padding=pad,
-                                                              groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                              bias=not bn))
-                elif quantized == 3:
-                    modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
+
+            if quantized == 2:
+                modules.add_module('Conv2d', DorefaConv2d(in_channels=output_filters[-1],
+                                                          out_channels=filters,
+                                                          kernel_size=kernel_size,
+                                                          stride=int(mdef['stride']),
+                                                          padding=pad,
+                                                          groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                          bias=not bn,
+                                                          a_bits=a_bit,
+                                                          w_bits=w_bit))
+                if bn:
+                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
+            elif quantized == 3:
+                modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
+                                                             out_channels=filters,
+                                                             kernel_size=kernel_size,
+                                                             stride=int(mdef['stride']),
+                                                             padding=pad,
+                                                             groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                             bias=not bn,
+                                                             a_bits=a_bit,
+                                                             w_bits=w_bit))
+                if bn:
+                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
+            elif quantized == 4:
+                modules.add_module('Conv2d', BNFold_DorefaConv2d(in_channels=output_filters[-1],
                                                                  out_channels=filters,
                                                                  kernel_size=kernel_size,
                                                                  stride=int(mdef['stride']),
                                                                  padding=pad,
                                                                  groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                                 bias=not bn))
-                else:
-                    modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
-                                                           out_channels=filters,
-                                                           kernel_size=kernel_size,
-                                                           stride=int(mdef['stride']),
-                                                           padding=pad,
-                                                           groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                           bias=not bn))
+                                                                 bias=not bn,
+                                                                 a_bit=a_bit,
+                                                                 w_bit=w_bit))
+
+            elif quantized == 5:
+                modules.add_module('Conv2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
+                                                             out_channels=filters,
+                                                             kernel_size=kernel_size,
+                                                             stride=int(mdef['stride']),
+                                                             padding=pad,
+                                                             groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                             bias=not bn,
+                                                             a_bits=a_bit,
+                                                             w_bits=w_bit))
+            else:
+                modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
+                                                       out_channels=filters,
+                                                       kernel_size=kernel_size,
+                                                       stride=int(mdef['stride']),
+                                                       padding=pad,
+                                                       groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                       bias=not bn))
                 if bn:
                     modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-                if mdef['activation'] == 'leaky':
-                    modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
-                    # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
-                    # modules.add_module('activation', Swish())
-                if mdef['activation'] == 'relu6':
-                    modules.add_module('activation', ReLU6())
-                if mdef['activation'] == 'h_swish':
-                    modules.add_module('activation', HardSwish())
-                if mdef['activation'] == 'relu':
-                    modules.add_module('activation', nn.ReLU())
-                if mdef['activation'] == 'mish':
-                    modules.add_module('activation', Mish())
+
+            if mdef['activation'] == 'leaky':
+                modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                # modules.add_module('activation', Swish())
+            if mdef['activation'] == 'relu6':
+                modules.add_module('activation', ReLU6())
+            if mdef['activation'] == 'h_swish':
+                modules.add_module('activation', HardSwish())
+            if mdef['activation'] == 'relu':
+                modules.add_module('activation', nn.ReLU())
+            if mdef['activation'] == 'mish':
+                modules.add_module('activation', Mish())
 
         elif mdef['type'] == 'depthwise':
             bn = int(mdef['batch_normalize'])
@@ -121,7 +111,12 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                                                                stride=int(mdef['stride']),
                                                                padding=pad,
                                                                groups=output_filters[-1],
-                                                               bias=not bn))
+                                                               bias=not bn,
+                                                               a_bits=a_bit,
+                                                               w_bits=w_bit))
+                if bn:
+                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
             elif quantized == 3:
                 modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
                                                                   out_channels=filters,
@@ -129,7 +124,32 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                                                                   stride=int(mdef['stride']),
                                                                   padding=pad,
                                                                   groups=output_filters[-1],
-                                                                  bias=not bn))
+                                                                  bias=not bn,
+                                                                  a_bits=a_bit,
+                                                                  w_bits=w_bit))
+                if bn:
+                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
+            elif quantized == 4:
+                modules.add_module('DepthWise2d', BNFold_DorefaConv2d(in_channels=output_filters[-1],
+                                                                      out_channels=filters,
+                                                                      kernel_size=kernel_size,
+                                                                      stride=int(mdef['stride']),
+                                                                      padding=pad,
+                                                                      groups=output_filters[-1],
+                                                                      bias=not bn,
+                                                                      a_bit=a_bit,
+                                                                      w_bit=w_bit))
+            elif quantized == 5:
+                modules.add_module('DepthWise2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
+                                                                  out_channels=filters,
+                                                                  kernel_size=kernel_size,
+                                                                  stride=int(mdef['stride']),
+                                                                  padding=pad,
+                                                                  groups=output_filters[-1],
+                                                                  bias=not bn,
+                                                                  a_bits=a_bit,
+                                                                  w_bits=w_bit))
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
                                                             out_channels=filters,
@@ -138,8 +158,9 @@ def create_modules(module_defs, img_size, cfg, quantized, qlayers):
                                                             padding=pad,
                                                             groups=output_filters[-1],
                                                             bias=not bn), )
-            if bn:
-                modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                if bn:
+                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
             if mdef['activation'] == 'leaky':
                 modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
                 # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
@@ -335,7 +356,7 @@ class YOLOLayer(nn.Module):
 class Darknet(nn.Module):
     # YOLOv3 object detection model
 
-    def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, qlayers=-1):
+    def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8):
         super(Darknet, self).__init__()
 
         if isinstance(cfg, str):
@@ -343,11 +364,12 @@ class Darknet(nn.Module):
         elif isinstance(cfg, list):
             self.module_defs = cfg
         self.quantized = quantized
-        self.qlayers = qlayers
+        self.a_bit = a_bit
+        self.w_bit = w_bit
 
         self.hyperparams = copy.deepcopy(self.module_defs[0])
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
-                                                      qlayers=self.qlayers)
+                                                      a_bit=self.a_bit, w_bit=self.w_bit)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 
@@ -440,7 +462,7 @@ class Darknet(nn.Module):
 
     def fuse(self, quantized=-1):
         # Fuse Conv2d + BatchNorm2d layers throughout model
-        if quantized == 2:
+        if quantized != -1:
             return
         print('Fusing layers...')
         fused_list = nn.ModuleList()
@@ -465,7 +487,7 @@ def get_yolo_layers(model):
     return [i for i, m in enumerate(model.module_list) if m.__class__.__name__ == 'YOLOLayer']  # [89, 101, 113]
 
 
-def load_darknet_weights(self, weights, cutoff=-1, pt=False):
+def load_darknet_weights(self, weights, cutoff=-1, pt=False, quantized=-1):
     # Parses and loads the weights stored in 'weights'
 
     # Establish cutoffs (load layers between 0 and cutoff. if cutoff = -1 all are loaded)
@@ -488,25 +510,45 @@ def load_darknet_weights(self, weights, cutoff=-1, pt=False):
         if mdef['type'] == 'convolutional':
             conv_layer = module[0]
             if mdef['batch_normalize']:
-                # Load BN bias, weights, running mean and running variance
-                bn_layer = module[1]
-                num_b = bn_layer.bias.numel()  # Number of biases
-                # Bias
-                bn_b = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.bias)
-                bn_layer.bias.data.copy_(bn_b)
-                ptr += num_b
-                # Weight
-                bn_w = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.weight)
-                bn_layer.weight.data.copy_(bn_w)
-                ptr += num_b
-                # Running Mean
-                bn_rm = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.running_mean)
-                bn_layer.running_mean.data.copy_(bn_rm)
-                ptr += num_b
-                # Running Var
-                bn_rv = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.running_var)
-                bn_layer.running_var.data.copy_(bn_rv)
-                ptr += num_b
+                if quantized == 4 or quantized == 5:
+                    # Load BN bias, weights, running mean and running variance
+                    num_b = conv_layer.beta.numel()
+                    # Bias
+                    bn_b = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(conv_layer.beta)
+                    conv_layer.beta.data.copy_(bn_b)
+                    ptr += num_b
+                    # Weight
+                    bn_w = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(conv_layer.gamma)
+                    conv_layer.gamma.data.copy_(bn_w)
+                    ptr += num_b
+                    # Running Mean
+                    bn_rm = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(conv_layer.running_mean)
+                    conv_layer.running_mean.data.copy_(bn_rm)
+                    ptr += num_b
+                    # Running Var
+                    bn_rv = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(conv_layer.running_var)
+                    conv_layer.running_var.data.copy_(bn_rv)
+                    ptr += num_b
+                else:
+                    # Load BN bias, weights, running mean and running variance
+                    bn_layer = module[1]
+                    num_b = bn_layer.bias.numel()  # Number of biases
+                    # Bias
+                    bn_b = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.bias)
+                    bn_layer.bias.data.copy_(bn_b)
+                    ptr += num_b
+                    # Weight
+                    bn_w = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.weight)
+                    bn_layer.weight.data.copy_(bn_w)
+                    ptr += num_b
+                    # Running Mean
+                    bn_rm = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.running_mean)
+                    bn_layer.running_mean.data.copy_(bn_rm)
+                    ptr += num_b
+                    # Running Var
+                    bn_rv = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.running_var)
+                    bn_layer.running_var.data.copy_(bn_rv)
+                    ptr += num_b
                 # Load conv. weights
                 num_w = conv_layer.weight.numel()
                 conv_w = torch.from_numpy(weights[ptr:ptr + num_w]).view_as(conv_layer.weight)
@@ -534,26 +576,46 @@ def load_darknet_weights(self, weights, cutoff=-1, pt=False):
         elif mdef['type'] == 'depthwise':
             depthwise_layer = module[0]
             if mdef['batch_normalize']:
-                # Load BN bias, weights, running mean and running variance
-                bn_layer = module[1]
-                num_b = bn_layer.bias.numel()  # Number of biases
-                # Bias
-                bn_b = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.bias)
-                bn_layer.bias.data.copy_(bn_b)
-                ptr += num_b
-                # Weight
-                bn_w = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.weight)
-                bn_layer.weight.data.copy_(bn_w)
-                ptr += num_b
-                # Running Mean
-                bn_rm = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.running_mean)
-                bn_layer.running_mean.data.copy_(bn_rm)
-                ptr += num_b
-                # Running Var
-                bn_rv = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.running_var)
-                bn_layer.running_var.data.copy_(bn_rv)
-                ptr += num_b
-            # 自己加的
+                if quantized == 4 or quantized == 5:
+                    # Load BN bias, weights, running mean and running variance
+                    num_b = conv_layer.beta.numel()
+                    # Bias
+                    bn_b = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(conv_layer.beta)
+                    conv_layer.beta.data.copy_(bn_b)
+                    ptr += num_b
+                    # Weight
+                    bn_w = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(conv_layer.gamma)
+                    conv_layer.gamma.data.copy_(bn_w)
+                    ptr += num_b
+                    # Running Mean
+                    bn_rm = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(conv_layer.running_mean)
+                    conv_layer.running_mean.data.copy_(bn_rm)
+                    ptr += num_b
+                    # Running Var
+                    bn_rv = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(conv_layer.running_var)
+                    conv_layer.running_var.data.copy_(bn_rv)
+                    ptr += num_b
+                else:
+                    # Load BN bias, weights, running mean and running variance
+                    bn_layer = module[1]
+                    num_b = bn_layer.bias.numel()  # Number of biases
+                    # Bias
+                    bn_b = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.bias)
+                    bn_layer.bias.data.copy_(bn_b)
+                    ptr += num_b
+                    # Weight
+                    bn_w = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.weight)
+                    bn_layer.weight.data.copy_(bn_w)
+                    ptr += num_b
+                    # Running Mean
+                    bn_rm = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.running_mean)
+                    bn_layer.running_mean.data.copy_(bn_rm)
+                    ptr += num_b
+                    # Running Var
+                    bn_rv = torch.from_numpy(weights[ptr:ptr + num_b]).view_as(bn_layer.running_var)
+                    bn_layer.running_var.data.copy_(bn_rv)
+                    ptr += num_b
+            # Load conv. weights
             num_w = depthwise_layer.weight.numel()
             conv_w = torch.from_numpy(weights[ptr:ptr + num_w]).view_as(depthwise_layer.weight)
             depthwise_layer.weight.data.copy_(conv_w)

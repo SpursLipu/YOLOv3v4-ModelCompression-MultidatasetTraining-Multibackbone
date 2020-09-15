@@ -33,14 +33,6 @@ def init_seeds(seed=0):
     torch_utils.init_seeds(seed=seed)
 
 
-def check_git_status():
-    if platform in ['linux', 'darwin']:
-        # Suggest 'git pull' if repo is out of date
-        s = subprocess.check_output('if [ -d .git ]; then git fetch && git status -uno; fi', shell=True).decode('utf-8')
-        if 'Your branch is behind' in s:
-            print(s[s.find('Your branch is behind'):s.find('\n\n')] + '\n')
-
-
 def load_classes(path):
     # Loads *.names file at 'path'
     with open(path, 'r') as f:

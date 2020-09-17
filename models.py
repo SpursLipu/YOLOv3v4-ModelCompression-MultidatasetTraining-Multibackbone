@@ -62,8 +62,9 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8):
                                                                  padding=pad,
                                                                  groups=mdef['groups'] if 'groups' in mdef else 1,
                                                                  bias=not bn,
-                                                                 a_bit=a_bit,
-                                                                 w_bit=w_bit))
+                                                                 a_bits=a_bit,
+                                                                 w_bits=w_bit,
+                                                                 bn=bn))
 
             elif quantized == 5:
                 modules.add_module('Conv2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
@@ -74,7 +75,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8):
                                                              groups=mdef['groups'] if 'groups' in mdef else 1,
                                                              bias=not bn,
                                                              a_bits=a_bit,
-                                                             w_bits=w_bit))
+                                                             w_bits=w_bit,
+                                                             bn=bn))
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,
@@ -138,8 +140,9 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8):
                                                                       padding=pad,
                                                                       groups=output_filters[-1],
                                                                       bias=not bn,
-                                                                      a_bit=a_bit,
-                                                                      w_bit=w_bit))
+                                                                      a_bits=a_bit,
+                                                                      w_bits=w_bit,
+                                                                      bn=bn))
             elif quantized == 5:
                 modules.add_module('DepthWise2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
                                                                   out_channels=filters,
@@ -149,7 +152,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8):
                                                                   groups=output_filters[-1],
                                                                   bias=not bn,
                                                                   a_bits=a_bit,
-                                                                  w_bits=w_bit))
+                                                                  w_bits=w_bit,
+                                                                  bn=bn))
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
                                                             out_channels=filters,

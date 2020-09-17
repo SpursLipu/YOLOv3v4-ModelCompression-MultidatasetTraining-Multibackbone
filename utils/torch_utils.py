@@ -80,16 +80,16 @@ def fuse_conv_and_bn(conv, bn, quantized=-1):
                                         stride=conv.stride,
                                         padding=conv.padding,
                                         bias=True)
-        elif quantized == 3:
-            fusedconv = QuantizedConv2d(conv.in_channels,
-                                        conv.out_channels,
-                                        groups=conv.groups,
-                                        kernel_size=conv.kernel_size,
-                                        stride=conv.stride,
-                                        padding=conv.padding,
-                                        bias=True)
-            fusedconv.weight_quantizer = deepcopy(conv.weight_quantizer)
-            fusedconv.activation_quantizer = deepcopy(conv.activation_quantizer)
+        # elif quantized == 3:
+        #     fusedconv = QuantizedConv2d(conv.in_channels,
+        #                                 conv.out_channels,
+        #                                 groups=conv.groups,
+        #                                 kernel_size=conv.kernel_size,
+        #                                 stride=conv.stride,
+        #                                 padding=conv.padding,
+        #                                 bias=True)
+        #     fusedconv.weight_quantizer = deepcopy(conv.weight_quantizer)
+        #     fusedconv.activation_quantizer = deepcopy(conv.activation_quantizer)
         # prepare filters
         w_conv = conv.weight.clone().view(conv.out_channels, -1)
         w_bn = torch.diag(bn.weight.div(torch.sqrt(bn.eps + bn.running_var)))

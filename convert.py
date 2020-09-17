@@ -23,7 +23,7 @@ def convert():
     else:  # darknet format
         _ = load_darknet_weights(model, weights)
 
-    save_weights(model, path='weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '.weights')
+    save_weights(model, path='weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '-best.weights')
 
     # Fuse Conv2d + BatchNorm2d layers
     model.fuse()
@@ -32,9 +32,9 @@ def convert():
     b_file = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_bias.bin', 'wb')
     stat = model.state_dict()
     for name in stat:
-        print(name)
+        # print(name)
         para = stat[name]
-        print(para.shape)
+        # print(para.shape)
         para_flatten = para.cpu().data.numpy().flatten()  # 展开
         if name.find('weight') >= 0:
             file = w_file

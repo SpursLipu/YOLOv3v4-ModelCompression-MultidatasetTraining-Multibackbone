@@ -149,9 +149,10 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             bias=False,
             eps=1e-5,
             momentum=0.1,  # 考虑量化带来的抖动影响,对momentum进行调整(0.1 ——> 0.01),削弱batch统计参数占比，一定程度抑制抖动。经实验量化训练效果更好,acc提升1%左右
-            a_bit=8,
-            w_bit=8,
+            a_bits=8,
+            w_bits=8,
             first_layer=0,
+            bn=0
     ):
         super().__init__(
             in_channels=in_channels,
@@ -172,73 +173,83 @@ class BNFold_DorefaConv2d(DorefaConv2d):
         self.register_buffer('running_var', torch.ones(out_channels))
         self.register_buffer('first_bn', torch.zeros(1))
         self.register_buffer('num_batch_tracked', torch.zeros(1))
+        self.bn = bn
         init.uniform_(self.gamma)
         init.zeros_(self.beta)
 
         # 实例化量化器（A-layer级，W-channel级）
-        self.activation_quantizer = activation_quantize(a_bits=a_bit)
-        self.weight_quantizer = weight_quantize(w_bits=w_bit)
+        self.activation_quantizer = activation_quantize(a_bits=a_bits)
+        self.weight_quantizer = weight_quantize(w_bits=w_bits)
         self.first_layer = first_layer
 
     def forward(self, input):
         # 训练态
         if self.training:
-            # 先做普通卷积得到A，以取得BN参数
-            output = F.conv2d(
-                input=input,
-                weight=self.weight,
-                bias=self.bias,
-                stride=self.stride,
-                padding=self.padding,
-                dilation=self.dilation,
-                groups=self.groups
-            )
-            # 更新BN统计参数（batch和running）
-            dims = [dim for dim in range(4) if dim != 1]
-            batch_mean = torch.mean(output, dim=dims)
-            batch_var = torch.var(output, dim=dims)
-            self.num_batch_tracked.add_(1)
+            if self.bn:
+                # 先做普通卷积得到A，以取得BN参数
+                output = F.conv2d(
+                    input=input,
+                    weight=self.weight,
+                    bias=self.bias,
+                    stride=self.stride,
+                    padding=self.padding,
+                    dilation=self.dilation,
+                    groups=self.groups
+                )
+                # 更新BN统计参数（batch和running）
+                dims = [dim for dim in range(4) if dim != 1]
+                batch_mean = torch.mean(output, dim=dims)
+                batch_var = torch.var(output, dim=dims)
+                self.num_batch_tracked.add_(1)
 
-            with torch.no_grad():
-                if self.first_bn == 0:
-                    self.first_bn.add_(1)
-                    self.running_mean.add_(batch_mean)
-                    self.running_var.add_(batch_var)
+                with torch.no_grad():
+                    if self.first_bn == 0:
+                        self.first_bn.add_(1)
+                        self.running_mean.add_(batch_mean)
+                        self.running_var.add_(batch_var)
+                    else:
+                        self.running_mean.mul_(1 - self.momentum).add_(self.momentum * batch_mean)
+                        self.running_mean.div_(1 - (1 - self.momentum) ** self.num_batch_tracked)
+
+                        self.running_var.mul_(1 - self.momentum).add_(self.momentum * batch_var)
+                        self.running_var.div_(1 - (1 - self.momentum) ** self.num_batch_tracked)
+                # BN融合
+                if self.bias is not None:
+                    bias = reshape_to_bias(
+                        self.beta + (self.bias - batch_mean) * (self.gamma / torch.sqrt(batch_var + self.eps)))
                 else:
-                    self.running_mean.mul_(1 - self.momentum).add_(self.momentum * batch_mean)
-                    self.running_mean.div_(1 - (1 - self.momentum) ** self.num_batch_tracked)
+                    bias = reshape_to_bias(
+                        self.beta - batch_mean * (self.gamma / torch.sqrt(batch_var + self.eps)))  # b融batch
+                weight = self.weight * reshape_to_weight(self.gamma / torch.sqrt(batch_var + self.eps))  # w融running
+                # if self.bias is not None:
+                #     bias = reshape_to_bias(
+                #         self.beta + (self.bias - self.running_mean) * (
+                #                     self.gamma / torch.sqrt(self.running_var + self.eps)))
+                # else:
+                #     bias = reshape_to_bias(
+                #         self.beta - self.running_mean * (self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融batch
+                # weight = self.weight * reshape_to_weight(self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
 
-                    self.running_var.mul_(1 - self.momentum).add_(self.momentum * batch_var)
-                    self.running_var.div_(1 - (1 - self.momentum) ** self.num_batch_tracked)
-            # BN融合
-            # if self.bias is not None:
-            #     bias = reshape_to_bias(
-            #         self.beta + (self.bias - batch_mean) * (self.gamma / torch.sqrt(batch_var + self.eps)))
-            # else:
-            #     bias = reshape_to_bias(
-            #         self.beta - batch_mean * (self.gamma / torch.sqrt(batch_var + self.eps)))  # b融batch
-            # weight = self.weight * reshape_to_weight(self.gamma / torch.sqrt(batch_var + self.eps))  # w融running
-            if self.bias is not None:
-                bias = reshape_to_bias(
-                    self.beta + (self.bias - self.running_mean) * (
-                                self.gamma / torch.sqrt(self.running_var + self.eps)))
             else:
-                bias = reshape_to_bias(
-                    self.beta - self.running_mean * (self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融batch
-            weight = self.weight * reshape_to_weight(self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
-
+                bias = self.bias
+                weight = self.weight
         # 测试态
         else:
             # print(self.running_mean, self.running_var)
             # BN融合
-            if self.bias is not None:
-                bias = reshape_to_bias(self.beta + (self.bias - self.running_mean) * (
-                        self.gamma / torch.sqrt(self.running_var + self.eps)))
+            if self.bn:
+                if self.bias is not None:
+                    bias = reshape_to_bias(self.beta + (self.bias - self.running_mean) * (
+                            self.gamma / torch.sqrt(self.running_var + self.eps)))
+                else:
+                    bias = reshape_to_bias(
+                        self.beta - self.running_mean * (
+                                self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融running
+                weight = self.weight * reshape_to_weight(
+                    self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
             else:
-                bias = reshape_to_bias(
-                    self.beta - self.running_mean * (self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融running
-            weight = self.weight * reshape_to_weight(self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
-
+                bias = self.bias
+                weight = self.weight
         # 量化A和bn融合后的W
         if not self.first_layer:
             input = self.activation_quantizer(input)
@@ -260,7 +271,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             # output *= reshape_to_activation(torch.sqrt(self.running_var + self.eps) / torch.sqrt(batch_var + self.eps))
             # output += reshape_to_activation(
             #     self.gamma * (self.running_mean / (self.running_var + self.eps) - batch_mean / (batch_var + self.eps)))
-            # output += reshape_to_activation(bias)
+            output += reshape_to_activation(bias)
         else:  # 测试态
             output = F.conv2d(
                 input=q_input,

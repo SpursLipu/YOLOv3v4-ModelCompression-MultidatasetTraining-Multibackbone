@@ -406,7 +406,7 @@ Distilling the Knowledge in a Neural Network
     `--KDstr 2` 对boxloss和classloss有所区分，student不直接向teacher学习。student，teacher和GT分别求l2距离，当student大于teacher时附加一项student和gt的loss。
     `--KDstr 3` 对boxloss和classloss有所区分，student直接向teacher学习。
     `--KDstr 4` 将KDloss分为三项，boxloss，classloss和featureloss。
-    `--KDstr 5` 在feature中加入Fine-grain-mask
+    `--KDstr 5` 在KDstr 4的基础上，feature中加入Fine-grain-mask
 蒸馏指令范例：
 
 ```bash
@@ -418,7 +418,6 @@ python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size .
 ### 蒸馏实验
 oxfordhand数据集，使用yolov3tiny作为teacher网络，normal剪植后的yolov3tiny作为学生网络
 
-|<center>teacher模型</center> |<center>teacher模型mAP</center> |<center>student模型</center>|<center>直接微调</center>|<center>KDstr 1</center> |<center>KDstr 2</center> |<center>KDstr 3</center> |<center>KDstr 4(L1)</center> |<center>KDstr 4(L2)</center> |<center>KDstr 5(L1)</center> |<center>KDstr 5(L2)</center> |<center>KDstr 6(L1)</center> |<center>KDstr 6(L2)</center> |<center>KDstr 7</center> |
-| --- | --- | --- | --- | --- | --- | --- |--- |--- |--- |--- |--- |--- |--- |
-|yolov3tiny512   |0.708    |normal剪植yolov3tiny512    |0.637     |0.644    |0.648  |0.652   |0.655   |0.640   |  |
-|yolov3tiny608   |0.708    |normal剪植yolov3tiny608    |0.658     |0.666    |0.661  |0.672   |0.669   |0.665   |0.673   |0.670   |0.674   |0.660   |
+|<center>teacher模型</center> |<center>teacher模型mAP</center> |<center>student模型</center>|<center>直接微调</center>|<center>KDstr 1</center> |<center>KDstr 2</center> |<center>KDstr 3</center>  |<center>KDstr 5(L1)</center> |<center>KDstr 6(L1)</center> |
+| --- | --- | --- | --- | --- | --- | --- |--- |--- |
+|yolov3tiny608   |0.708    |normal剪植yolov3tiny608    |0.658     |0.666    |0.661  |0.672   |0.673   |0.674   |

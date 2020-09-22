@@ -37,8 +37,7 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8):
                                                                       bias=not bn,
                                                                       a_bits=a_bit,
                                                                       w_bits=w_bit))
-                if bn:
-                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
             elif quantized == 2:
                 modules.add_module('Conv2d', DorefaConv2d(in_channels=output_filters[-1],
                                                           out_channels=filters,
@@ -117,6 +116,16 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8):
             filters = int(mdef['filters'])
             kernel_size = int(mdef['size'])
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
+            if quantized == 1:
+                modules.add_module('DepthWise2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                           out_channels=filters,
+                                                                           kernel_size=kernel_size,
+                                                                           stride=int(mdef['stride']),
+                                                                           padding=pad,
+                                                                           groups=output_filters[-1],
+                                                                           bias=not bn,
+                                                                           a_bits=a_bit,
+                                                                           w_bits=w_bit))
             if quantized == 2:
                 modules.add_module('DepthWise2d', DorefaConv2d(in_channels=output_filters[-1],
                                                                out_channels=filters,
@@ -524,7 +533,7 @@ def load_darknet_weights(self, weights, cutoff=-1, pt=False, quantized=-1):
         if mdef['type'] == 'convolutional':
             conv_layer = module[0]
             if mdef['batch_normalize']:
-                if quantized == 4 or quantized == 5:
+                if quantized == 1 or quantized == 4 or quantized == 5:
                     # Load BN bias, weights, running mean and running variance
                     num_b = conv_layer.beta.numel()
                     # Bias
@@ -590,7 +599,7 @@ def load_darknet_weights(self, weights, cutoff=-1, pt=False, quantized=-1):
         elif mdef['type'] == 'depthwise':
             depthwise_layer = module[0]
             if mdef['batch_normalize']:
-                if quantized == 4 or quantized == 5:
+                if quantized == 1 or quantized == 4 or quantized == 5:
                     # Load BN bias, weights, running mean and running variance
                     num_b = conv_layer.beta.numel()
                     # Bias

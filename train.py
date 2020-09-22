@@ -695,16 +695,13 @@ def WarmupForQ(hyp, step):
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
             # Forward
-            pred, feature_s = model(imgs)
+            pred, _ = model(imgs)
 
             # Loss
             loss, loss_items = compute_loss(pred, targets, model)
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results
-
-            soft_target = 0
-            reg_ratio = 0  # 表示有多少target的回归是不如老师的，这时学生会跟gt再学习
 
             # Backward
             loss *= batch_size / 64  # scale loss

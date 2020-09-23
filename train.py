@@ -520,7 +520,7 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
         os.remove(f)
 
     # Initialize model
-    model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit, BN_Fold=opt.BN_Fold,
+    model = Darknet(cfg, quantized=opt.quantized, a_bit=a_bit, w_bit=w_bit, BN_Fold=opt.BN_Fold,
                     FPGA=opt.FPGA).to(device)
 
     # Optimizer

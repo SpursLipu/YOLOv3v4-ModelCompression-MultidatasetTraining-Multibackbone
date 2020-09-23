@@ -96,7 +96,8 @@ def train(hyp):
         os.remove(f)
 
     # Initialize model
-    model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit).to(device)
+    model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit, BN_Fold=opt.BN_Fold,
+                    FPGA=opt.FPGA).to(device)
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
 
@@ -155,7 +156,7 @@ def train(hyp):
 
         elif len(weights) > 0:  # darknet format
             # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-            load_darknet_weights(model, weights, pt=opt.pt, quantized=opt.quantized)
+            load_darknet_weights(model, weights, pt=opt.pt, BN_Fold=opt.BN_Fold, FPGA=opt.FPGA)
     if t_cfg:
         if t_weights.endswith('.pt'):
             t_model.load_state_dict(torch.load(t_weights, map_location=device)['model'])
@@ -519,7 +520,8 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
         os.remove(f)
 
     # Initialize model
-    model = Darknet(cfg, quantized=opt.quantized, a_bit=a_bit, w_bit=w_bit).to(device)
+    model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit, BN_Fold=opt.BN_Fold,
+                    FPGA=opt.FPGA).to(device)
 
     # Optimizer
     pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
@@ -574,7 +576,7 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
 
         elif len(weights) > 0:  # darknet format
             # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-            load_darknet_weights(model, weights, pt=opt.pt, quantized=opt.quantized)
+            load_darknet_weights(model, weights, pt=opt.pt, BN_Fold=opt.BN_Fold, FPGA=opt.FPGA)
 
     # Mixed precision training https://github.com/NVIDIA/apex
     if mixed_precision:
@@ -861,6 +863,8 @@ if __name__ == '__main__':
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
+    parser.add_argument('--BN_Fold', action='store_true', help='BN_Fold')
+    parser.add_argument('--FPGA', action='store_true', help='FPGA')
 
     opt = parser.parse_args()
     opt.weights = last if opt.resume else opt.weights

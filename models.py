@@ -9,7 +9,7 @@ import copy
 ONNX_EXPORT = False
 
 
-def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8):
+def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_Fold=False, FPGA=False):
     # Constructs module list of layer blocks from module configuration in module_defs
 
     img_size = [img_size] * 2 if isinstance(img_size, int) else img_size  # expand if necessary
@@ -28,65 +28,65 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8):
             kernel_size = int(mdef['size'])
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
             if quantized == 1:
-                modules.add_module('Conv2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
-                                                                      out_channels=filters,
-                                                                      kernel_size=kernel_size,
-                                                                      stride=int(mdef['stride']),
-                                                                      padding=pad,
-                                                                      groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                                      bias=not bn,
-                                                                      a_bits=a_bit,
-                                                                      w_bits=w_bit))
-
+                if FPGA:
+                    modules.add_module('Conv2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                          out_channels=filters,
+                                                                          kernel_size=kernel_size,
+                                                                          stride=int(mdef['stride']),
+                                                                          padding=pad,
+                                                                          groups=mdef[
+                                                                              'groups'] if 'groups' in mdef else 1,
+                                                                          bias=not bn,
+                                                                          a_bits=a_bit,
+                                                                          w_bits=w_bit))
+                else:
+                    if BN_Fold:
+                        modules.add_module('Conv2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
+                                                                     out_channels=filters,
+                                                                     kernel_size=kernel_size,
+                                                                     stride=int(mdef['stride']),
+                                                                     padding=pad,
+                                                                     groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                                     bias=not bn,
+                                                                     a_bits=a_bit,
+                                                                     w_bits=w_bit,
+                                                                     bn=bn))
+                    else:
+                        modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
+                                                                     out_channels=filters,
+                                                                     kernel_size=kernel_size,
+                                                                     stride=int(mdef['stride']),
+                                                                     padding=pad,
+                                                                     groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                                     bias=not bn,
+                                                                     a_bits=a_bit,
+                                                                     w_bits=w_bit))
+                        if bn:
+                            modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
             elif quantized == 2:
-                modules.add_module('Conv2d', DorefaConv2d(in_channels=output_filters[-1],
-                                                          out_channels=filters,
-                                                          kernel_size=kernel_size,
-                                                          stride=int(mdef['stride']),
-                                                          padding=pad,
-                                                          groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                          bias=not bn,
-                                                          a_bits=a_bit,
-                                                          w_bits=w_bit))
-                if bn:
-                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-
-            elif quantized == 3:
-                modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
-                                                             out_channels=filters,
-                                                             kernel_size=kernel_size,
-                                                             stride=int(mdef['stride']),
-                                                             padding=pad,
-                                                             groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                             bias=not bn,
-                                                             a_bits=a_bit,
-                                                             w_bits=w_bit))
-                if bn:
-                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-
-            elif quantized == 4:
-                modules.add_module('Conv2d', BNFold_DorefaConv2d(in_channels=output_filters[-1],
-                                                                 out_channels=filters,
-                                                                 kernel_size=kernel_size,
-                                                                 stride=int(mdef['stride']),
-                                                                 padding=pad,
-                                                                 groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                                 bias=not bn,
-                                                                 a_bits=a_bit,
-                                                                 w_bits=w_bit,
-                                                                 bn=bn))
-
-            elif quantized == 5:
-                modules.add_module('Conv2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
-                                                             out_channels=filters,
-                                                             kernel_size=kernel_size,
-                                                             stride=int(mdef['stride']),
-                                                             padding=pad,
-                                                             groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                             bias=not bn,
-                                                             a_bits=a_bit,
-                                                             w_bits=w_bit,
-                                                             bn=bn))
+                if BN_Fold:
+                    modules.add_module('Conv2d', BNFold_DorefaConv2d(in_channels=output_filters[-1],
+                                                                     out_channels=filters,
+                                                                     kernel_size=kernel_size,
+                                                                     stride=int(mdef['stride']),
+                                                                     padding=pad,
+                                                                     groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                                     bias=not bn,
+                                                                     a_bits=a_bit,
+                                                                     w_bits=w_bit,
+                                                                     bn=bn))
+                else:
+                    modules.add_module('Conv2d', DorefaConv2d(in_channels=output_filters[-1],
+                                                              out_channels=filters,
+                                                              kernel_size=kernel_size,
+                                                              stride=int(mdef['stride']),
+                                                              padding=pad,
+                                                              groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                              bias=not bn,
+                                                              a_bits=a_bit,
+                                                              w_bits=w_bit))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,
@@ -117,63 +117,66 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8):
             kernel_size = int(mdef['size'])
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
             if quantized == 1:
-                modules.add_module('DepthWise2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
-                                                                           out_channels=filters,
-                                                                           kernel_size=kernel_size,
-                                                                           stride=int(mdef['stride']),
-                                                                           padding=pad,
-                                                                           groups=output_filters[-1],
-                                                                           bias=not bn,
-                                                                           a_bits=a_bit,
-                                                                           w_bits=w_bit))
+                if FPGA:
+                    modules.add_module('DepthWise2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                               out_channels=filters,
+                                                                               kernel_size=kernel_size,
+                                                                               stride=int(mdef['stride']),
+                                                                               padding=pad,
+                                                                               groups=output_filters[-1],
+                                                                               bias=not bn,
+                                                                               a_bits=a_bit,
+                                                                               w_bits=w_bit))
+                else:
+                    if BN_Fold:
+                        modules.add_module('DepthWise2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
+                                                                          out_channels=filters,
+                                                                          kernel_size=kernel_size,
+                                                                          stride=int(mdef['stride']),
+                                                                          padding=pad,
+                                                                          groups=output_filters[-1],
+                                                                          bias=not bn,
+                                                                          a_bits=a_bit,
+                                                                          w_bits=w_bit,
+                                                                          bn=bn))
+                    else:
+                        modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
+                                                                          out_channels=filters,
+                                                                          kernel_size=kernel_size,
+                                                                          stride=int(mdef['stride']),
+                                                                          padding=pad,
+                                                                          groups=output_filters[-1],
+                                                                          bias=not bn,
+                                                                          a_bits=a_bit,
+                                                                          w_bits=w_bit))
+                        if bn:
+                            modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
             if quantized == 2:
-                modules.add_module('DepthWise2d', DorefaConv2d(in_channels=output_filters[-1],
-                                                               out_channels=filters,
-                                                               kernel_size=kernel_size,
-                                                               stride=int(mdef['stride']),
-                                                               padding=pad,
-                                                               groups=output_filters[-1],
-                                                               bias=not bn,
-                                                               a_bits=a_bit,
-                                                               w_bits=w_bit))
+                if BN_Fold:
+                    modules.add_module('DepthWise2d', BNFold_DorefaConv2d(in_channels=output_filters[-1],
+                                                                          out_channels=filters,
+                                                                          kernel_size=kernel_size,
+                                                                          stride=int(mdef['stride']),
+                                                                          padding=pad,
+                                                                          groups=output_filters[-1],
+                                                                          bias=not bn,
+                                                                          a_bits=a_bit,
+                                                                          w_bits=w_bit,
+                                                                          bn=bn))
+                else:
+                    modules.add_module('DepthWise2d', DorefaConv2d(in_channels=output_filters[-1],
+                                                                   out_channels=filters,
+                                                                   kernel_size=kernel_size,
+                                                                   stride=int(mdef['stride']),
+                                                                   padding=pad,
+                                                                   groups=output_filters[-1],
+                                                                   bias=not bn,
+                                                                   a_bits=a_bit,
+                                                                   w_bits=w_bit))
                 if bn:
                     modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
-            elif quantized == 3:
-                modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
-                                                                  out_channels=filters,
-                                                                  kernel_size=kernel_size,
-                                                                  stride=int(mdef['stride']),
-                                                                  padding=pad,
-                                                                  groups=output_filters[-1],
-                                                                  bias=not bn,
-                                                                  a_bits=a_bit,
-                                                                  w_bits=w_bit))
-                if bn:
-                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-
-            elif quantized == 4:
-                modules.add_module('DepthWise2d', BNFold_DorefaConv2d(in_channels=output_filters[-1],
-                                                                      out_channels=filters,
-                                                                      kernel_size=kernel_size,
-                                                                      stride=int(mdef['stride']),
-                                                                      padding=pad,
-                                                                      groups=output_filters[-1],
-                                                                      bias=not bn,
-                                                                      a_bits=a_bit,
-                                                                      w_bits=w_bit,
-                                                                      bn=bn))
-            elif quantized == 5:
-                modules.add_module('DepthWise2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
-                                                                  out_channels=filters,
-                                                                  kernel_size=kernel_size,
-                                                                  stride=int(mdef['stride']),
-                                                                  padding=pad,
-                                                                  groups=output_filters[-1],
-                                                                  bias=not bn,
-                                                                  a_bits=a_bit,
-                                                                  w_bits=w_bit,
-                                                                  bn=bn))
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
                                                             out_channels=filters,
@@ -380,7 +383,8 @@ class YOLOLayer(nn.Module):
 class Darknet(nn.Module):
     # YOLOv3 object detection model
 
-    def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8):
+    def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, BN_Fold=False,
+                 FPGA=False, ):
         super(Darknet, self).__init__()
 
         if isinstance(cfg, str):
@@ -390,9 +394,12 @@ class Darknet(nn.Module):
         self.quantized = quantized
         self.a_bit = a_bit
         self.w_bit = w_bit
+        self.BN_Fold = BN_Fold
+        self.FPGA = FPGA
         self.hyperparams = copy.deepcopy(self.module_defs[0])
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
-                                                      a_bit=self.a_bit, w_bit=self.w_bit)
+                                                      a_bit=self.a_bit, w_bit=self.w_bit, BN_Fold=self.BN_Fold,
+                                                      FPGA=self.FPGA)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 
@@ -510,7 +517,7 @@ def get_yolo_layers(model):
     return [i for i, m in enumerate(model.module_list) if m.__class__.__name__ == 'YOLOLayer']  # [89, 101, 113]
 
 
-def load_darknet_weights(self, weights, cutoff=-1, pt=False, quantized=-1):
+def load_darknet_weights(self, weights, cutoff=-1, pt=False, BN_Fold=False, FPGA=False):
     # Parses and loads the weights stored in 'weights'
 
     # Establish cutoffs (load layers between 0 and cutoff. if cutoff = -1 all are loaded)
@@ -533,7 +540,7 @@ def load_darknet_weights(self, weights, cutoff=-1, pt=False, quantized=-1):
         if mdef['type'] == 'convolutional':
             conv_layer = module[0]
             if mdef['batch_normalize']:
-                if quantized == 1 or quantized == 4 or quantized == 5:
+                if FPGA or BN_Fold:
                     # Load BN bias, weights, running mean and running variance
                     num_b = conv_layer.beta.numel()
                     # Bias
@@ -599,7 +606,7 @@ def load_darknet_weights(self, weights, cutoff=-1, pt=False, quantized=-1):
         elif mdef['type'] == 'depthwise':
             depthwise_layer = module[0]
             if mdef['batch_normalize']:
-                if quantized == 1 or quantized == 4 or quantized == 5:
+                if FPGA or BN_Fold:
                     # Load BN bias, weights, running mean and running variance
                     num_b = conv_layer.beta.numel()
                     # Bias

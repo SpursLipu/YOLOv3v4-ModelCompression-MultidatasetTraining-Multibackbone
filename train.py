@@ -482,7 +482,7 @@ def train(hyp):
     return results
 
 
-def WarmupForQ(hyp, step):
+def WarmupForQ(hyp, step, a_bit, w_bit):
     cfg = opt.cfg
     data = opt.data
     epochs = 5 + step * 5
@@ -519,9 +519,7 @@ def WarmupForQ(hyp, step):
         os.remove(f)
 
     # Initialize model
-    a_bit = int(32 / (2 ** step))
-    print("Warm up by activation %d bits  and weight %d bit" % (a_bit, opt.w_bit))
-    model = Darknet(cfg, quantized=opt.quantized, a_bit=a_bit, w_bit=opt.w_bit).to(device)
+    model = Darknet(cfg, quantized=opt.quantized, a_bit=a_bit, w_bit=w_bit).to(device)
 
     # Optimizer
     pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
@@ -882,10 +880,51 @@ if __name__ == '__main__':
         print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
         tb_writer = SummaryWriter(comment=opt.name)
         if opt.quantized != -1:
-            times = math.log(32 / opt.a_bit, 2)
+            times = 2 * math.log(32 / opt.a_bit, 2)
             print('<.....................using warm up.......................>')
             for i in range(0, int(times)):
-                WarmupForQ(hyp, i)
+                if i == 0:
+                    a_bit = 32
+                    w_bit = 32
+                    print("Warm up by activation %d bits  and weight %d bit" % (a_bit, w_bit))
+                    WarmupForQ(hyp, step=i, a_bit=a_bit, w_bit=w_bit)
+                elif i == 1:
+                    a_bit = 16
+                    w_bit = 32
+                    print("Warm up by activation %d bits  and weight %d bit" % (a_bit, w_bit))
+                    WarmupForQ(hyp, step=i, a_bit=a_bit, w_bit=w_bit)
+                elif i == 2:
+                    a_bit = 16
+                    w_bit = 16
+                    print("Warm up by activation %d bits  and weight %d bit" % (a_bit, w_bit))
+                    WarmupForQ(hyp, step=i, a_bit=a_bit, w_bit=w_bit)
+                elif i == 3:
+                    a_bit = 8
+                    w_bit = 16
+                    print("Warm up by activation %d bits  and weight %d bit" % (a_bit, w_bit))
+                    WarmupForQ(hyp, step=i, a_bit=a_bit, w_bit=w_bit)
+                elif i == 4:
+                    a_bit = 8
+                    w_bit = 8
+                    print("Warm up by activation %d bits  and weight %d bit" % (a_bit, w_bit))
+                    WarmupForQ(hyp, step=i, a_bit=a_bit, w_bit=w_bit)
+                elif i == 5:
+                    a_bit = 4
+                    w_bit = 8
+                    print("Warm up by activation %d bits  and weight %d bit" % (a_bit, w_bit))
+                    WarmupForQ(hyp, step=i, a_bit=a_bit, w_bit=w_bit)
+                elif i == 6:
+                    a_bit = 4
+                    w_bit = 4
+                    print("Warm up by activation %d bits  and weight %d bit" % (a_bit, w_bit))
+                    WarmupForQ(hyp, step=i, a_bit=a_bit, w_bit=w_bit)
+                elif i == 7:
+                    a_bit = 2
+                    w_bit = 4
+                    print("Warm up by activation %d bits  and weight %d bit" % (a_bit, w_bit))
+                    WarmupForQ(hyp, step=i, a_bit=a_bit, w_bit=w_bit)
+                else:
+                    print("Quantization bits are limited 16, 8, 4, 2 !")
         train(hyp)  # train normally
 
     else:  # Evolve hyperparameters (optional)

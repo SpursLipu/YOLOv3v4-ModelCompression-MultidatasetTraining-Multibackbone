@@ -72,8 +72,8 @@ def train(hyp):
     imgsz_min, imgsz_max, imgsz_test = opt.img_size  # img sizes (min, max, test)
 
     # Image Sizes
-    gs = 64  # (pixels) grid size
-    assert math.fmod(imgsz_min, gs) == 0, '--img-size %g must be a %g-multiple' % (imgsz_min, gs)
+    # gs = 64  # (pixels) grid size
+    # assert math.fmod(imgsz_min, gs) == 0, '--img-size %g must be a %g-multiple' % (imgsz_min, gs)
     opt.multi_scale |= imgsz_min != imgsz_max  # multi if different (min, max)
     if opt.multi_scale:
         if imgsz_min == imgsz_max:
@@ -96,8 +96,11 @@ def train(hyp):
         os.remove(f)
 
     # Initialize model
-    model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit, BN_Fold=opt.BN_Fold,
-                    FPGA=opt.FPGA).to(device)
+    if opt.ssd:
+        model = SSDDetector(cfg).to(device)
+    else:
+        model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit, BN_Fold=opt.BN_Fold,
+                        FPGA=opt.FPGA).to(device)
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
 
@@ -192,11 +195,12 @@ def train(hyp):
     # Initialize distributed training
     if device.type != 'cpu' and torch.cuda.device_count() > 1 and torch.distributed.is_available():
         dist.init_process_group(backend='nccl',  # 'distributed backend'
-                                init_method='tcp://127.0.0.1:9999',  # distributed training init method
+                                init_method='tcp://127.0.0.1:9991',  # distributed training init method
                                 world_size=1,  # number of nodes for distributed training
                                 rank=0)  # distributed training node rank
         model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
-        model.yolo_layers = model.module.yolo_layers  # move yolo layer indices to top level
+        if opt.ssd == False:
+            model.yolo_layers = model.module.yolo_layers  # move yolo layer indices to top level
 
     # Dataset
     dataset = LoadImagesAndLabels(train_path, img_size, batch_size,
@@ -289,14 +293,16 @@ def train(hyp):
             w = model.class_weights.cpu().numpy() * (1 - maps) ** 2  # class weights
             image_weights = labels_to_image_weights(dataset.labels, nc=nc, class_weights=w)
             dataset.indices = random.choices(range(dataset.n), weights=image_weights, k=dataset.n)  # rand weighted idx
-
-        mloss = torch.zeros(4).to(device)  # mean losses
-        print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
+        if opt.ssd:
+            mloss = torch.zeros(3).to(device)  # mean losses
+            print(('\n' + '%10s' * 6) % ('Epoch', 'gpu_mem', 'bbox', 'cls', 'total', 'img_size'))
+        else:
+            mloss = torch.zeros(4).to(device)  # mean losses
+            print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
         pbar = tqdm(enumerate(dataloader), total=nb)  # progress bar
         for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
-            targets = targets.to(device)
 
             # Burn-in
             if ni <= n_burn:
@@ -318,48 +324,60 @@ def train(hyp):
                 if sf != 1:
                     ns = [math.ceil(x * sf / gs) * gs for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
+            if opt.ssd == False:
+                # Forward
+                # imgs = fencemask(imgs)
+                targets = targets.to(device)
+                pred, feature_s = model(imgs)
 
-            # Forward
-            # imgs = fencemask(imgs)
-            pred, feature_s = model(imgs)
+                # Loss
+                loss, loss_items = compute_loss(pred, targets, model)
+                if not torch.isfinite(loss):
+                    print('WARNING: non-finite loss, ending training ', loss_items)
+                    return results
 
-            # Loss
-            loss, loss_items = compute_loss(pred, targets, model)
-            if not torch.isfinite(loss):
-                print('WARNING: non-finite loss, ending training ', loss_items)
-                return results
+                soft_target = 0
+                if t_cfg:
+                    if mixed_precision:
+                        with torch.no_grad():
+                            output_t, feature_t = t_model(imgs)
+                    else:
+                        _, output_t, feature_t = t_model(imgs)
+                    if opt.KDstr == 1:
+                        soft_target = compute_lost_KD(pred, output_t, model.nc, imgs.size(0))
+                    elif opt.KDstr == 2:
+                        soft_target, reg_ratio = compute_lost_KD2(model, targets, pred, output_t)
+                    elif opt.KDstr == 3:
+                        soft_target = compute_lost_KD3(model, targets, pred, output_t)
+                    elif opt.KDstr == 4:
+                        soft_target = compute_lost_KD4(model, targets, pred, output_t, feature_s, feature_t,
+                                                       imgs.size(0))
+                    elif opt.KDstr == 5:
+                        soft_target = compute_lost_KD5(model, targets, pred, output_t, feature_s, feature_t,
+                                                       imgs.size(0),
+                                                       img_size)
+                    else:
+                        print("please select KD strategy!")
+                    loss += soft_target
 
-            soft_target = 0
-            reg_ratio = 0  # 表示有多少target的回归是不如老师的，这时学生会跟gt再学习
-            if t_cfg:
+                # Backward
+                loss *= batch_size / 64  # scale loss
                 if mixed_precision:
-                    with torch.no_grad():
-                        output_t, feature_t = t_model(imgs)
+                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        scaled_loss.backward()
                 else:
-                    _, output_t, feature_t = t_model(imgs)
-                if opt.KDstr == 1:
-                    soft_target = compute_lost_KD(pred, output_t, model.nc, imgs.size(0))
-                elif opt.KDstr == 2:
-                    soft_target, reg_ratio = compute_lost_KD2(model, targets, pred, output_t)
-                elif opt.KDstr == 3:
-                    soft_target = compute_lost_KD3(model, targets, pred, output_t)
-                elif opt.KDstr == 4:
-                    soft_target = compute_lost_KD4(model, targets, pred, output_t, feature_s, feature_t, imgs.size(0))
-                elif opt.KDstr == 5:
-                    soft_target = compute_lost_KD5(model, targets, pred, output_t, feature_s, feature_t, imgs.size(0),
-                                                   img_size)
-                else:
-                    print("please select KD strategy!")
-                loss += soft_target
-
-            # Backward
-            loss *= batch_size / 64  # scale loss
-            if mixed_precision:
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
+                    loss.backward()
             else:
+                targets = SSD_targets_Convert(imgs, targets)
+                targets = targets.to(device)
+                gt_boxes, gt_labels = targets['boxes'], targets['labels']
+                pred = model(imgs)
+                cls_logits, bbox_pred = pred[0], pred[1]
+                reg_loss, cls_loss = compute_loss_ssd(cls_logits, bbox_pred, gt_labels, gt_boxes)
+                loss_dict = dict(reg_loss=reg_loss, cls_loss=cls_loss)
+                loss = sum(loss for loss in loss_dict.values())
+                loss_items = torch.cat((reg_loss.unsqueeze(0), cls_loss.unsqueeze(0), loss.unsqueeze(0))).detach()
                 loss.backward()
-
             # 对要剪枝层的γ参数稀疏化
             if hasattr(model, 'module'):
                 if opt.prune != -1:
@@ -378,16 +396,20 @@ def train(hyp):
             # Print
             mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
             mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
-            s = ('%10s' * 2 + '%10.3g' * 6) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
+            if opt.ssd:
+                s = ('%10s' * 2 + '%10.3g' * 4) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, img_size)
+            else:
+                s = ('%10s' * 2 + '%10.3g' * 6) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
             pbar.set_description(s)
 
             # Plot
-            if ni < 1:
-                f = 'train_batch%g.jpg' % i  # filename
-                res = plot_images(images=imgs, targets=targets, paths=paths, fname=f)
-                if tb_writer:
-                    tb_writer.add_image(f, res, dataformats='HWC', global_step=epoch)
-                    # tb_writer.add_graph(model, imgs)  # add model to tensorboard
+            if opt.ssd == False:
+                if ni < 1:
+                    f = 'train_batch%g.jpg' % i  # filename
+                    res = plot_images(images=imgs, targets=targets, paths=paths, fname=f)
+                    if tb_writer:
+                        tb_writer.add_image(f, res, dataformats='HWC', global_step=epoch)
+                        # tb_writer.add_graph(model, imgs)  # add model to tensorboard
 
             # end batch ------------------------------------------------------------------------------------------------
 
@@ -859,6 +881,7 @@ if __name__ == '__main__':
                         help='0:nomal prune or regular prune 1:shortcut prune 2:layer prune')
     parser.add_argument('--quantized', type=int, default=-1,
                         help='0:quantization way one Ternarized weight and 8bit activation')
+    parser.add_argument('--ssd', action='store_true', help='SSD')
     parser.add_argument('--a-bit', type=int, default=8,
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,

@@ -1,14 +1,28 @@
 from utils.google_utils import *
-from utils.layers import *
 from utils.parse_config import *
-from utils.quantized_lowbit import *
 from utils.quantized_google import *
 from utils.quantized_dorefa import *
+from utils.SSD.SSD_utils import *
 import copy
 
 ONNX_EXPORT = False
 
 
+# SSD
+class SSDDetector(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+        self.backbone = cfg_backbone(cfg)
+        self.box_head = SSDBoxHead()
+
+    def forward(self, images):
+        features = self.backbone(images)
+        detections = self.box_head(features)
+        return detections
+
+
+# YOLO
 def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_Fold=False, FPGA=False):
     # Constructs module list of layer blocks from module configuration in module_defs
 
@@ -29,16 +43,31 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
             if quantized == 1:
                 if FPGA:
-                    modules.add_module('Conv2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
-                                                                          out_channels=filters,
-                                                                          kernel_size=kernel_size,
-                                                                          stride=int(mdef['stride']),
-                                                                          padding=pad,
-                                                                          groups=mdef[
-                                                                              'groups'] if 'groups' in mdef else 1,
-                                                                          bias=not bn,
-                                                                          a_bits=a_bit,
-                                                                          w_bits=w_bit))
+                    if BN_Fold:
+                        modules.add_module('Conv2d', BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                                     out_channels=filters,
+                                                                                     kernel_size=kernel_size,
+                                                                                     stride=int(mdef['stride']),
+                                                                                     padding=pad,
+                                                                                     groups=mdef[
+                                                                                         'groups'] if 'groups' in mdef else 1,
+                                                                                     bias=not bn,
+                                                                                     a_bits=a_bit,
+                                                                                     w_bits=w_bit,
+                                                                                     bn=bn))
+                    else:
+                        modules.add_module('Conv2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                              out_channels=filters,
+                                                                              kernel_size=kernel_size,
+                                                                              stride=int(mdef['stride']),
+                                                                              padding=pad,
+                                                                              groups=mdef[
+                                                                                  'groups'] if 'groups' in mdef else 1,
+                                                                              bias=not bn,
+                                                                              a_bits=a_bit,
+                                                                              w_bits=w_bit))
+                        if bn:
+                            modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
                 else:
                     if BN_Fold:
                         modules.add_module('Conv2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
@@ -118,15 +147,31 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
             if quantized == 1:
                 if FPGA:
-                    modules.add_module('DepthWise2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
-                                                                               out_channels=filters,
-                                                                               kernel_size=kernel_size,
-                                                                               stride=int(mdef['stride']),
-                                                                               padding=pad,
-                                                                               groups=output_filters[-1],
-                                                                               bias=not bn,
-                                                                               a_bits=a_bit,
-                                                                               w_bits=w_bit))
+                    if BN_Fold:
+                        modules.add_module('DepthWise2d',
+                                           BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                           out_channels=filters,
+                                                                           kernel_size=kernel_size,
+                                                                           stride=int(mdef['stride']),
+                                                                           padding=pad,
+                                                                           groups=output_filters[-1],
+                                                                           bias=not bn,
+                                                                           a_bits=a_bit,
+                                                                           w_bits=w_bit,
+                                                                           bn=bn))
+
+                    else:
+                        modules.add_module('DepthWise2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                                   out_channels=filters,
+                                                                                   kernel_size=kernel_size,
+                                                                                   stride=int(mdef['stride']),
+                                                                                   padding=pad,
+                                                                                   groups=output_filters[-1],
+                                                                                   bias=not bn,
+                                                                                   a_bits=a_bit,
+                                                                                   w_bits=w_bit))
+                        if bn:
+                            modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
                 else:
                     if BN_Fold:
                         modules.add_module('DepthWise2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
@@ -408,7 +453,7 @@ class Darknet(nn.Module):
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
         self.info(verbose) if not ONNX_EXPORT else None  # print model description
 
-    def forward(self, x, augment=False, verbose=False):
+    def forward(self, x, augment=False):
 
         if not augment:
             return self.forward_once(x)
@@ -490,9 +535,9 @@ class Darknet(nn.Module):
                 x = torch.cat(x, 1)
             return x, p, feature_out
 
-    def fuse(self, quantized=-1):
+    def fuse(self, quantized=-1, BN_Fold=False, FPGA=False):
         # Fuse Conv2d + BatchNorm2d layers throughout model
-        if quantized == 2 or quantized == 4 or quantized == 5:
+        if quantized == 2 or BN_Fold == True or FPGA == True:
             return
         print('Fusing layers...')
         fused_list = nn.ModuleList()

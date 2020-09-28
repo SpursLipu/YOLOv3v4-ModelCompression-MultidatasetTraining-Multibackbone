@@ -16,7 +16,9 @@ import torch.nn as nn
 import torchvision
 from tqdm import tqdm
 
+import torch.nn.functional as F
 from . import torch_utils  # , google_utils
+from utils.SSD import box_utils
 
 # Set printoptions
 torch.set_printoptions(linewidth=320, precision=5, profile='long')
@@ -429,6 +431,32 @@ def compute_loss(p, targets, model):  # predictions, targets, model
 
     loss = lbox + lobj + lcls
     return loss, torch.cat((lbox, lobj, lcls, loss)).detach()
+
+
+def compute_loss_ssd(cls_logits, bbox_pred, gt_labels, gt_boxes):
+    """Compute classification loss and smooth l1 loss.
+
+            Args:
+                confidence (batch_size, num_priors, num_classes): class predictions.
+                predicted_locations (batch_size, num_priors, 4): predicted locations.
+                labels (batch_size, num_priors): real labels of all the priors.
+                gt_locations (batch_size, num_priors, 4): real boxes corresponding all the priors.
+            """
+    num_classes = cls_logits.size(2)
+    with torch.no_grad():
+        # derived from cross_entropy=sum(log(p))
+        loss = -F.log_softmax(cls_logits, dim=2)[:, :, 0]
+        mask = box_utils.hard_negative_mining(loss, gt_labels, 3)
+
+    confidence = cls_logits[mask, :]
+    classification_loss = F.cross_entropy(confidence.view(-1, num_classes), gt_labels[mask], reduction='sum')
+
+    pos_mask = gt_labels > 0
+    predicted_locations = bbox_pred[pos_mask, :].view(-1, 4)
+    gt_locations = gt_boxes[pos_mask, :].view(-1, 4)
+    smooth_l1_loss = F.smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')
+    num_pos = gt_locations.size(0)
+    return smooth_l1_loss / num_pos, classification_loss / num_pos
 
 
 def compute_lost_KD(output_s, output_t, num_classes, batch_size):

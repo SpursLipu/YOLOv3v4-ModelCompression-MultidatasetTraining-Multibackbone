@@ -35,17 +35,21 @@ def test(cfg,
             os.remove(f)
 
         # Initialize model
-        model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit)
+        if opt.ssd:
+            model = SSDDetector(cfg).to(device)
+        else:
+            model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit, BN_Fold=opt.BN_Fold,
+                            FPGA=opt.FPGA)
 
         # Load weights
         attempt_download(weights)
         if weights.endswith('.pt'):  # pytorch format
             model.load_state_dict(torch.load(weights, map_location=device)['model'])
         else:  # darknet format
-            load_darknet_weights(model, weights, quantized=quantized)
+            load_darknet_weights(model, weights, BN_Fold=opt.BN_Fold, FPGA=opt.FPGA)
 
         # Fuse
-        model.fuse(quantized=quantized)
+        model.fuse(quantized=quantized, BN_Fold=opt.BN_Fold, FPGA=opt.FPGA)
         model.to(device)
 
         if device.type != 'cpu' and torch.cuda.device_count() > 1:
@@ -252,10 +256,14 @@ if __name__ == '__main__':
                         help='0:quantization way one Ternarized weight and 8bit activation')
     parser.add_argument('--qlayers', type=int, default=-1,
                         help='0:no quantization , x:The shallow layer of current quantized layers(from deep to shallow)')
+    parser.add_argument('--ssd', action='store_true', help='SSD')
     parser.add_argument('--a-bit', type=int, default=8,
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
+    parser.add_argument('--BN_Fold', action='store_true', help='BN_Fold')
+    parser.add_argument('--FPGA', action='store_true', help='FPGA')
+
     opt = parser.parse_args()
     opt.save_json = opt.save_json or any([x in opt.data for x in ['coco.data', 'coco2014.data', 'coco2017.data']])
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file

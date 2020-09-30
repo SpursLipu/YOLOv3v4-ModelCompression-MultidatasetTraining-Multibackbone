@@ -1,13 +1,5 @@
 # YOLOv3-ModelCompression-MultidatasetTraining
 
-This project mainly include three parts.
-
-1.Provides training methods for multiple mainstream object detection datasets(coco2017, coco2014, BDD100k, Visdrone, Hand)
-
-2.Provides a mainstream model compression algorithm including pruning, quantization, and knowledge distillation.
-
-3.Provides multiple backbone for yolov3 including Darknet-YOLOv3，Tiny-YOLOv3，Mobilenetv3-YOLOv3
-
 本项目包含三部分内容：
 
 1、提供多个主流目标检测数据集的预处理后文件及训练方法。

@@ -1,5 +1,7 @@
 # YOLOv3-ModelCompression-MultidatasetTraining
 
+[README for chinese](https://github.com/SpursLipu/YOLOv3v4-ModelCompression-MultidatasetTraining-Multibackbone/blob/master/README_for_Chinese.md)
+
 This project mainly include three parts.
 
 1.Provides training methods for multiple mainstream object detection datasets(coco2017, coco2014, BDD100k, Visdrone, Hand)
@@ -346,7 +348,7 @@ oxfordhand，img_size = 608，test on GTX2080Ti*4
 |yolov3-mobilenet(fine tuning)   |22.75M   |0.812   |0.0345s   |0.97   |2.72M  |0.795 |0.0211s |
 |yolov3tiny(fine tuning)         |8.27M    |0.708   |0.0144s   |0.5    |1.13M  |0.641 |0.0116s |
 
-2、regular pruning
+2.regular pruning
 oxfordhand，img_size = 608，test ong GTX2080Ti*4
 
 |<center>model</center> |<center>parameter before pruning</center> |<center>mAP before pruning</center>|<center>inference time before pruning</center>|<center>percent</center> |<center>parameter after pruning</center> |<center>mAP after pruning</center> |<center>inference time after pruning</center>
@@ -355,7 +357,7 @@ oxfordhand，img_size = 608，test ong GTX2080Ti*4
 |yolov3-mobilenet(fine tuning)   |22.75M   |0.812   |0.0345s   |0.97   |2.75M  |0.803 |0.0208s |
 |yolov3tiny(fine tuning)         |8.27M    |0.708   |0.0144s   |0.5    |1.82M  |0.703 |0.0122s |
 
-## 2、quantization
+## 2.quantization
 
 `--quantized 2` Dorefa quantization method
 
@@ -379,7 +381,7 @@ oxfordhand, yolov3, 640image-size
 |Google8bit + BN Flod         |0.851    |
 |Google8bit + BN Flod + FPGA  |0.852    |
 |Google4bit + BN Flod + FPGA  |0.842    |
-## 3、知识蒸馏
+## 3.Knowledge Distillation
 
 ### Knowledge Distillation
 The distillation method is based on the basic distillation method proposed by Hinton in 2015, and has been partially improved in combination with the detection network.

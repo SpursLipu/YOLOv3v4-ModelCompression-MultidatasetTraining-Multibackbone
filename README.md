@@ -56,11 +56,11 @@ Here is a brief explanation:
 
 # Training
 
-`python3 train.py --data ... --cfg ... `为训练模型指令，使用coco预训练模型时需要-pt指令。
+`python3 train.py --data ... --cfg ... `For training model command, the -pt command is required when using coco pre-training model.
 
-`python3 test.py --data ... --cfg ... ` 为mAP测试指令。
+`python3 test.py --data ... --cfg ... ` Test command
 
-`python3 detect.py --data ... --cfg ... --source ...`为推理检测指令，source默认地址为data/samples,输出结果保存在output文件中，检测资源可以为图片，视频等。
+`python3 detect.py --data ... --cfg ... --source ...` Detection command, the default address of source is data/samples, the output result is saved in the output file, and the detection resource can be pictures, videos.
 
 # Multi-Datasets
 This project provides preprocessed datasets for the YOLOv3, configuration files (.cfg), dataset index files (.data), dataset category files (.names), and anchor box sizes (including 9 boxes for YOLOv3 and 6 boxes for tiny- YOLOv3) that are reclustered using the K-means algorithm.

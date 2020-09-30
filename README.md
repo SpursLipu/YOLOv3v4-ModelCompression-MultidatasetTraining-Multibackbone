@@ -40,6 +40,8 @@ This project mainly include three parts.
  2020年7月12日 修复了YOLOv3-mobilenet剪植后map归0的问题，详见issue#41。
 
  2020年7月14日 更新mobilenet支持基于shortcut的两种极限剪植方法和depthwise卷积的bn融合方法。
+ 
+ 2020年9月30日 更新BN融合的边融合边训练方法，减少BN融合所带来的精度损失，更新针对FPGA的pow(2)量化方法，详见量化篇。
 # 环境部署
 1.由于采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)的YOLO实现，环境搭建详见[ultralytics/yolov3](https://github.com/ultralytics/yolov3)。这里简要说明：
 
@@ -70,9 +72,6 @@ This project mainly include three parts.
 |<center>极限剪枝(shortcut)</center>|<center>√</center> |
 |<center>层剪植</center>|<center>√</center> |
 |<center>量化</center>|
-|<center>BNN量化</center>|<center>√</center>  |
-|<center>BWN量化</center>|<center>√</center>  |
-|<center>stage-wise 逐层量化</center>|<center>√</center>  |
 |<center>知识蒸馏</center>|<center>√</center>  |
 
 # 可用指令
@@ -379,11 +378,22 @@ oxfordhand数据集，img_size = 608，在GTX2080Ti*4上计算推理时间
 python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 2
 ```
 
-`--quantized 3` 使用Google白皮书8位定点量化方法
+`--quantized 1` 使用Google白皮书8位定点量化方法
 
 ```bash
 python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 3
 ```
+
+加入`--BN_Flod`使用BN融合训练，加入`--FPGA`使用针对FPGA的pow(2)量化。
+### 量化实验
+oxfordhand数据集，使用yolov3网络，640image-size
+|<center>方法</center> |<center>teacher模型mAP</center> |
+| --- | --- |
+|Baseline                     |0.847    |
+|Google8bit                   |0.851    |
+|Google8bit + BN融合训练       |0.851    |
+|Google8bit + BN融合训练 + FPGA|0.852    |
+|Google4bit + BN融合训练 + FPGA|0.842    |
 ## 3、知识蒸馏
 
 ### 蒸馏方法

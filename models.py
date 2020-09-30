@@ -2,24 +2,10 @@ from utils.google_utils import *
 from utils.parse_config import *
 from utils.quantized_google import *
 from utils.quantized_dorefa import *
-from utils.SSD.SSD_utils import *
+from utils.layers import *
 import copy
 
 ONNX_EXPORT = False
-
-
-# SSD
-class SSDDetector(nn.Module):
-    def __init__(self, cfg):
-        super().__init__()
-        self.cfg = cfg
-        self.backbone = cfg_backbone(cfg)
-        self.box_head = SSDBoxHead()
-
-    def forward(self, images):
-        features = self.backbone(images)
-        detections = self.box_head(features)
-        return detections
 
 
 # YOLO
@@ -537,7 +523,7 @@ class Darknet(nn.Module):
 
     def fuse(self, quantized=-1, BN_Fold=False, FPGA=False):
         # Fuse Conv2d + BatchNorm2d layers throughout model
-        if quantized == 2 or BN_Fold == True or FPGA == True:
+        if quantized == 2 or BN_Fold == True:
             return
         print('Fusing layers...')
         fused_list = nn.ModuleList()
@@ -547,7 +533,7 @@ class Darknet(nn.Module):
                     if isinstance(b, nn.modules.batchnorm.BatchNorm2d):
                         # fuse this bn layer with the previous conv2d layer
                         conv = a[i - 1]
-                        fused = torch_utils.fuse_conv_and_bn(conv, b, quantized)
+                        fused = torch_utils.fuse_conv_and_bn(conv, b, quantized, FPGA)
                         a = nn.Sequential(fused, *list(a.children())[i + 1:])
                         break
             fused_list.append(a)

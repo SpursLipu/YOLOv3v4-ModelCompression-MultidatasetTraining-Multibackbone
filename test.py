@@ -23,8 +23,7 @@ def test(cfg,
          multi_label=True,
          quantized=-1,
          a_bit=8,
-         w_bit=8,
-         ):
+         w_bit=8):
     # Initialize/load model and set device
     if model is None:
         device = torch_utils.select_device(opt.device, batch_size=batch_size)
@@ -35,10 +34,7 @@ def test(cfg,
             os.remove(f)
 
         # Initialize model
-        if opt.ssd:
-            model = SSDDetector(cfg).to(device)
-        else:
-            model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit, BN_Fold=opt.BN_Fold,
+        model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit, BN_Fold=opt.BN_Fold,
                             FPGA=opt.FPGA)
 
         # Load weights
@@ -256,7 +252,6 @@ if __name__ == '__main__':
                         help='0:quantization way one Ternarized weight and 8bit activation')
     parser.add_argument('--qlayers', type=int, default=-1,
                         help='0:no quantization , x:The shallow layer of current quantized layers(from deep to shallow)')
-    parser.add_argument('--ssd', action='store_true', help='SSD')
     parser.add_argument('--a-bit', type=int, default=8,
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,

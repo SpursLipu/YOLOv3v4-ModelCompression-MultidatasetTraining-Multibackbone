@@ -68,7 +68,7 @@ def find_modules(model, mclass=nn.Conv2d):
     return [i for i, m in enumerate(model.module_list) if isinstance(m, mclass)]
 
 
-def fuse_conv_and_bn(conv, bn, quantized=-1):
+def fuse_conv_and_bn(conv, bn, quantized=-1, FPGA=False):
     # https://tehnokv.com/posts/fusing-batchnorm-and-conv/
     with torch.no_grad():
         # init
@@ -80,7 +80,7 @@ def fuse_conv_and_bn(conv, bn, quantized=-1):
                                         stride=conv.stride,
                                         padding=conv.padding,
                                         bias=True)
-        elif quantized == 1 or quantized == 3:
+        elif quantized == 1 and FPGA == False:
             fusedconv = QuantizedConv2d(conv.in_channels,
                                         conv.out_channels,
                                         groups=conv.groups,
@@ -90,6 +90,19 @@ def fuse_conv_and_bn(conv, bn, quantized=-1):
                                         bias=True)
             fusedconv.weight_quantizer = deepcopy(conv.weight_quantizer)
             fusedconv.activation_quantizer = deepcopy(conv.activation_quantizer)
+        elif quantized == 1 and FPGA == True:
+            fusedconv = QuantizedConv2d_For_FPGA(conv.in_channels,
+                                                 conv.out_channels,
+                                                 groups=conv.groups,
+                                                 kernel_size=conv.kernel_size,
+                                                 stride=conv.stride,
+                                                 padding=conv.padding,
+                                                 bias=True)
+            fusedconv.weight_quantizer = deepcopy(conv.weight_quantizer)
+            fusedconv.activation_quantizer = deepcopy(conv.activation_quantizer)
+        else:
+            print("BN fuse error!")
+            return
         # prepare filters
         w_conv = conv.weight.clone().view(conv.out_channels, -1)
         w_bn = torch.diag(bn.weight.div(torch.sqrt(bn.eps + bn.running_var)))

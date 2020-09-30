@@ -416,4 +416,4 @@ oxfordhand，yolov3tiny as teacher model，normal pruning yolov3tiny as student 
 
 |<center>teacher model</center> |<center>mAP of teacher model</center> |<center>student model</center>|<center>directly fine tuning</center>|<center>KDstr 1</center> |<center>KDstr 2</center> |<center>KDstr 3</center>  |<center>KDstr 4(L1)</center> |<center>KDstr 5(L1)</center> |
 | --- | --- | --- | --- | --- | --- | --- |--- |--- |
-|yolov3tiny608   |0.708    |normal剪植yolov3tiny608    |0.658     |0.666    |0.661  |0.672   |0.673   |0.674   |
+|yolov3tiny608   |0.708    |normal pruning yolov3tiny608    |0.658     |0.666    |0.661  |0.672   |0.673   |0.674   |

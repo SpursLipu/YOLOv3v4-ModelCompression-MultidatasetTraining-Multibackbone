@@ -1,6 +1,6 @@
 # YOLOv3-ModelCompression-MultidatasetTraining
 
-[README for chinese](https://github.com/SpursLipu/YOLOv3v4-ModelCompression-MultidatasetTraining-Multibackbone/blob/master/README_for_Chinese.md)
+[README in chinese](https://github.com/SpursLipu/YOLOv3v4-ModelCompression-MultidatasetTraining-Multibackbone/blob/master/README_in_Chinese.md)
 
 This project mainly include three parts.
 

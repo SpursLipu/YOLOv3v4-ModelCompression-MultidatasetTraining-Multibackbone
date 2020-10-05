@@ -23,7 +23,9 @@ def test(cfg,
          multi_label=True,
          quantized=-1,
          a_bit=8,
-         w_bit=8):
+         w_bit=8,
+         BN_Fold=False,
+         FPGA=False):
     # Initialize/load model and set device
     if model is None:
         device = torch_utils.select_device(opt.device, batch_size=batch_size)
@@ -34,8 +36,8 @@ def test(cfg,
             os.remove(f)
 
         # Initialize model
-        model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit, BN_Fold=opt.BN_Fold,
-                            FPGA=opt.FPGA)
+        model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit, BN_Fold=BN_Fold,
+                        FPGA=FPGA)
 
         # Load weights
         attempt_download(weights)
@@ -280,7 +282,9 @@ if __name__ == '__main__':
              opt.augment,
              quantized=opt.quantized,
              a_bit=opt.a_bit,
-             w_bit=opt.w_bit)
+             w_bit=opt.w_bit,
+             BN_Fold=opt.BN_Fold,
+             FPGA=opt.FPGA)
 
     elif opt.task == 'benchmark':  # mAPs at 256-640 at conf 0.5 and 0.7
         y = []

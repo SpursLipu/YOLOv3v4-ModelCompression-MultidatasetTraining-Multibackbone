@@ -408,7 +408,12 @@ def train(hyp):
                                       save_json=final_epoch and is_coco,
                                       single_cls=opt.single_cls,
                                       dataloader=testloader,
-                                      multi_label=ni > n_burn, )
+                                      multi_label=ni > n_burn,
+                                      quantized=opt.quantized,
+                                      a_bit=opt.a_bit,
+                                      w_bit=opt.w_bit,
+                                      BN_Fold=opt.BN_Fold,
+                                      FPGA=opt.FPGA)
 
         # Write
         with open(results_file, 'a') as f:
@@ -751,7 +756,12 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
                                       save_json=final_epoch and is_coco,
                                       single_cls=opt.single_cls,
                                       dataloader=testloader,
-                                      multi_label=ni > n_burn, )
+                                      multi_label=ni > n_burn,
+                                      quantized=opt.quantized,
+                                      a_bit=opt.a_bit,
+                                      w_bit=opt.w_bit,
+                                      BN_Fold=opt.BN_Fold,
+                                      FPGA=opt.FPGA)
 
         # Write
         with open(results_file, 'a') as f:

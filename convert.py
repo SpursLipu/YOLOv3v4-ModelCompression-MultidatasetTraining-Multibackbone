@@ -33,15 +33,17 @@ def convert():
     stat = model.state_dict()
     for name in stat:
         # print(name)
-        para = stat[name]
-        # print(para.shape)
-        para_flatten = para.cpu().data.numpy().flatten()  # 展开
         if name.find('weight') >= 0:
             file = w_file
         elif name.find('bias') >= 0:
             file = b_file
         else:
             continue
+
+        para = stat[name]
+        # print(para.shape)
+        para_flatten = para.cpu().data.numpy().flatten()  # 展开
+
         for i in para_flatten:
             a = struct.pack('<f', i)  # 小端浮点                 大端，浮点32>f
             file.write(a)

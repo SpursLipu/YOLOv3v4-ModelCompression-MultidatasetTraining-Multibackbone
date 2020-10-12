@@ -210,7 +210,7 @@ Based on mobilenetv3, two kinds of network structures are designed
 |YOLOv4                      |-       |-       |61.35M  |107.1   |0.650  |0.438  |13.5/1.8/15.3 ms|65.4fps  |
 |YOLOv4-tiny                 |-       |-       |5.78M   |12.3    |0.435  |0.225  |4.1/1.7/5.8 ms  |172.4fps |
 
-1. YOLOv3,YOLOv3tiny and YOLOv4 were trained and tested on Coco2014, and Yolov3-Mobilenetv3 and YOLOv3tiny Mobilenetv3-Small were trained and tested on Coco2017.    
+1. YOLOv3,YOLOv3tiny and YOLOv4 were trained and tested on coco2014, and Yolov3-Mobilenetv3 and YOLOv3tiny Mobilenetv3-Small were trained and tested on coco2017.    
 
 2. The reasoning speed is tested on GTX2080ti*4, and the image size is 608.
     

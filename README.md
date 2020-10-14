@@ -397,10 +397,10 @@ command : `--t_cfg --t_weights --KDstr`
 
 `--KDstr` KD strategy
 
-    `--KDstr 1` KLloss can be obtained directly from the output of Tencher network and the output of Student network and added to the overall loss.
-    `--KDstr 2` To distinguish between Boxloss and ClassLoss, the student does not learn directly from the teacher. L2 distance is calculated respectively for Student, teacher and GT. When Student is greater than teacher, an additional loss is added for Student and GT.
+    `--KDstr 1` KLloss can be obtained directly from the output of teacher network and the output of student network and added to the overall loss.
+    `--KDstr 2` To distinguish between box loss and class loss, the student does not learn directly from the teacher. L2 distance is calculated respectively for student, teacher and GT. When student is greater than teacher, an additional loss is added for student and GT.
     `--KDstr 3` To distinguish between Boxloss and ClassLoss, the student learns directly from the teacher.
-    `--KDstr 4` KDloss is divided into three categories, boxLoss, ClassLoss and FeatureLoss.
+    `--KDstr 4` KDloss is divided into three categories, box loss, class loss and feature loss.
     `--KDstr 5` On the basis of KDstr 4, the fine-grain-mask is added into the feature
 
 example:

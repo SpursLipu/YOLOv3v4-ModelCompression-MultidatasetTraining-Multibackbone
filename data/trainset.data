@@ -1,0 +1,4 @@
+classes=5
+train=data/trainset/train.txt
+valid=data/trainset/test.txt
+names=data/trainset.names

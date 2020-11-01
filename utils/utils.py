@@ -616,7 +616,8 @@ def fine_grained_imitation_feature_mask(feature_s, feature_t, indices, img_size)
         for i in range(gj.size()[0]):
             if 2 ** (5 - j) == scale:
                 break
-            b_temp = (torch.ones(int(2 ** (5 - j) / scale - 1)) * b[i]).long().cuda()
+            # first modify    
+            b_temp = (torch.ones(int(2 ** (5 - j) / scale - 1)).cuda() * b[i]).long().cuda()
             gj_temp = torch.arange(int(gj[i].item()) + 1, int(gj[i].item() + 2 ** (5 - j) / scale)).cuda()
             gi_temp = torch.arange(int(gi[i].item()) + 1, int(gi[i].item() + 2 ** (5 - j) / scale)).cuda()
             b = torch.cat((b, b_temp))
@@ -662,13 +663,15 @@ def compute_lost_KD5(model, targets, output_s, output_t, feature_s, feature_t, b
     if len(feature_t) != len(feature_s):
         print("feature mismatch!")
         exit()
-    merge = indices_merge(indices)
+    # second, 
+    # merge = indices_merge(indices)
     for i in range(len(feature_t)):
         # feature_t[i] = feature_t[i].pow(2).sum(1)
         feature_t[i] = feature_t[i].abs().sum(1)
         # feature_s[i] = feature_s[i].pow(2).sum(1)
         feature_s[i] = feature_s[i].abs().sum(1)
-        mask = fine_grained_imitation_feature_mask(feature_s[i], feature_t[i], merge, img_size)
+        # dont use the indices_merge(indices)
+        mask = fine_grained_imitation_feature_mask(feature_s[i], feature_t[i], indices, img_size)
         mask = mask.to(targets.device)
         feature_t[i] = (feature_t[i] * mask).view(batch_size, -1)
         feature_s[i] = (feature_s[i] * mask).view(batch_size, -1)

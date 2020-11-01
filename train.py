@@ -72,7 +72,7 @@ def train(hyp):
     imgsz_min, imgsz_max, imgsz_test = opt.img_size  # img sizes (min, max, test)
 
     # Image Sizes
-    gs = 64  # (pixels) grid size
+    gs = 32  # (pixels) grid size
     assert math.fmod(imgsz_min, gs) == 0, '--img-size %g must be a %g-multiple' % (imgsz_min, gs)
     opt.multi_scale |= imgsz_min != imgsz_max  # multi if different (min, max)
     if opt.multi_scale:
@@ -158,7 +158,7 @@ def train(hyp):
 
         elif len(weights) > 0:  # darknet format
             # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-            load_darknet_weights(model, weights, pt=opt.pt, BN_Fold=opt.BN_Fold, FPGA=opt.FPGA)
+            load_darknet_weights(model, weights, pt=opt.pt, BN_Fold=opt.BN_Fold)
     if t_cfg:
         if t_weights.endswith('.pt'):
             t_model.load_state_dict(torch.load(t_weights, map_location=device)['model'])
@@ -397,6 +397,14 @@ def train(hyp):
         # Process epoch results
         if opt.ema:
             ema.update_attr(model)
+            for i, (mdef, module) in enumerate(zip(ema.eam.module_defs, ema.eam.module_list)):
+                if mdef['type'] == 'yolo':
+                    yolo_layer = module
+                    yolo_layer.nx, yolo_layer.ny = 0, 0
+        for i, (mdef, module) in enumerate(zip(model.module_defs, model.module_list)):
+            if mdef['type'] == 'yolo':
+                yolo_layer = module
+                yolo_layer.nx, yolo_layer.ny = 0, 0
         final_epoch = epoch + 1 == epochs
         if not opt.notest or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
@@ -501,7 +509,7 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
     imgsz_min, imgsz_max, imgsz_test = opt.img_size  # img sizes (min, max, test)
 
     # Image Sizes
-    gs = 64  # (pixels) grid size
+    gs = 32  # (pixels) grid size
     assert math.fmod(imgsz_min, gs) == 0, '--img-size %g must be a %g-multiple' % (imgsz_min, gs)
     opt.multi_scale |= imgsz_min != imgsz_max  # multi if different (min, max)
     if opt.multi_scale:
@@ -581,7 +589,7 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
 
         elif len(weights) > 0:  # darknet format
             # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-            load_darknet_weights(model, weights, pt=opt.pt, BN_Fold=opt.BN_Fold, FPGA=opt.FPGA)
+            load_darknet_weights(model, weights, pt=opt.pt, BN_Fold=opt.BN_Fold)
 
     # Mixed precision training https://github.com/NVIDIA/apex
     if mixed_precision:
@@ -745,6 +753,14 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
         # Process epoch results
         if opt.ema:
             ema.update_attr(model)
+            for i, (mdef, module) in enumerate(zip(ema.eam.module_defs, ema.eam.module_list)):
+                if mdef['type'] == 'yolo':
+                    yolo_layer = module
+                    yolo_layer.nx, yolo_layer.ny = 0, 0
+        for i, (mdef, module) in enumerate(zip(model.module_defs, model.module_list)):
+            if mdef['type'] == 'yolo':
+                yolo_layer = module
+                yolo_layer.nx, yolo_layer.ny = 0, 0
         final_epoch = epoch + 1 == epochs
         if not opt.notest or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80

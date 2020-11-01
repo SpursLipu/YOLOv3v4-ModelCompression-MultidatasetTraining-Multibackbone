@@ -141,6 +141,18 @@ class Quantizer(nn.Module):
             output = self.dequantize(output)  # 反量化
         return output
 
+    def get_weights(self, input):
+        if self.bits == 32:
+            output = input
+        elif self.bits == 1:
+            print('！Binary quantization is not supported ！')
+            assert self.bits != 1
+        else:
+            output = self.quantize(input)  # 量化
+            output = self.round(output)
+            output = self.clamp(output)  # 截断
+        return output
+
 
 class SignedQuantizer(Quantizer):
     def __init__(self, bits, range_tracker, out_channels, FPGA):
@@ -660,3 +672,20 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 groups=self.groups
             )
         return output
+
+    def BN_fuse(self):
+        if self.bn:
+            # BN融合
+            if self.bias is not None:
+                bias = reshape_to_bias(self.beta + (self.bias - self.running_mean) * (
+                        self.gamma / torch.sqrt(self.running_var + self.eps)))
+            else:
+                bias = reshape_to_bias(
+                    self.beta - self.running_mean * self.gamma / torch.sqrt(
+                        self.running_var + self.eps))  # b融running
+            weight = self.weight * reshape_to_weight(
+                self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
+        else:
+            bias = self.bias
+            weight = self.weight
+        return weight, bias

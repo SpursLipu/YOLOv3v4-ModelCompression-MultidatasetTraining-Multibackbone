@@ -72,6 +72,20 @@ class weight_quantize(nn.Module):
             output = 2 * output - 1
         return output
 
+    def get_weights(self, input):
+        if self.w_bits == 32:
+            output = input
+        elif self.w_bits == 1:
+            print('！Binary quantization is not supported ！')
+            assert self.w_bits != 1
+        else:
+            output = torch.tanh(input)
+            output = output / 2 / torch.max(torch.abs(output)) + 0.5  # 归一化-[0,1]
+            scale = float(2 ** self.w_bits - 1)
+            output = output * scale
+            output = self.round(output)
+        return output
+
 
 # ********************* 量化卷积（同时量化A/W，并做卷积） ***********************
 class DorefaConv2d(nn.Conv2d):

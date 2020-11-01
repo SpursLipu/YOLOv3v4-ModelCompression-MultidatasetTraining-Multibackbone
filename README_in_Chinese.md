@@ -48,21 +48,9 @@
 
 |<center>功能</center>|<center></center>|
 | --- |--- |
-|<center>训练</center>|
-|<center>正常训练</center>|<center>√</center>|
-|<center>tiny训练</center>|<center>√</center>|
-|<center>mobilenetv3训练</center>|<center>√</center>|
-|<center>mobilenetv3-small训练</center>|<center>√</center>|
-|<center>多数据集</center>|
-|<center>Dior数据集训练</center>|<center>√</center>|
-|<center>bdd100k数据集训练</center>|<center>√</center>|
-|<center>visdrone数据集训练</center>|<center>√</center>|
+|<center>多种主干网络</center>|
+|<center>多种数据集</center>|
 |<center>剪植</center>|
-|<center>稀疏化训练</center>|<center>√</center>  |
-|<center>正常剪枝</center>|<center>√</center>|
-|<center>规整剪枝</center>|<center>√</center>  |
-|<center>极限剪枝(shortcut)</center>|<center>√</center> |
-|<center>层剪植</center>|<center>√</center> |
 |<center>量化</center>|
 |<center>知识蒸馏</center>|<center>√</center>  |
 

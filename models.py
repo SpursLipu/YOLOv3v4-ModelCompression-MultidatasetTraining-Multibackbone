@@ -548,7 +548,7 @@ def get_yolo_layers(model):
     return [i for i, m in enumerate(model.module_list) if m.__class__.__name__ == 'YOLOLayer']  # [89, 101, 113]
 
 
-def load_darknet_weights(self, weights, cutoff=-1, pt=False, BN_Fold=False, FPGA=False):
+def load_darknet_weights(self, weights, cutoff=-1, pt=False, BN_Fold=False):
     # Parses and loads the weights stored in 'weights'
 
     # Establish cutoffs (load layers between 0 and cutoff. if cutoff = -1 all are loaded)
@@ -571,7 +571,7 @@ def load_darknet_weights(self, weights, cutoff=-1, pt=False, BN_Fold=False, FPGA
         if mdef['type'] == 'convolutional':
             conv_layer = module[0]
             if mdef['batch_normalize']:
-                if FPGA or BN_Fold:
+                if BN_Fold:
                     # Load BN bias, weights, running mean and running variance
                     num_b = conv_layer.beta.numel()
                     # Bias

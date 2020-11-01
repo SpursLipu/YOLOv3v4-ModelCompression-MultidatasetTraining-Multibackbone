@@ -44,7 +44,7 @@ def test(cfg,
         if weights.endswith('.pt'):  # pytorch format
             model.load_state_dict(torch.load(weights, map_location=device)['model'])
         else:  # darknet format
-            load_darknet_weights(model, weights, BN_Fold=opt.BN_Fold, FPGA=opt.FPGA)
+            load_darknet_weights(model, weights, BN_Fold=opt.BN_Fold)
 
         # Fuse
         model.fuse(quantized=quantized, BN_Fold=opt.BN_Fold, FPGA=opt.FPGA)

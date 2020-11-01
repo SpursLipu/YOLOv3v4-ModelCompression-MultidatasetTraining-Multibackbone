@@ -214,8 +214,8 @@ Based on mobilenetv3, two kinds of network structures are designed
 
 2. The reasoning speed is tested on GTX2080ti*4, and the image size is 608.
     
-3. The training test set should match the training set, as mismatch will cause the problem of map virtual height.
-Because reference [issue](https://github.com/ultralytics/yolov3/issues/970)
+3. The training set should match the testing set, because mismatch will cause the problem of mAP virtual height.
+Read [issue](https://github.com/ultralytics/yolov3/issues/970) for detial.
 
 ## Train command
 1.YOLOv3

@@ -48,10 +48,10 @@
 
 |<center>功能</center>|<center></center>|
 | --- |--- |
-|<center>多种主干网络</center>|
-|<center>多种数据集</center>|
-|<center>剪植</center>|
-|<center>量化</center>|
+|<center>多种主干网络</center>|<center>√</center>  |
+|<center>多种数据集</center>|<center>√</center>  |
+|<center>剪植</center>|<center>√</center>  |
+|<center>量化</center>|<center>√</center>  |
 |<center>知识蒸馏</center>|<center>√</center>  |
 
 # 可用指令

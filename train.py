@@ -321,10 +321,12 @@ def train(hyp):
             # Forward
             imgs = fencemask(imgs)
             targets = targets.to(device)
-            pred, feature_s = model(imgs)
-
-            # Loss
-            loss, loss_items = compute_loss(pred, targets, model)
+            if cfg.find('yolov2') >= 0:
+                pred, feature_s = model(imgs)
+            else:
+                pred, feature_s = model(imgs)
+                # Loss
+                loss, loss_items = compute_loss(pred, targets, model)
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results

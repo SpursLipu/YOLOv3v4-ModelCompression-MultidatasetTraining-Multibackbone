@@ -25,15 +25,15 @@ Pruning method based on BN layer by [coldlarry/YOLOv3-complete-pruning](https://
  April 27, 2020. Update mobilenetv3  pre-training weights, add a layer pruning method, methods from the [tanluren/yolov3-channel-and-layer-pruning/yolov3](https://github.com/tanluren/yolov3-channel-and-layer-pruning),
 Thanks for sharing.
  
- May 22, 2020 Updated some new optimizations from [ultralytics/yolov3](https://github.com/ultralytics/yolov3), update cfg file and weights of YOLOv4.
+ May 22, 2020. Updated some new optimizations from [ultralytics/yolov3](https://github.com/ultralytics/yolov3), update cfg file and weights of YOLOv4.
  
- May 22, 2020, the 8-bit fixed-point quantization method was updated and some bugs were fixed.
+ May 22, 2020. The 8-bit quantization method was updated and some bugs were fixed.
  
- July 12, 2020, the problem of map returning to 0 after pruning and of yolov3-mobilenet was fixed. See issue#41 for more details.
+ July 12, 2020. The problem of mAP returning to 0 after pruning in yolov3-mobilenet was fixed. See issue#41 for more details.
 
  July 14, 2020. Mobilenet supports a bn fusion method and two methods of extreme pruning that based on shortcut.
  
- September 30, 2020, the BN_Fold training method was updated to reduce the precision loss caused by BN fusion, and the POW (2) quantization method targeted at FPGA was updated. See the quantization section for details.
+ September 30, 2020. The BN_Fold training method was updated to reduce the precision loss caused by BN fusion, and the POW (2) quantization method targeted at FPGA was updated. See the quantization section for details.
 
 # Requirements
 Our project based on [ultralytics/yolov3](https://github.com/ultralytics/yolov3), see [ultralytics/yolov3](https://github.com/ultralytics/yolov3) for details.

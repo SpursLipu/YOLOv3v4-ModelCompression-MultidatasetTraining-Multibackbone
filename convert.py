@@ -20,6 +20,7 @@ def convert():
     # Load weights
     attempt_download(weights)
     if weights.endswith('.pt'):  # pytorch format
+        stat = torch.load(weights, map_location=device)['model']
         model.load_state_dict(torch.load(weights, map_location=device)['model'])
     else:  # darknet format
         _ = load_darknet_weights(model, weights, BN_Fold=opt.BN_Fold)
@@ -32,6 +33,8 @@ def convert():
 
     w_file = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_weights.bin', 'wb')
     b_file = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_bias.bin', 'wb')
+    w_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_w_scale.bin', 'wb')
+    a_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_a_scale.bin', 'wb')
     for _, (mdef, module) in enumerate(zip(model.module_defs, model.module_list)):
         print(mdef)
         if mdef['type'] == 'convolutional':
@@ -42,7 +45,16 @@ def convert():
                 weight, bias = conv_layer.BN_fuse()
             else:
                 weight, bias = conv_layer.weight, conv_layer.bias
-
+            # 得到缩放因子
+            if conv_layer.in_channels == 3:
+                activate_scale = 14
+            else:
+                activate_scale = -math.log(conv_layer.activation_quantizer.scale.cpu().data.numpy()[0], 2)
+            weight_scale = -math.log(conv_layer.weight_quantizer.scale.cpu().data.numpy()[0], 2)
+            a = struct.pack('<i', int(activate_scale))
+            a_scale.write(a)
+            a = struct.pack('<i', int(weight_scale))
+            w_scale.write(a)
             # 处理weights
             if opt.quantized != 0:
                 # 生成量化后的参数
@@ -106,7 +118,8 @@ def convert():
                 for i in para_flatten:
                     a = struct.pack('<f', i)  # 小端浮点                 大端，浮点32>f
                     b_file.write(a)
-
+    w_scale.close()
+    a_scale.close()
     w_file.close()
     b_file.close()
     # Eval mode

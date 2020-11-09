@@ -321,12 +321,9 @@ def train(hyp):
             # Forward
             imgs = fencemask(imgs)
             targets = targets.to(device)
-            if cfg.find('yolov2') >= 0:
-                pred, feature_s = model(imgs)
-            else:
-                pred, feature_s = model(imgs)
-                # Loss
-                loss, loss_items = compute_loss(pred, targets, model)
+            pred, feature_s = model(imgs)
+            # Loss
+            loss, loss_items = compute_loss(pred, targets, model)
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results
@@ -379,7 +376,7 @@ def train(hyp):
 
             # Print
             mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
-            mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
+            mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
             s = ('%10s' * 2 + '%10.3g' * 6) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
             pbar.set_description(s)
 
@@ -746,7 +743,7 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
 
             # Print
             mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
-            mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
+            mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
             s = ('%10s' * 2 + '%10.3g' * 6) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
             pbar.set_description(s)
 

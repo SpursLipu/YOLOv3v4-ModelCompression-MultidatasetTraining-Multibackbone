@@ -20,12 +20,10 @@ def convert():
     # Load weights
     attempt_download(weights)
     if weights.endswith('.pt'):  # pytorch format
-        stat = torch.load(weights, map_location=device)['model']
         model.load_state_dict(torch.load(weights, map_location=device)['model'])
     else:  # darknet format
         _ = load_darknet_weights(model, weights, BN_Fold=opt.BN_Fold)
-    if opt.quantized == 0:
-        save_weights(model, path='weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '-best.weights')
+    save_weights(model, path='weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '-best.weights')
 
     # Fuse Conv2d + BatchNorm2d layers
     if not opt.BN_Fold:
@@ -33,28 +31,30 @@ def convert():
 
     w_file = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_weights.bin', 'wb')
     b_file = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_bias.bin', 'wb')
-    w_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_w_scale.bin', 'wb')
-    a_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_a_scale.bin', 'wb')
+    if opt.quantized == 1:
+        w_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_w_scale.bin', 'wb')
+        a_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_a_scale.bin', 'wb')
     for _, (mdef, module) in enumerate(zip(model.module_defs, model.module_list)):
         print(mdef)
         if mdef['type'] == 'convolutional':
             conv_layer = module[0]
 
-            if opt.BN_Fold:
+            if opt.quantized != 0 and opt.BN_Fold:
                 # 使用BN训练中量化，融合BN参数
                 weight, bias = conv_layer.BN_fuse()
             else:
                 weight, bias = conv_layer.weight, conv_layer.bias
-            # 得到缩放因子
-            if conv_layer.in_channels == 3:
-                activate_scale = 14
-            else:
-                activate_scale = -math.log(conv_layer.activation_quantizer.scale.cpu().data.numpy()[0], 2)
-            weight_scale = -math.log(conv_layer.weight_quantizer.scale.cpu().data.numpy()[0], 2)
-            a = struct.pack('<i', int(activate_scale))
-            a_scale.write(a)
-            a = struct.pack('<i', int(weight_scale))
-            w_scale.write(a)
+            if opt.quantized == 1:
+                # 得到缩放因子
+                if conv_layer.in_channels == 3:
+                    activate_scale = 14
+                else:
+                    activate_scale = -math.log(conv_layer.activation_quantizer.scale.cpu().data.numpy()[0], 2)
+                weight_scale = -math.log(conv_layer.weight_quantizer.scale.cpu().data.numpy()[0], 2)
+                a = struct.pack('<i', int(activate_scale))
+                a_scale.write(a)
+                a = struct.pack('<i', int(weight_scale))
+                w_scale.write(a)
             # 处理weights
             if opt.quantized != 0:
                 # 生成量化后的参数
@@ -118,8 +118,9 @@ def convert():
                 for i in para_flatten:
                     a = struct.pack('<f', i)  # 小端浮点                 大端，浮点32>f
                     b_file.write(a)
-    w_scale.close()
-    a_scale.close()
+    if opt.quantized == 1:
+        w_scale.close()
+        a_scale.close()
     w_file.close()
     b_file.close()
     # Eval mode
@@ -149,7 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('--nms-thres', type=float, default=0.8, help='iou threshold for non-maximum suppression')
     parser.add_argument('--half', action='store_true', help='half precision FP16 inference')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
-    parser.add_argument('--quantized', type=int, default=-1,
+    parser.add_argument('--quantized', type=int, default=0,
                         help='0:quantization way one Ternarized weight and 8bit activation')
     parser.add_argument('--a-bit', type=int, default=8,
                         help='a-bit')

@@ -8,7 +8,6 @@ from terminaltables import AsciiTable
 import time
 from utils.utils import *
 from utils.prune_utils import *
-from torchsummary import summary
 import os
 import argparse
 

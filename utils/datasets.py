@@ -769,8 +769,10 @@ class Fence(object):
         height, width = sp[1], sp[2]
 
         # mask_1代表横着的条纹，mask_2代表竖着的条纹
-        mask_1 = np.random.normal(loc=1, scale=0.2, size=(sp[1], sp[2], 3))
-        mask_2 = np.random.normal(loc=1, scale=0.2, size=(sp[1], sp[2], 3))
+        mask_1 = np.ones(shape=(sp[1], sp[2], 3))
+        mask_2 = np.ones(shape=(sp[1], sp[2], 3))
+        # mask_1 = np.random.normal(loc=1, scale=0.2, size=(sp[1], sp[2], 3))
+        # mask_2 = np.random.normal(loc=1, scale=0.2, size=(sp[1], sp[2], 3))
         for i in range(1, height // (self.l1 + self.x) + 1):
             mask_1[i * self.l1 + (i - 1) * self.x:i * (self.l1 + self.x):, 0:, 0] = self.mean[0]
             mask_1[i * self.l1 + (i - 1) * self.x:i * (self.l1 + self.x):, 0:, 1] = self.mean[1]

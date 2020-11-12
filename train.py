@@ -122,9 +122,12 @@ def train(hyp):
     print('Optimizer groups: %g .bias, %g Conv2d.weight, %g other' % (len(pg2), len(pg1), len(pg0)))
     del pg0, pg1, pg2
 
-    print('<.....................using fencemask.......................>')
-    seed = int(img_size / 16)
-    fencemask = FenceMask(seed, seed * 3, seed * 4, seed * 8, [0, 0, 0], 0.8)
+    print('<.....................using gridmask.......................>')
+    seed = int(img_size / 32)
+    gridmask = GridMask(d1=96, d2=224, rotate=360, ratio=0.6, mode=0, prob=0.8)
+
+    # print('<.....................using fencemask.......................>')
+    # fencemask = FenceMask(seed, seed * 3, seed * 4, seed * 8, [0, 0, 0], 0.8)
     max_epoch = int(epochs * 0.8)
     start_epoch = 0
     best_fitness = 0.0
@@ -281,7 +284,8 @@ def train(hyp):
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
-        fencemask.set_prob(epoch, max_epoch)
+        # fencemask.set_prob(epoch, max_epoch)
+        gridmask.set_prob(epoch, max_epoch)
         model.train()
         # 稀疏化标志
         sr_flag = get_sr_flag(epoch, opt.sr)
@@ -319,7 +323,8 @@ def train(hyp):
                     ns = [math.ceil(x * sf / gs) * gs for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
             # Forward
-            imgs = fencemask(imgs)
+            # imgs = fencemask(imgs)
+            imgs = gridmask(imgs)
             targets = targets.to(device)
             pred, feature_s = model(imgs)
             # Loss

@@ -17,7 +17,8 @@ def detect(save_img=False):
     os.makedirs(out)  # make new output folder
 
     # Initialize model
-    model = Darknet(opt.cfg, imgsz)
+    model = Darknet(opt.cfg, imgsz, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit, BN_Fold=opt.BN_Fold,
+                    FPGA=opt.FPGA)
 
     # Load weights
     attempt_download(weights)
@@ -37,7 +38,8 @@ def detect(save_img=False):
     model.to(device).eval()
 
     # Fuse Conv2d + BatchNorm2d layers
-    # model.fuse()
+    if not opt.BN_Fold:
+        model.fuse()
 
     # Export mode
     if ONNX_EXPORT:
@@ -182,6 +184,14 @@ if __name__ == '__main__':
     parser.add_argument('--classes', nargs='+', type=int, help='filter by class')
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
+    parser.add_argument('--quantized', type=int, default=0,
+                        help='0:quantization way one Ternarized weight and 8bit activation')
+    parser.add_argument('--a-bit', type=int, default=8,
+                        help='a-bit')
+    parser.add_argument('--w-bit', type=int, default=8,
+                        help='w-bit')
+    parser.add_argument('--BN_Fold', action='store_true', help='BN_Fold')
+    parser.add_argument('--FPGA', action='store_true', help='FPGA')
     opt = parser.parse_args()
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
     opt.names = list(glob.iglob('./**/' + opt.names, recursive=True))[0]  # find file

@@ -468,6 +468,10 @@ class QuantizedConv2d_For_FPGA(QuantizedConv2d):
                                                        range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
                                                                                         FPGA=True),
                                                        out_channels=-1, FPGA=False)
+            self.bias_quantizer = SymmetricQuantizer(bits=w_bits,
+                                                     range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
+                                                                                      FPGA=True),
+                                                     out_channels=-1, FPGA=False)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
                                                             range_tracker=GlobalRangeTracker(q_level='L',
@@ -478,6 +482,10 @@ class QuantizedConv2d_For_FPGA(QuantizedConv2d):
                                                         range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
                                                                                          FPGA=False),
                                                         out_channels=-1, FPGA=True)
+            self.bias_quantizer = AsymmetricQuantizer(bits=w_bits,
+                                                      range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
+                                                                                       FPGA=False),
+                                                      out_channels=-1, FPGA=True)
 
     def forward(self, input):
         # 量化A和W
@@ -485,11 +493,12 @@ class QuantizedConv2d_For_FPGA(QuantizedConv2d):
             input = self.activation_quantizer(input)
         q_input = input
         q_weight = self.weight_quantizer(self.weight)
+        q_bias = self.bias_quantizer(self.bias)
         # 量化卷积
         output = F.conv2d(
             input=q_input,
             weight=q_weight,
-            bias=self.bias,
+            bias=q_bias,
             stride=self.stride,
             padding=self.padding,
             dilation=self.dilation,
@@ -551,6 +560,10 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                                                        range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
                                                                                         FPGA=True),
                                                        out_channels=-1, FPGA=False)
+            self.bias_quantizer = SymmetricQuantizer(bits=w_bits,
+                                                     range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
+                                                                                      FPGA=True),
+                                                     out_channels=-1, FPGA=False)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
                                                             range_tracker=GlobalRangeTracker(q_level='L',
@@ -561,6 +574,10 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                                                         range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
                                                                                          FPGA=False),
                                                         out_channels=-1, FPGA=True)
+            self.bias_quantizer = AsymmetricQuantizer(bits=w_bits,
+                                                      range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
+                                                                                       FPGA=False),
+                                                      out_channels=-1, FPGA=True)
 
     def forward(self, input):
         # 训练态
@@ -634,12 +651,13 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             input = self.activation_quantizer(input)
         q_input = input
         q_weight = self.weight_quantizer(weight)
+        q_bias = self.bias_quantizer(bias)
         # 量化卷积
         if self.training:  # 训练态
             output = F.conv2d(
                 input=q_input,
                 weight=q_weight,
-                bias=bias,
+                bias=q_bias,
                 stride=self.stride,
                 padding=self.padding,
                 dilation=self.dilation,
@@ -657,7 +675,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             output = F.conv2d(
                 input=q_input,
                 weight=q_weight,
-                bias=bias,  # 注意，这里加bias，做完整的conv+bn
+                bias=q_bias,  # 注意，这里加bias，做完整的conv+bn
                 stride=self.stride,
                 padding=self.padding,
                 dilation=self.dilation,

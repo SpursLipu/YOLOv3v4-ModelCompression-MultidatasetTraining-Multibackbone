@@ -8,10 +8,9 @@ from torch.autograd import Function
 
 # ********************* range_trackers(范围统计器，统计量化前范围) *********************
 class RangeTracker(nn.Module):
-    def __init__(self, q_level, FPGA):
+    def __init__(self, q_level):
         super().__init__()
         self.q_level = q_level
-        self.FPGA = FPGA
 
     def update_range(self, min_val, max_val):
         raise NotImplementedError
@@ -24,17 +23,12 @@ class RangeTracker(nn.Module):
         elif self.q_level == 'C':  # W,min_max_shape=(N, 1, 1, 1),channel级
             min_val = torch.min(torch.min(torch.min(input, 3, keepdim=True)[0], 2, keepdim=True)[0], 1, keepdim=True)[0]
             max_val = torch.max(torch.max(torch.max(input, 3, keepdim=True)[0], 2, keepdim=True)[0], 1, keepdim=True)[0]
-        if self.FPGA == True:
-            sign_min = min_val / (min_val.abs())
-            sign_max = max_val / (max_val.abs())
-            min_val = (2 ** min_val.abs().log2().ceil()) * sign_min
-            max_val = (2 ** max_val.abs().log2().ceil()) * sign_max
         self.update_range(min_val, max_val)
 
 
 class GlobalRangeTracker(RangeTracker):  # W,min_max_shape=(N, 1, 1, 1),channel级,取本次和之前相比的min_max —— (N, C, W, H)
-    def __init__(self, q_level, out_channels, FPGA):
-        super().__init__(q_level, FPGA)
+    def __init__(self, q_level, out_channels):
+        super().__init__(q_level)
         if self.q_level == 'L':
             self.register_buffer('min_val', torch.zeros(1))
             self.register_buffer('max_val', torch.zeros(1))
@@ -56,8 +50,8 @@ class GlobalRangeTracker(RangeTracker):  # W,min_max_shape=(N, 1, 1, 1),channel�
 
 
 class AveragedRangeTracker(RangeTracker):  # A,min_max_shape=(1, 1, 1, 1),layer级,取running_min_max —— (N, C, W, H)
-    def __init__(self, q_level, out_channels, FPGA, momentum=0.1):
-        super().__init__(q_level, FPGA)
+    def __init__(self, q_level, out_channels, momentum=0.1):
+        super().__init__(q_level)
         self.momentum = momentum
         if self.q_level == 'L':
             self.register_buffer('min_val', torch.zeros(1))
@@ -108,7 +102,9 @@ class Quantizer(nn.Module):
         raise NotImplementedError
 
     # 量化
-    def quantize(self, input):
+    def quantize(self, input, FPGA_first=False):
+        if FPGA_first:
+            self.scale = torch.tensor([2 ** (-(self.bits - 2))]).to(input.device)
         output = input / self.scale + self.zero_point
         return output
 
@@ -128,7 +124,7 @@ class Quantizer(nn.Module):
         output = (input - self.zero_point) * self.scale
         return output
 
-    def forward(self, input):
+    def forward(self, input, first=False):
         if self.bits == 32:
             output = input
         elif self.bits == 1:
@@ -137,7 +133,7 @@ class Quantizer(nn.Module):
         else:
             self.range_tracker(input)
             self.update_params()
-            output = self.quantize(input)  # 量化
+            output = self.quantize(input, first)  # 量化
             output = self.round(output)
             output = self.clamp(output)  # 截断
             output = self.dequantize(output)  # 反量化
@@ -183,8 +179,8 @@ class AsymmetricQuantizer(Quantizer):
         if self.FPGA == False:
             float_range = self.range_tracker.max_val - self.range_tracker.min_val  # 量化前范围
         else:
-            float_max = torch.max(torch.abs(self.range_tracker.min_val), torch.abs(self.range_tracker.max_val))  # 量化前范围
-            float_range = 2 ** float_max.log2().ceil()
+            float_range = self.range_tracker.max_val - self.range_tracker.min_val  # 量化前范围
+            float_range = 2 ** float_range.log2().ceil()
         self.scale = float_range / quantized_range  # 量化比例因子
         self.zero_point = torch.round(-min_val / self.scale)  # 量化零点
 
@@ -217,22 +213,18 @@ class QuantizedConv2d(nn.Conv2d):
         # 实例化量化器（A-layer级，W-channel级）
         if q_type == 0:
             self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L',
-                                                                                                           out_channels=-1,
-                                                                                                           FPGA=False),
+                                                                                                           out_channels=-1),
                                                            out_channels=-1, FPGA=False)
             self.weight_quantizer = SymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
-                                                                                                     out_channels=out_channels,
-                                                                                                     FPGA=False),
+                                                                                                     out_channels=out_channels),
                                                        out_channels=out_channels, FPGA=False)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
                                                             range_tracker=AveragedRangeTracker(q_level='L',
-                                                                                               out_channels=-1,
-                                                                                               FPGA=False),
+                                                                                               out_channels=-1),
                                                             out_channels=-1, FPGA=False)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
-                                                                                                      out_channels=out_channels,
-                                                                                                      FPGA=False),
+                                                                                                      out_channels=out_channels),
                                                         out_channels=out_channels, FPGA=False)
 
     def forward(self, input):
@@ -313,12 +305,10 @@ class BNFold_Conv2d_Q(QuantizedConv2d):
         # 实例化量化器（A-layer级，W-channel级）
         if q_type == 0:
             self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L',
-                                                                                                           out_channels=-1,
-                                                                                                           FPGA=False),
+                                                                                                           out_channels=-1),
                                                            out_channels=-1, FPGA=False)
             self.weight_quantizer = SymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
-                                                                                                     out_channels=out_channels,
-                                                                                                     FPGA=False),
+                                                                                                     out_channels=out_channels),
                                                        out_channels=out_channels, FPGA=False)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
@@ -326,8 +316,7 @@ class BNFold_Conv2d_Q(QuantizedConv2d):
                                                                                                out_channels=-1),
                                                             out_channels=-1, FPGA=False)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
-                                                                                                      out_channels=out_channels,
-                                                                                                      FPGA=False),
+                                                                                                      out_channels=out_channels),
                                                         out_channels=out_channels, FPGA=False)
 
     def forward(self, input):
@@ -460,38 +449,34 @@ class QuantizedConv2d_For_FPGA(QuantizedConv2d):
         )
         # 实例化量化器（A-layer级，W-channel级）
         if q_type == 0:
-            self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=GlobalRangeTracker(q_level='L',
-                                                                                                         out_channels=-1,
-                                                                                                         FPGA=True),
-                                                           out_channels=-1, FPGA=False)
+            self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L',
+                                                                                                           out_channels=-1),
+                                                           out_channels=-1, FPGA=True)
             self.weight_quantizer = SymmetricQuantizer(bits=w_bits,
-                                                       range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
-                                                                                        FPGA=True),
-                                                       out_channels=-1, FPGA=False)
+                                                       range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
+                                                       out_channels=-1, FPGA=True)
             self.bias_quantizer = SymmetricQuantizer(bits=w_bits,
-                                                     range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
-                                                                                      FPGA=True),
-                                                     out_channels=-1, FPGA=False)
+                                                     range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
+                                                     out_channels=-1, FPGA=True)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
-                                                            range_tracker=GlobalRangeTracker(q_level='L',
-                                                                                             out_channels=-1,
-                                                                                             FPGA=False),
+                                                            range_tracker=AveragedRangeTracker(q_level='L',
+                                                                                               out_channels=-1),
                                                             out_channels=-1, FPGA=True)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits,
-                                                        range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
-                                                                                         FPGA=False),
+                                                        range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
                                                         out_channels=-1, FPGA=True)
             self.bias_quantizer = AsymmetricQuantizer(bits=w_bits,
-                                                      range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
-                                                                                       FPGA=False),
+                                                      range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
                                                       out_channels=-1, FPGA=True)
 
     def forward(self, input):
         # 量化A和W
-        if input.shape[1] != 3:
-            input = self.activation_quantizer(input)
-        q_input = input
+        if input.shape[1] == 3:
+            first = True
+        else:
+            first = False
+        q_input = self.activation_quantizer(input, first)
         q_weight = self.weight_quantizer(self.weight)
         q_bias = self.bias_quantizer(self.bias)
         # 量化卷积
@@ -552,31 +537,25 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
         # 实例化量化器（A-layer级，W-channel级）
         if q_type == 0:
-            self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=GlobalRangeTracker(q_level='L',
-                                                                                                         out_channels=-1,
-                                                                                                         FPGA=True),
-                                                           out_channels=-1, FPGA=False)
+            self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L',
+                                                                                                           out_channels=-1),
+                                                           out_channels=-1, FPGA=True)
             self.weight_quantizer = SymmetricQuantizer(bits=w_bits,
-                                                       range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
-                                                                                        FPGA=True),
-                                                       out_channels=-1, FPGA=False)
+                                                       range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
+                                                       out_channels=-1, FPGA=True)
             self.bias_quantizer = SymmetricQuantizer(bits=w_bits,
-                                                     range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
-                                                                                      FPGA=True),
-                                                     out_channels=-1, FPGA=False)
+                                                     range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
+                                                     out_channels=-1, FPGA=True)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
-                                                            range_tracker=GlobalRangeTracker(q_level='L',
-                                                                                             out_channels=-1,
-                                                                                             FPGA=False),
+                                                            range_tracker=AveragedRangeTracker(q_level='L',
+                                                                                               out_channels=-1),
                                                             out_channels=-1, FPGA=True)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits,
-                                                        range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
-                                                                                         FPGA=False),
+                                                        range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
                                                         out_channels=-1, FPGA=True)
             self.bias_quantizer = AsymmetricQuantizer(bits=w_bits,
-                                                      range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1,
-                                                                                       FPGA=False),
+                                                      range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
                                                       out_channels=-1, FPGA=True)
 
     def forward(self, input):
@@ -647,9 +626,11 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 bias = self.bias
                 weight = self.weight
         # 量化A和bn融合后的W
-        if input.shape[1] != 3:
-            input = self.activation_quantizer(input)
-        q_input = input
+        if input.shape[1] == 3:
+            first = True
+        else:
+            first = False
+        q_input = self.activation_quantizer(input, first)
         q_weight = self.weight_quantizer(weight)
         q_bias = self.bias_quantizer(bias)
         # 量化卷积

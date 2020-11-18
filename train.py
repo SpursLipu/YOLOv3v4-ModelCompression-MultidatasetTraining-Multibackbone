@@ -63,7 +63,7 @@ def train(hyp):
     epochs = opt.epochs  # 500200 batches at bs 64, 117263 images = 273 epochs
     batch_size = opt.batch_size
     accumulate = max(round(64 / batch_size), 1)  # accumulate n times before optimizer update (bs 64)
-    if opt.quantized != -1:
+    if opt.quantized != 0:
         weights = "weights/last.pt"
     else:
         weights = opt.weights  # initial training weights
@@ -123,12 +123,12 @@ def train(hyp):
     del pg0, pg1, pg2
 
     # print('<.....................using gridmask.......................>')
-    seed = int(img_size / 32)
+    # seed = int(img_size / 32)
     # gridmask = GridMask(d1=96, d2=224, rotate=360, ratio=0.6, mode=1, prob=0.8)
 
-    print('<.....................using fencemask.......................>')
-    fencemask = FenceMask(seed, seed * 3, seed * 4, seed * 8, [0, 0, 0], 0.8)
-    max_epoch = int(epochs * 0.8)
+    # print('<.....................using fencemask.......................>')
+    # fencemask = FenceMask(seed, seed * 3, seed * 4, seed * 8, [0, 0, 0], 0.8)
+    # max_epoch = int(epochs * 0.8)
     start_epoch = 0
     best_fitness = 0.0
     if weights != 'None':
@@ -197,7 +197,7 @@ def train(hyp):
     # Initialize distributed training
     if device.type != 'cpu' and torch.cuda.device_count() > 1 and torch.distributed.is_available():
         dist.init_process_group(backend='nccl',  # 'distributed backend'
-                                init_method='tcp://127.0.0.1:9991',  # distributed training init method
+                                init_method='tcp://127.0.0.1:9999',  # distributed training init method
                                 world_size=1,  # number of nodes for distributed training
                                 rank=0)  # distributed training node rank
         model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
@@ -284,7 +284,7 @@ def train(hyp):
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
-        fencemask.set_prob(epoch, max_epoch)
+        # fencemask.set_prob(epoch, max_epoch)
         # gridmask.set_prob(epoch, max_epoch)
         model.train()
         # 稀疏化标志
@@ -323,7 +323,7 @@ def train(hyp):
                     ns = [math.ceil(x * sf / gs) * gs for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
             # Forward
-            imgs = fencemask(imgs)
+            # imgs = fencemask(imgs)
             # imgs = gridmask(imgs)
             targets = targets.to(device)
             pred, feature_s = model(imgs)
@@ -909,7 +909,7 @@ if __name__ == '__main__':
     parser.add_argument('--s', type=float, default=0.001, help='scale sparse rate')
     parser.add_argument('--prune', type=int, default=-1,
                         help='0:nomal prune or regular prune 1:shortcut prune 2:layer prune')
-    parser.add_argument('--quantized', type=int, default=-1,
+    parser.add_argument('--quantized', type=int, default=0,
                         help='0:quantization way one Ternarized weight and 8bit activation')
     parser.add_argument('--a-bit', type=int, default=8,
                         help='a-bit')
@@ -935,7 +935,7 @@ if __name__ == '__main__':
     if not opt.evolve:  # Train normally
         print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
         tb_writer = SummaryWriter(comment=opt.name)
-        if opt.quantized != -1:
+        if opt.quantized != 0:
             times = 2 * math.log(32 / opt.a_bit, 2)
             print('<.....................using warm up.......................>')
             for i in range(0, int(times)):
@@ -981,6 +981,7 @@ if __name__ == '__main__':
                     WarmupForQ(hyp, step=i, a_bit=a_bit, w_bit=w_bit)
                 else:
                     print("Quantization bits are limited 16, 8, 4, 2 !")
+            hyp['lr0'] = hyp['lr0'] * 0.1
         train(hyp)  # train normally
 
     else:  # Evolve hyperparameters (optional)

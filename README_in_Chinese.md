@@ -361,7 +361,7 @@ python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size .
 `--quantized 1` 使用Google白皮书8位定点量化方法
 
 ```bash
-python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 3
+python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 1
 ```
 
 加入`--BN_Flod`使用BN融合训练，加入`--FPGA`使用针对FPGA的pow(2)量化。

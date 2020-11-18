@@ -368,7 +368,7 @@ python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size .
 `--quantized 1` Google quantization method
 
 ```bash
-python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 3
+python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 1
 ```
 
 `--BN_Flod` using BN Flod training, `--FPGA` Pow(2) quantization for FPGA.

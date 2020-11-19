@@ -38,7 +38,7 @@ class activation_quantize(nn.Module):
             print('！Binary quantization is not supported ！')
             assert self.a_bits != 1
         else:
-            output = torch.clamp(input * (2 ** -3), 0, 1)  # 特征A截断前先进行缩放（* 0.1），以减小截断误差
+            output = torch.clamp(input * 0.1, 0, 1)  # 特征A截断前先进行缩放（* 0.1），以减小截断误差
             scale = float(2 ** self.a_bits - 1)
             output = output * scale
             output = self.round(output)

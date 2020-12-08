@@ -654,7 +654,7 @@ def load_darknet_weights(self, weights, cutoff=-1, pt=False, BN_Fold=False):
         elif mdef['type'] == 'depthwise':
             depthwise_layer = module[0]
             if mdef['batch_normalize']:
-                if FPGA or BN_Fold:
+                if BN_Fold:
                     # Load BN bias, weights, running mean and running variance
                     num_b = conv_layer.beta.numel()
                     # Bias

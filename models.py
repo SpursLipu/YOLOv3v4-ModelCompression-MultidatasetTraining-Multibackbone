@@ -337,7 +337,7 @@ class YOLOLayer(nn.Module):
         self.anchor_vec = self.anchors / self.stride
         self.anchor_wh = self.anchor_vec.view(1, self.na, 1, 1, 2)
         if quantized == 1 and FPGA:
-            self.register_buffer('scale', torch.zeros(1))
+            self.register_buffer('scale', torch.zeros(torch.Size([])))
             self.a_bits = a_bit
 
         if ONNX_EXPORT:

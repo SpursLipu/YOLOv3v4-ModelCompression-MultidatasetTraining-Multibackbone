@@ -131,8 +131,9 @@ class Quantizer(nn.Module):
             print('！Binary quantization is not supported ！')
             assert self.bits != 1
         else:
-            self.range_tracker(input)
-            self.update_params()
+            if self.training == True:
+                self.range_tracker(input)
+                self.update_params()
             output = self.quantize(input, first)  # 量化
             output = self.round(output)
             output = self.clamp(output)  # 截断

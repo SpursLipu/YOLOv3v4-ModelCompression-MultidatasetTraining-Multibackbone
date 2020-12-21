@@ -981,6 +981,7 @@ if __name__ == '__main__':
                     WarmupForQ(hyp, step=i, a_bit=a_bit, w_bit=w_bit)
                 else:
                     print("Quantization bits are limited 16, 8, 4, 2 !")
+            # The learning rate decreases tenfold after quantification
             hyp['lr0'] = hyp['lr0'] * 0.1
         train(hyp)  # train normally
 

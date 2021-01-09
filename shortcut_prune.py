@@ -140,6 +140,7 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str, default='weights/last.pt', help='sparse model weights')
     parser.add_argument('--percent', type=float, default=0.6, help='channel prune percent')
     parser.add_argument('--img-size', type=int, default=608, help='inference size (pixels)')
+    parser.add_argument('--batch-size', type=int, default=16, help='batch-size')
     opt = parser.parse_args()
     print(opt)
 
@@ -159,7 +160,7 @@ if __name__ == '__main__':
     valid_path = data_config["valid"]
     class_names = load_classes(data_config["names"])
     # 测试模型
-    eval_model = lambda model: test(model=model, imgsz=opt.img_size, cfg=opt.cfg, data=opt.data)
+    eval_model = lambda model: test(model=model, imgsz=opt.img_size, cfg=opt.cfg, data=opt.data,batch_size=opt.batch_size)
     # 获取参数总数
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 

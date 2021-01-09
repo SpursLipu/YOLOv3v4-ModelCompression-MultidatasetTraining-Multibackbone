@@ -1,7 +1,5 @@
 # YOLOv3-ModelCompression-MultidatasetTraining
 
-[README in chinese](https://github.com/SpursLipu/YOLOv3v4-ModelCompression-MultidatasetTraining-Multibackbone/blob/master/README_in_Chinese.md)
-
 This project mainly include three parts.
 
 1.Provides training methods for multiple mainstream object detection datasets(coco2017, coco2014, BDD100k, Visdrone,

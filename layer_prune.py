@@ -63,7 +63,8 @@ if __name__ == '__main__':
     parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
     opt = parser.parse_args()
     print(opt)
-
+    
+    assert opt.cfg.find("mobilenet") == -1, "Mobilenet doesn't support layer pruning!"
     img_size = opt.img_size
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Darknet(opt.cfg, (img_size, img_size)).to(device)

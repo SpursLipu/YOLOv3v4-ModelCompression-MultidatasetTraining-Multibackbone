@@ -139,6 +139,7 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str, default='weights/last.pt', help='sparse model weights')
     parser.add_argument('--percent', type=float, default=0.5, help='global channel prune percent')
     parser.add_argument('--img-size', type=int, default=608, help='inference size (pixels)')
+    parser.add_argument('--batch-size', type=int, default=16, help='batch-size')
     opt = parser.parse_args()
     print(opt)
 
@@ -162,7 +163,7 @@ if __name__ == '__main__':
     valid_path = data_config["valid"]
     class_names = load_classes(data_config["names"])
 
-    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, imgsz=opt.img_size)
+    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data,batch_size=opt.batch_size,imgsz=opt.img_size)
 
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
@@ -187,7 +188,7 @@ if __name__ == '__main__':
     highest_thre = min(highest_thre)
 
     # 找到highest_thre对应的下标对应的百分比
-    percent_limit = (sorted_bn == highest_thre).nonzero().item() / len(bn_weights)
+    percent_limit = (sorted_bn == highest_thre).nonzero(as_tuple=False).item() / len(bn_weights)
 
     print(f'Threshold should be less than {highest_thre:.4f}.')
     print(f'The corresponding prune ratio is {percent_limit:.3f}.')

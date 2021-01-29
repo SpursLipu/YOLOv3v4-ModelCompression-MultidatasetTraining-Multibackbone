@@ -432,32 +432,6 @@ def compute_loss(p, targets, model):  # predictions, targets, model
     return loss, torch.cat((lbox, lobj, lcls, loss)).detach()
 
 
-def compute_loss_ssd(cls_logits, bbox_pred, gt_labels, gt_boxes):
-    """Compute classification loss and smooth l1 loss.
-
-            Args:
-                confidence (batch_size, num_priors, num_classes): class predictions.
-                predicted_locations (batch_size, num_priors, 4): predicted locations.
-                labels (batch_size, num_priors): real labels of all the priors.
-                gt_locations (batch_size, num_priors, 4): real boxes corresponding all the priors.
-            """
-    num_classes = cls_logits.size(2)
-    with torch.no_grad():
-        # derived from cross_entropy=sum(log(p))
-        loss = -F.log_softmax(cls_logits, dim=2)[:, :, 0]
-        mask = box_utils.hard_negative_mining(loss, gt_labels, 3)
-
-    confidence = cls_logits[mask, :]
-    classification_loss = F.cross_entropy(confidence.view(-1, num_classes), gt_labels[mask], reduction='sum')
-
-    pos_mask = gt_labels > 0
-    predicted_locations = bbox_pred[pos_mask, :].view(-1, 4)
-    gt_locations = gt_boxes[pos_mask, :].view(-1, 4)
-    smooth_l1_loss = F.smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')
-    num_pos = gt_locations.size(0)
-    return smooth_l1_loss / num_pos, classification_loss / num_pos
-
-
 def compute_lost_KD(output_s, output_t, num_classes, batch_size):
     T = 3.0
     Lambda_ST = 0.001
@@ -713,6 +687,35 @@ def compute_lost_KD6(model, targets, output_s, output_t, batch_size):
     lfeature = criterion_st(nn.functional.log_softmax(feature_s / T, dim=1),
                             nn.functional.softmax(feature_t / T, dim=1)) * (T * T) / batch_size
     return lfeature * Lambda_feature
+
+
+def Failure_Case_Loss_FM(masks, imgs, targets):
+    criterion = torch.nn.KLDivLoss(reduction='sum')
+    if masks == None:
+        return torch.zeros([1]).to(imgs.device)
+    PBI = 0
+    PBO = 0
+    masks_target = []
+    for i in range(masks.size(0)):
+        mask = masks[i]
+        pbi = torch.sum(mask[0]) / (mask.shape[1] * mask.shape[2])
+        PBI = PBI + pbi
+        target = targets[targets[:, 0] == i]
+        # mask_target = torch.zeros((3, mask.shape[1], mask.shape[2])).to(mask.device)
+        for object in target:
+            x, y = mask.shape[1] * float(object[2]), mask.shape[2] * float(object[3])
+            w, h = mask.shape[1] * float(object[4]), mask.shape[2] * float(object[5])
+            mask_object = torch.zeros((3, mask.shape[1], mask.shape[2])).to(mask.device)
+            mask_object[:, round(y - h / 2):round(y + h / 2), round(x - w / 2):round(x + w / 2)] = 1
+            pbo = torch.sum((mask * mask_object)) / torch.sum(mask_object)
+            PBO = PBO + pbo
+            # mask_target = mask_target + mask_object
+        # masks_target.append(mask_target.unsqueeze(0))
+    # masks_target = torch.cat(masks_target, dim=0)
+    PBI = PBI / imgs.shape[0]
+    PBO = PBO / targets.shape[0]
+    # return criterion(masks*imgs, masks_target*imgs)#, PBI, PBO
+    return PBI + 1/PBO
 
 
 def build_targets(p, targets, model):

@@ -265,6 +265,7 @@ if __name__ == '__main__':
     print(f'Config file has been saved: {pruned_cfg_file}')
 
     compact_model_name = opt.weights.replace('/', f'/prune_{str(percent)}_percent_')
-
+    if compact_model_name.endswith('.pt'):
+        compact_model_name = compact_model_name.replace('.pt', '.weights')
     save_weights(compact_model, path=compact_model_name)
     print(f'Compact model has been saved: {compact_model_name}')

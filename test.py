@@ -2,7 +2,7 @@ import argparse
 import json
 
 from torch.utils.data import DataLoader
-
+from torchsummary import summary
 from models import *
 from utils.datasets import *
 from utils.utils import *
@@ -52,10 +52,10 @@ def test(cfg,
 
         if device.type != 'cpu' and torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
+        summary(model, input_size=(3, imgsz, imgsz))
     else:  # called by train.py
         device = next(model.parameters()).device  # get model device
         verbose = False
-
     # Configure run
     data = parse_data_cfg(data)
     nc = 1 if single_cls else int(data['classes'])  # number of classes

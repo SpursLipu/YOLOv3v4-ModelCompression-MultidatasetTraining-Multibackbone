@@ -73,6 +73,7 @@ def train(hyp):
 
     # Image Sizes
     gs = 32  # (pixels) grid size
+    start_epoch = 0
     assert math.fmod(imgsz_min, gs) == 0, '--img-size %g must be a %g-multiple' % (imgsz_min, gs)
     opt.multi_scale |= imgsz_min != imgsz_max  # multi if different (min, max)
     if opt.multi_scale:
@@ -101,6 +102,17 @@ def train(hyp):
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
 
+    # print('<.....................using gridmask.......................>')
+    # gridmask = GridMask(d1=96, d2=224, rotate=360, ratio=0.6, mode=1, prob=0.8)
+    if opt.fencemask:
+        print('<.....................using fencemask.......................>')
+        # fencemask = FenceMask(img_size, [0, 0, 0], 0.8).to(device)
+        fencemask = FenceMask(batch_size, img_size, [0, 0, 0], 0.8).to(device)
+        max_epoch = int(epochs * 0.8)
+        pg_fencemask = []
+        for k,v in dict(fencemask.named_parameters()).items():
+            pg_fencemask +=[v]
+
     # Optimizer
     pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
     for k, v in dict(model.named_parameters()).items():
@@ -119,18 +131,14 @@ def train(hyp):
         optimizer = optim.SGD(pg0, lr=hyp['lr0'], momentum=hyp['momentum'], nesterov=True)
     optimizer.add_param_group({'params': pg1, 'weight_decay': hyp['weight_decay']})  # add pg1 with weight_decay
     optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
-    print('Optimizer groups: %g .bias, %g Conv2d.weight, %g other' % (len(pg2), len(pg1), len(pg0)))
+    if opt.fencemask:
+        optimizer.add_param_group({'params': pg_fencemask})  # add pg2 (biases)
+        print('Optimizer groups: %g .bias, %g Conv2d.weight,%g fencemask, %g other' % (len(pg2), len(pg1), len(pg_fencemask), len(pg0)))
+    else:
+        print('Optimizer groups: %g .bias, %g Conv2d.weight, %g other' % (len(pg2), len(pg1), len(pg0)))
     del pg0, pg1, pg2
 
-    # print('<.....................using gridmask.......................>')
-    # seed = int(img_size / 32)
-    # gridmask = GridMask(d1=96, d2=224, rotate=360, ratio=0.6, mode=1, prob=0.8)
 
-    print('<.....................using fencemask.......................>')
-    seed = int(img_size / 32)
-    fencemask = FenceMask(seed, seed * 3, seed * 4, seed * 8, [0, 0, 0], 0.8)
-    max_epoch = int(epochs * 0.8)
-    start_epoch = 0
     best_fitness = 0.0
     if weights != 'None':
         attempt_download(weights)
@@ -285,8 +293,9 @@ def train(hyp):
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
-        fencemask.set_prob(epoch, max_epoch)
-        # gridmask.set_prob(epoch, max_epoch)
+        if opt.fencemask:
+            fencemask.set_prob(epoch, max_epoch)
+            # gridmask.set_prob(epoch, max_epoch)
         model.train()
         # 稀疏化标志
         sr_flag = get_sr_flag(epoch, opt.sr)
@@ -324,12 +333,19 @@ def train(hyp):
                     ns = [math.ceil(x * sf / gs) * gs for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
             # Forward
-            imgs = fencemask(imgs)
-            # imgs = gridmask(imgs)
+            if opt.fencemask:
+                imgs, masks = fencemask(imgs)
+                # print(torch.sum(fencemask.masks))
+                imgs = imgs.detach()
+                # imgs = gridmask(imgs)
             targets = targets.to(device)
             pred, feature_s = model(imgs)
             # Loss
+
             loss, loss_items = compute_loss(pred, targets, model)
+            if opt.fencemask:
+                loss_FCLM = Failure_Case_Loss_FM(masks, imgs, targets)
+                loss = loss_FCLM + loss
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results
@@ -365,6 +381,7 @@ def train(hyp):
                     scaled_loss.backward()
             else:
                 loss.backward()
+                # print(torch.sum(fencemask.masks.grad))
             # 对要剪枝层的γ参数稀疏化
             if hasattr(model, 'module'):
                 if opt.prune != -1:
@@ -387,8 +404,8 @@ def train(hyp):
             pbar.set_description(s)
 
             # Plot
-            if ni < 1:
-                f = 'train_batch%g.jpg' % i  # filename
+            if i == 0:
+                f = 'train_sample/train_batch%g.jpg' % epoch  # filename
                 res = plot_images(images=imgs, targets=targets, paths=paths, fname=f)
                 if tb_writer:
                     tb_writer.add_image(f, res, dataformats='HWC', global_step=epoch)
@@ -918,6 +935,7 @@ if __name__ == '__main__':
                         help='w-bit')
     parser.add_argument('--BN_Fold', action='store_true', help='BN_Fold')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
+    parser.add_argument('--fencemask', action='store_true', help='fencemask')
 
     opt = parser.parse_args()
     opt.weights = last if opt.resume else opt.weights

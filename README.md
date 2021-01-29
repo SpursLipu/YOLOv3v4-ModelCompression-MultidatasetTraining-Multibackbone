@@ -392,6 +392,13 @@ In addition, you can get more compression by increasing the percent value in the
 |yolov3-mobilenet(fine tuning)   |22.75M   |0.812   |0.0345s   |0.97   |2.75M  |0.803 |0.0208s |
 |yolov3tiny(fine tuning)         |8.27M    |0.708   |0.0144s   |0.5    |1.82M  |0.703 |0.0122s |
 
+3.shortcut pruning oxfordhand，img_size = 608，test ong GTX2080Ti*4
+
+|<center>model</center> |<center>parameter before pruning</center> |<center>mAP before pruning</center>|<center>inference time before pruning</center>|<center>percent</center> |<center>parameter after pruning</center> |<center>mAP after pruning</center> |<center>inference time after pruning</center>
+| --- | --- | --- | --- | --- | --- | --- | --- |
+|yolov3           |58.67M   |0.806   |   |0.8    |6.35M  |0.816 | |
+|yolov4           |60.94M   |0.896   |   |0.6    |13.97M |0.855 | |
+
 ## 2.quantization
 
 `--quantized 2` Dorefa quantization method
@@ -410,9 +417,15 @@ python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size .
 
 ### experiment
 
-oxfordhand, yolov3, 640image-size |<center>method</center> |<center>mAP</center> | | --- | --- | |Baseline |0.847 |
-|Google8bit |0.851 | |Google8bit + BN Flod |0.851 | |Google8bit + BN Flod + FPGA |0.852 | |Google4bit + BN Flod + FPGA
-|0.842 |
+oxfordhand, yolov3, 640image-size
+
+|<center>method</center> |<center>mAP</center> |
+| --- | --- |
+|Baseline                     |0.847    |
+|Google8bit                   |0.851    |
+|Google8bit + BN Flod         |0.851    |
+|Google8bit + BN Flod + FPGA  |0.852    |
+|Google4bit + BN Flod + FPGA  |0.842    |
 
 ## 3.Knowledge Distillation
 

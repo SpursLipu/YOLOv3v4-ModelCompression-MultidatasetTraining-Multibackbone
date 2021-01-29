@@ -13,7 +13,7 @@ import torch
 from PIL import Image, ExifTags
 from torch.utils.data import Dataset
 from tqdm import tqdm
-
+from torch.autograd import Function
 from utils.utils import xyxy2xywh, xywh2xyxy
 
 help_url = 'https://github.com/ultralytics/yolov3/wiki/Train-Custom-Data'
@@ -739,88 +739,158 @@ def cutout(image, labels):
 
     return labels
 
+# class FenceMask(torch.nn.Module):
+#     def __init__(self, img_size, mean, probability=0.8):
+#         super(FenceMask, self).__init__()
+#         self.x = torch.nn.Parameter((0.25 - 0.05) * torch.rand(1) + 0.05, requires_grad=True)
+#         self.y = torch.nn.Parameter((0.25 - 0.05) * torch.rand(1) + 0.05, requires_grad=True)
+#         self.l1 = torch.nn.Parameter((0.25 - 0.05) * torch.rand(1) + 0.05, requires_grad=True)
+#         self.l2 = torch.nn.Parameter((0.25 - 0.05) * torch.rand(1) + 0.05, requires_grad=True)
+#         self.mean = mean
+#         self.probability = probability
+#         self.st_prob = self.prob = probability
+#         self.img_size = img_size
+#
+#     def set_prob(self, epoch, max_epoch):
+#         self.prob = self.st_prob * min(1, epoch / max_epoch)
+#
+#     def forward(self, x):
+#         if not self.training:
+#             return x
+#         n, c, h, w = x.size()
+#         imgs = []
+#         masks = []
+#         for i in range(n):
+#             img, mask = self.Fence(x[i])
+#             imgs.append(img)
+#             masks.append(mask)
+#         imgs = torch.cat(imgs).view(n, c, h, w)
+#         masks = torch.cat(masks).view(n, c, h, w)
+#         return imgs, masks
+#
+#     def Fence(self, img):
+#         if random.uniform(0, 1) > self.prob:
+#             mask = img.new_ones(img.shape)
+#             return img, mask
+#
+#         sp = img.shape
+#         height, width = sp[1], sp[2]
+#
+#         # mask_1代表横着的条纹，mask_2代表竖着的条纹
+#         mask_1 = np.ones(shape=(sp[1], sp[2], 3))
+#         mask_2 = np.ones(shape=(sp[1], sp[2], 3))
+#         x, y, l1, l2 = int(self.x * self.img_size), int(self.y * self.img_size), int(self.l1 * self.img_size), int(self.l2 * self.img_size)
+#         for i in range(1, height // (l1 + x) + 1):
+#             mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 0] = self.mean[0]
+#             mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 1] = self.mean[1]
+#             mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 2] = self.mean[2]
+#         for i in range(1, width // (l2 + y) + 1):
+#             mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 0] = self.mean[0]
+#             mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 1] = self.mean[1]
+#             mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 2] = self.mean[2]
+#
+#         # 将生成的两个mask随机旋转一定角度
+#         center = (width / 2, height / 2)
+#         rotation_1, rotation_2 = random.randint(0, 360), random.randint(0, 360)
+#         M_1 = cv2.getRotationMatrix2D(center, rotation_1, 2)
+#         M_2 = cv2.getRotationMatrix2D(center, rotation_2, 2)
+#         mask_1 = cv2.warpAffine(mask_1, M_1, (width, height))
+#         mask_2 = cv2.warpAffine(mask_2, M_2, (width, height))
+#
+#         mask = (mask_1 * mask_2)
+#         # cv2.imwrite('mask.png', mask * 255)
+#         mask = mask.transpose(2, 0, 1)
+#         mask = torch.from_numpy(mask).float().cuda()
+#         img = img * mask
+#         return img, mask
 
-class Fence(object):
+class Binarize(Function):
+    @staticmethod
+    def forward(cxt, input):
+        cxt.save_for_backward(input)
+        output = input.new(input.size())
+        output[input >= 0.5] = 1
+        output[input < 0.5] = 0
+        return output
 
-    def __init__(self, l, m, ll, lm, mean, probability=0.8):
-        # x为竖线的宽度，
-        # y为横线的宽度
-        # l1为竖线的间距
-        # l2为横线的间距
-        # mean为从随机擦除借鉴
-        # probability为是否mask的概率
+    @staticmethod
+    def backward(cxt, grad_output):
+        # input = cxt.saved_tensors
+        grad_input = grad_output.clone()
+        # grad_input[input < -1] = 0
+        # grad_input[input >= 1] = 0
+        return grad_input
 
-        self.mean = mean
-        self.x = random.randint(l, m)
-        self.y = random.randint(l, m)
-        self.l1 = random.randint(ll, lm)
-        self.l2 = random.randint(ll, lm)
-        self.mean = mean
+
+binarize = Binarize.apply
+
+class FenceMask(torch.nn.Module):
+    def __init__(self, batch_size, img_size, mean, probability):
+        super(FenceMask, self).__init__()
+        self.img_size = img_size
+        self.batch_size = batch_size
+        self.mean =mean
+        masks = []
+        for k in range(batch_size):
+            x = random.randint(self.img_size/32, self.img_size*3/32)
+            y = random.randint(self.img_size/32, self.img_size*3/32)
+            l1 = random.randint(self.img_size/8, self.img_size/4)
+            l2 = random.randint(self.img_size/8, self.img_size/4)
+            # mask_1代表横着的条纹，mask_2代表竖着的条纹
+            mask_1 = np.ones(shape=(self.img_size, self.img_size, 3))
+            mask_2 = np.ones(shape=(self.img_size, self.img_size, 3))
+            height = self.img_size
+            width = self.img_size
+            for i in range(1, height // (l1 + x) + 1):
+                mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 0] = mean[0]
+                mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 1] = mean[1]
+                mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 2] = mean[2]
+            for i in range(1, width // (l2 + y) + 1):
+                mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 0] = mean[0]
+                mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 1] = mean[1]
+                mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 2] = mean[2]
+            # 将生成的两个mask随机旋转一定角度
+            center = (width / 2, height / 2)
+            rotation_1, rotation_2 = random.randint(0, 360), random.randint(0, 360)
+            M_1 = cv2.getRotationMatrix2D(center, rotation_1, 2)
+            M_2 = cv2.getRotationMatrix2D(center, rotation_2, 2)
+            mask_1 = cv2.warpAffine(mask_1, M_1, (width, height))
+            mask_2 = cv2.warpAffine(mask_2, M_2, (width, height))
+
+            mask = (mask_1 * mask_2)
+            # cv2.imwrite('mask.png', mask * 255)
+            mask = mask.transpose(2, 0, 1)
+            mask = torch.from_numpy(mask).unsqueeze(0)
+            masks.append(mask)
+        masks = torch.cat(masks, dim=0).int()
+        mask_white = (0.5 * torch.rand((batch_size, 3, img_size, img_size)) + 0.5) * masks
+        mask_black = (0.5 * torch.rand((batch_size, 3, img_size, img_size))) * (1-masks)
+        self.masks = torch.nn.Parameter(mask_black+mask_white, requires_grad=True)
         self.st_prob = self.prob = probability
+
+    def forward(self, x):
+        masks = None
+        if random.uniform(0, 1) > self.prob:
+            return x, masks
+        if x.size(0) != self.masks.size(0):
+            return x, masks
+        # for img in x:
+        #     img =img.cpu().detach().numpy()
+        #     image = img.transpose(1, 2, 0)
+        #     cv2.imshow('image', image)
+        #     cv2.waitKey(500)
+        # masks = binarize(self.masks)
+        masks = self.masks
+        # for img in (x*masks):
+        #     img = img.cpu().detach().numpy()
+        #     image = img.transpose(1, 2, 0)
+        #     cv2.imshow('image', image)
+        #     cv2.waitKey(500)
+
+        return x*masks, masks
 
     def set_prob(self, epoch, max_epoch):
         self.prob = self.st_prob * min(1, epoch / max_epoch)
-
-    def __call__(self, img):
-        if random.uniform(0, 1) > self.prob:
-            return img
-
-        sp = img.shape
-        height, width = sp[1], sp[2]
-
-        # mask_1代表横着的条纹，mask_2代表竖着的条纹
-        mask_1 = np.ones(shape=(sp[1], sp[2], 3))
-        mask_2 = np.ones(shape=(sp[1], sp[2], 3))
-        # mask_1 = np.random.normal(loc=1, scale=0.2, size=(sp[1], sp[2], 3))
-        # mask_2 = np.random.normal(loc=1, scale=0.2, size=(sp[1], sp[2], 3))
-        for i in range(1, height // (self.l1 + self.x) + 1):
-            mask_1[i * self.l1 + (i - 1) * self.x:i * (self.l1 + self.x):, 0:, 0] = self.mean[0]
-            mask_1[i * self.l1 + (i - 1) * self.x:i * (self.l1 + self.x):, 0:, 1] = self.mean[1]
-            mask_1[i * self.l1 + (i - 1) * self.x:i * (self.l1 + self.x):, 0:, 2] = self.mean[2]
-        for i in range(1, width // (self.l2 + self.y) + 1):
-            mask_2[0:, i * self.l2 + (i - 1) * self.y:i * (self.l2 + self.y), 0] = self.mean[0]
-            mask_2[0:, i * self.l2 + (i - 1) * self.y:i * (self.l2 + self.y), 1] = self.mean[1]
-            mask_2[0:, i * self.l2 + (i - 1) * self.y:i * (self.l2 + self.y), 2] = self.mean[2]
-
-        # 将生成的两个mask随机旋转一定角度
-        center = (width / 2, height / 2)
-        rotation_1, rotation_2 = random.randint(0, 360), random.randint(0, 360)
-        M_1 = cv2.getRotationMatrix2D(center, rotation_1, 2)
-        M_2 = cv2.getRotationMatrix2D(center, rotation_2, 2)
-        mask_1 = cv2.warpAffine(mask_1, M_1, (width, height))
-        mask_2 = cv2.warpAffine(mask_2, M_2, (width, height))
-
-        mask = (mask_1 * mask_2)
-        # cv2.imwrite('mask.png', mask * 255)
-        mask = mask.transpose(2, 0, 1)
-        mask = torch.from_numpy(mask).float().cuda()
-        img = img * mask
-        return img
-
-
-class FenceMask(torch.nn.Module):
-    def __init__(self, l, m, ll, lm, mean, probability=0.8):
-        super(FenceMask, self).__init__()
-        self.l = l
-        self.m = m
-        self.ll = ll
-        self.lm = lm
-        self.mean = mean
-        self.probability = probability
-        self.Fence = Fence(l, m, ll, lm, mean, probability)
-
-    def set_prob(self, epoch, max_epoch):
-        self.Fence.set_prob(epoch, max_epoch)
-
-    def forward(self, x):
-        if not self.training:
-            return x
-        n, c, h, w = x.size()
-        y = []
-        for i in range(n):
-            y.append(self.Fence(x[i]))
-        y = torch.cat(y).view(n, c, h, w)
-        return y
 
 class Grid(object):
     def __init__(self, d1, d2, rotate=1, ratio=0.5, mode=0, prob=1.):

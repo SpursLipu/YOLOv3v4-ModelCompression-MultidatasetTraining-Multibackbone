@@ -186,6 +186,9 @@ if __name__ == '__main__':
         if line.split(' = ')[0] == 'anchors':
             anchor = line.split(' = ')[1]
             break
+        if line.split('=')[0] == 'anchors':
+            anchor = line.split('=')[1]
+            break
     file.close()
     for item in compact_module_defs:
         if item['type'] == 'shortcut':

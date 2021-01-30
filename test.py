@@ -52,7 +52,7 @@ def test(cfg,
 
         if device.type != 'cpu' and torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
-        summary(model, input_size=(3, imgsz, imgsz))
+        # summary(model, input_size=(3, imgsz, imgsz))
     else:  # called by train.py
         device = next(model.parameters()).device  # get model device
         verbose = False

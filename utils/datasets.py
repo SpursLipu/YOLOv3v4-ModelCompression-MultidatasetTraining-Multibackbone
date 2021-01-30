@@ -804,75 +804,62 @@ def cutout(image, labels):
 #         img = img * mask
 #         return img, mask
 
-class Binarize(Function):
-    @staticmethod
-    def forward(cxt, input):
-        cxt.save_for_backward(input)
-        output = input.new(input.size())
-        output[input >= 0.5] = 1
-        output[input < 0.5] = 0
-        return output
-
-    @staticmethod
-    def backward(cxt, grad_output):
-        # input = cxt.saved_tensors
-        grad_input = grad_output.clone()
-        # grad_input[input < -1] = 0
-        # grad_input[input >= 1] = 0
-        return grad_input
-
-
-binarize = Binarize.apply
-
 class FenceMask(torch.nn.Module):
     def __init__(self, batch_size, img_size, mean, probability):
         super(FenceMask, self).__init__()
         self.img_size = img_size
         self.batch_size = batch_size
         self.mean =mean
-        masks = []
-        for k in range(batch_size):
-            x = random.randint(self.img_size/32, self.img_size*3/32)
-            y = random.randint(self.img_size/32, self.img_size*3/32)
-            l1 = random.randint(self.img_size/8, self.img_size/4)
-            l2 = random.randint(self.img_size/8, self.img_size/4)
-            # mask_1代表横着的条纹，mask_2代表竖着的条纹
-            mask_1 = np.ones(shape=(self.img_size, self.img_size, 3))
-            mask_2 = np.ones(shape=(self.img_size, self.img_size, 3))
-            height = self.img_size
-            width = self.img_size
-            for i in range(1, height // (l1 + x) + 1):
-                mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 0] = mean[0]
-                mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 1] = mean[1]
-                mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 2] = mean[2]
-            for i in range(1, width // (l2 + y) + 1):
-                mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 0] = mean[0]
-                mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 1] = mean[1]
-                mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 2] = mean[2]
-            # 将生成的两个mask随机旋转一定角度
-            center = (width / 2, height / 2)
-            rotation_1, rotation_2 = random.randint(0, 360), random.randint(0, 360)
-            M_1 = cv2.getRotationMatrix2D(center, rotation_1, 2)
-            M_2 = cv2.getRotationMatrix2D(center, rotation_2, 2)
-            mask_1 = cv2.warpAffine(mask_1, M_1, (width, height))
-            mask_2 = cv2.warpAffine(mask_2, M_2, (width, height))
+        self.group_size = 10
+        self.group_number = None
+        group_masks = []
+        for j in range(self.group_size):
+            masks = []
+            for k in range(batch_size):
+                x = random.randint(self.img_size/32, self.img_size/16)
+                y = random.randint(self.img_size/32, self.img_size/16)
+                l1 = random.randint(self.img_size/16, self.img_size/8)
+                l2 = random.randint(self.img_size/16, self.img_size/8)
+                # mask_1代表横着的条纹，mask_2代表竖着的条纹
+                mask_1 = np.ones(shape=(self.img_size, self.img_size, 3))
+                mask_2 = np.ones(shape=(self.img_size, self.img_size, 3))
+                height = self.img_size
+                width = self.img_size
+                for i in range(1, height // (l1 + x) + 1):
+                    mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 0] = mean[0]
+                    mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 1] = mean[1]
+                    mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 2] = mean[2]
+                for i in range(1, width // (l2 + y) + 1):
+                    mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 0] = mean[0]
+                    mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 1] = mean[1]
+                    mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 2] = mean[2]
+                # 将生成的两个mask随机旋转一定角度
+                center = (width / 2, height / 2)
+                rotation_1, rotation_2 = random.randint(0, 360), random.randint(0, 360)
+                M_1 = cv2.getRotationMatrix2D(center, rotation_1, 2)
+                M_2 = cv2.getRotationMatrix2D(center, rotation_2, 2)
+                mask_1 = cv2.warpAffine(mask_1, M_1, (width, height))
+                mask_2 = cv2.warpAffine(mask_2, M_2, (width, height))
 
-            mask = (mask_1 * mask_2)
-            # cv2.imwrite('mask.png', mask * 255)
-            mask = mask.transpose(2, 0, 1)
-            mask = torch.from_numpy(mask).unsqueeze(0)
-            masks.append(mask)
-        masks = torch.cat(masks, dim=0).int()
-        mask_white = (0.5 * torch.rand((batch_size, 3, img_size, img_size)) + 0.5) * masks
-        mask_black = (0.5 * torch.rand((batch_size, 3, img_size, img_size))) * (1-masks)
-        self.masks = torch.nn.Parameter(mask_black+mask_white, requires_grad=True)
+                mask = (mask_1 * mask_2)
+                # cv2.imwrite('mask.png', mask * 255)
+                mask = mask.transpose(2, 0, 1)
+                mask = torch.from_numpy(mask).unsqueeze(0)
+                masks.append(mask)
+            masks = torch.cat(masks, dim=0).int()
+            mask_white = (0.5 * torch.rand((batch_size, 3, img_size, img_size)) + 0.5) * masks
+            mask_black = (0.5 * torch.rand((batch_size, 3, img_size, img_size))) * (1-masks)
+            masks = mask_black+mask_white
+            group_masks.append(masks.unsqueeze(0))
+        group_masks = torch.cat(group_masks, dim=0)
+        self.group_masks = torch.nn.Parameter(group_masks, requires_grad=True)
         self.st_prob = self.prob = probability
 
     def forward(self, x):
         masks = None
         if random.uniform(0, 1) > self.prob:
             return x, masks
-        if x.size(0) != self.masks.size(0):
+        if x.size(0) != self.group_masks.size(1):
             return x, masks
         # for img in x:
         #     img =img.cpu().detach().numpy()
@@ -880,7 +867,8 @@ class FenceMask(torch.nn.Module):
         #     cv2.imshow('image', image)
         #     cv2.waitKey(500)
         # masks = binarize(self.masks)
-        masks = self.masks
+        self.group_number = random.randrange(self.group_size)
+        masks = self.group_masks[self.group_number]
         # for img in (x*masks):
         #     img = img.cpu().detach().numpy()
         #     image = img.transpose(1, 2, 0)

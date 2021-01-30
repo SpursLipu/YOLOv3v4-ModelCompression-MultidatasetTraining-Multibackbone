@@ -695,7 +695,7 @@ def Failure_Case_Loss_FM(masks, imgs, targets):
         return torch.zeros([1]).to(imgs.device)
     PBI = 0
     PBO = 0
-    masks_target = []
+    # masks_target = []
     for i in range(masks.size(0)):
         mask = masks[i]
         pbi = torch.sum(mask[0]) / (mask.shape[1] * mask.shape[2])
@@ -715,8 +715,10 @@ def Failure_Case_Loss_FM(masks, imgs, targets):
     PBI = PBI / imgs.shape[0]
     PBO = PBO / targets.shape[0]
     # return criterion(masks*imgs, masks_target*imgs)#, PBI, PBO
-    return PBI + 1/PBO
-
+    fence_imgs = F.log_softmax((masks * imgs).view(imgs.size(0), -1), dim=-1)
+    original_imgs = F.softmax(imgs.view(imgs.size(0), -1), dim=-1)
+    D_loss = criterion(fence_imgs, original_imgs)
+    return PBI + 1/PBO + D_loss
 
 def build_targets(p, targets, model):
     # targets = [image, class, x, y, w, h]

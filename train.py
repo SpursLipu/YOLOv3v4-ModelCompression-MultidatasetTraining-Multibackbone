@@ -106,7 +106,6 @@ def train(hyp):
     # gridmask = GridMask(d1=96, d2=224, rotate=360, ratio=0.6, mode=1, prob=0.8)
     if opt.fencemask:
         print('<.....................using fencemask.......................>')
-        # fencemask = FenceMask(img_size, [0, 0, 0], 0.8).to(device)
         fencemask = FenceMask(batch_size, img_size, [0, 0, 0], 0.8).to(device)
         max_epoch = int(epochs * 0.8)
         pg_fencemask = []
@@ -206,7 +205,7 @@ def train(hyp):
     # Initialize distributed training
     if device.type != 'cpu' and torch.cuda.device_count() > 1 and torch.distributed.is_available():
         dist.init_process_group(backend='nccl',  # 'distributed backend'
-                                init_method='tcp://127.0.0.1:9999',  # distributed training init method
+                                init_method='tcp://127.0.0.1:9998',  # distributed training init method
                                 world_size=1,  # number of nodes for distributed training
                                 rank=0)  # distributed training node rank
         model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
@@ -345,7 +344,7 @@ def train(hyp):
             loss, loss_items = compute_loss(pred, targets, model)
             if opt.fencemask:
                 loss_FCLM = Failure_Case_Loss_FM(masks, imgs, targets)
-                loss = loss_FCLM + loss
+                loss = loss + loss_FCLM
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results
@@ -381,7 +380,7 @@ def train(hyp):
                     scaled_loss.backward()
             else:
                 loss.backward()
-                # print(torch.sum(fencemask.masks.grad))
+                # print(torch.sum(fencemask.group_masks.grad))
             # 对要剪枝层的γ参数稀疏化
             if hasattr(model, 'module'):
                 if opt.prune != -1:
@@ -389,7 +388,9 @@ def train(hyp):
             else:
                 if opt.prune != -1:
                     BNOptimizer.updateBN(sr_flag, model.module_list, opt.s, prune_idx)
-
+            if opt.fencemask:
+                if masks !=None:
+                    fencemask.group_masks.grad.add_(0.0001 * torch.sign(fencemask.group_masks.data))
             # Optimize
             if ni % accumulate == 0:
                 optimizer.step()

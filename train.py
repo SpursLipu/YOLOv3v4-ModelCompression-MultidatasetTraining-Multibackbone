@@ -406,6 +406,8 @@ def train(hyp):
 
             # Plot
             if i == 0:
+                if not os.path.isdir('train_sample/'):
+                    os.makedirs('train_sample/')
                 f = 'train_sample/train_batch%g.jpg' % epoch  # filename
                 res = plot_images(images=imgs, targets=targets, paths=paths, fname=f)
                 if tb_writer:

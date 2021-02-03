@@ -13,6 +13,9 @@ Source using Pytorch implementation to [ultralytics/yolov3](https://github.com/u
 code. Pruning method based on BN layer
 by [coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning), thanks to both of you.
 
+** If you can't download weights file and datasets from BaiDu, please send e-mail(spurslipu@pku.edu.cn) to me, I will 
+reply as soon as I can. **
+
 # Update
 
 January 4, 2020. Provides download links and training methods to the Visdrone dataset.

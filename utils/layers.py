@@ -42,9 +42,9 @@ class FeatureConcat(nn.Module):
                 return outputs[self.layers[0]]
 
 
-class WeightedFeatureFusion(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
+class Shortcut(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
     def __init__(self, layers, weight=False):
-        super(WeightedFeatureFusion, self).__init__()
+        super(Shortcut, self).__init__()
         self.layers = layers  # layer indices
         self.weight = weight  # apply weights boolean
         self.n = len(layers) + 1  # number of layers

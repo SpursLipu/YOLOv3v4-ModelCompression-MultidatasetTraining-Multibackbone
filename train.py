@@ -106,7 +106,7 @@ def train(hyp):
     # gridmask = GridMask(d1=96, d2=224, rotate=360, ratio=0.6, mode=1, prob=0.8)
     if opt.fencemask:
         print('<.....................using fencemask.......................>')
-        fencemask = FenceMask(batch_size, img_size, [0, 0, 0], 0.8).to(device)
+        fencemask = FenceMask(batch_size, img_size, 1).to(device)
         max_epoch = int(epochs * 0.8)
         pg_fencemask = []
         for k,v in dict(fencemask.named_parameters()).items():
@@ -292,8 +292,8 @@ def train(hyp):
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
-        if opt.fencemask:
-            fencemask.set_prob(epoch, max_epoch)
+        #if opt.fencemask:
+            #fencemask.set_prob(epoch, max_epoch)
             # gridmask.set_prob(epoch, max_epoch)
         model.train()
         # 稀疏化标志
@@ -388,9 +388,9 @@ def train(hyp):
             else:
                 if opt.prune != -1:
                     BNOptimizer.updateBN(sr_flag, model.module_list, opt.s, prune_idx)
-            if opt.fencemask:
-                if masks !=None:
-                    fencemask.group_masks.grad.add_(0.0001 * torch.sign(fencemask.group_masks.data))
+            # if opt.fencemask:
+            #     if masks !=None:
+            #         fencemask.group_masks.grad.add_(0.0001 * torch.sign(fencemask.group_masks.data))
             # Optimize
             if ni % accumulate == 0:
                 optimizer.step()

@@ -805,11 +805,10 @@ def cutout(image, labels):
 #         return img, mask
 
 class FenceMask(torch.nn.Module):
-    def __init__(self, batch_size, img_size, mean, probability):
+    def __init__(self, batch_size, img_size, probability):
         super(FenceMask, self).__init__()
         self.img_size = img_size
         self.batch_size = batch_size
-        self.mean =mean
         self.group_size = 10
         self.group_number = None
         group_masks = []
@@ -826,13 +825,13 @@ class FenceMask(torch.nn.Module):
                 height = self.img_size
                 width = self.img_size
                 for i in range(1, height // (l1 + x) + 1):
-                    mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 0] = mean[0]
-                    mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 1] = mean[1]
-                    mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 2] = mean[2]
+                    mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 0] = 0
+                    mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 1] = 0
+                    mask_1[i * l1 + (i - 1) * x:i * (l1 + x):, 0:, 2] = 0
                 for i in range(1, width // (l2 + y) + 1):
-                    mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 0] = mean[0]
-                    mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 1] = mean[1]
-                    mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 2] = mean[2]
+                    mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 0] = 0
+                    mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 1] = 0
+                    mask_2[0:, i * l2 + (i - 1) * y:i * (l2 + y), 2] = 0
                 # 将生成的两个mask随机旋转一定角度
                 center = (width / 2, height / 2)
                 rotation_1, rotation_2 = random.randint(0, 360), random.randint(0, 360)

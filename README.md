@@ -14,7 +14,7 @@ code. Pruning method based on BN layer
 by [coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning), thanks to both of you.
 
 ** If you can't download weights file and datasets from BaiDu, please send e-mail(spurslipu@pku.edu.cn) to me, I will 
-reply as soon as I can. **
+rely as soon as I can. **
 
 # Update
 

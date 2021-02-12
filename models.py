@@ -540,7 +540,7 @@ class Darknet(nn.Module):
 
     def fuse(self, quantized=-1, BN_Fold=False, FPGA=False):
         # Fuse Conv2d + BatchNorm2d layers throughout model
-        if quantized == 2 or BN_Fold == True:
+        if quantized != -1 or BN_Fold == True:
             return
         print('Fusing layers...')
         fused_list = nn.ModuleList()

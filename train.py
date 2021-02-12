@@ -157,14 +157,15 @@ def train(hyp):
             # load optimizer
             if chkpt['optimizer'] is not None:
                 optimizer.load_state_dict(chkpt['optimizer'])
-                best_fitness = chkpt['best_fitness']
+                if chkpt.get('best_fitness') is not None:
+                    best_fitness = chkpt['best_fitness']
 
             # load results
             if chkpt.get('training_results') is not None:
                 with open(results_file, 'w') as file:
                     file.write(chkpt['training_results'])  # write results.txt
-
-            start_epoch = chkpt['epoch'] + 1
+            if chkpt.get('epoch') is not None:
+                start_epoch = chkpt['epoch'] + 1
             del chkpt
 
         elif len(weights) > 0:  # darknet format
@@ -535,7 +536,7 @@ def train(hyp):
 def WarmupForQ(hyp, step, a_bit, w_bit):
     cfg = opt.cfg
     data = opt.data
-    epochs = 5 + step * 5
+    epochs = 5
     batch_size = opt.batch_size
     accumulate = max(round(64 / batch_size), 1)  # accumulate n times before optimizer update (bs 64)
     if step > 0:
@@ -613,14 +614,11 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
             # load optimizer
             if chkpt['optimizer'] is not None:
                 optimizer.load_state_dict(chkpt['optimizer'])
-                best_fitness = chkpt['best_fitness']
 
             # load results
             if chkpt.get('training_results') is not None:
                 with open(results_file, 'w') as file:
                     file.write(chkpt['training_results'])  # write results.txt
-
-            start_epoch = chkpt['epoch'] + 1
             del chkpt
 
         elif len(weights) > 0:  # darknet format
@@ -865,9 +863,7 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
                 model_temp = model.state_dict()
         if save:
             with open(results_file, 'r') as f:  # create checkpoint
-                chkpt = {'epoch': epoch,
-                         'best_fitness': best_fitness,
-                         'training_results': f.read(),
+                chkpt = {'training_results': f.read(),
                          'model': model_temp,
                          'optimizer': None if final_epoch else optimizer.state_dict()}
 

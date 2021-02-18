@@ -180,6 +180,7 @@ if __name__ == '__main__':
     parser.add_argument('--percent', type=float, default=0.6, help='global channel prune percent')
     parser.add_argument('--layer_keep', type=float, default=0.01, help='channel keep percent per layer')
     parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
+    parser.add_argument('--batch-size', type=int, default=16, help='batch-size')
     opt = parser.parse_args()
     print(opt)
 
@@ -194,7 +195,7 @@ if __name__ == '__main__':
         _ = load_darknet_weights(model, opt.weights)
     print('\nloaded weights from ', opt.weights)
 
-    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=16, imgsz=img_size)
+    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size, imgsz=img_size)
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
     print("\nlet's test the original model first:")

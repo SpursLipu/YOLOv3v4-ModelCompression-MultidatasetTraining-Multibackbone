@@ -265,7 +265,7 @@ def train(hyp):
                                              num_workers=nw,
                                              pin_memory=True,
                                              collate_fn=dataset.collate_fn)
-    if opt.sr:
+    if opt.prune != -1:
         for idx in prune_idx:
             if hasattr(model, 'module'):
                 bn_weights = gather_bn_weights(model.module.module_list, [idx])
@@ -298,8 +298,10 @@ def train(hyp):
             # gridmask.set_prob(epoch, max_epoch)
         model.train()
         # 稀疏化标志
-        sr_flag = get_sr_flag(epoch, opt.sr)
-
+        if opt.prune == -1:
+            sr_flag =False
+        else:
+            sr_flag = True
         # Update image weights (optional)
         if dataset.image_weights:
             w = model.class_weights.cpu().numpy() * (1 - maps) ** 2  # class weights
@@ -473,7 +475,7 @@ def train(hyp):
                     'val/giou_loss', 'val/obj_loss', 'val/cls_loss']
             for x, tag in zip(list(mloss[:-1]) + list(results), tags):
                 tb_writer.add_scalar(tag, x, epoch)
-            if opt.sr:
+            if opt.prune == -1:
                 if hasattr(model, 'module'):
                     bn_weights = gather_bn_weights(model.module.module_list, [idx])
                 else:
@@ -649,7 +651,7 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
     # Initialize distributed training
     if device.type != 'cpu' and torch.cuda.device_count() > 1 and torch.distributed.is_available():
         dist.init_process_group(backend='nccl',  # 'distributed backend'
-                                init_method='tcp://127.0.0.1:9999',  # distributed training init method
+                                init_method='tcp://127.0.0.1:9998',  # distributed training init method
                                 world_size=1,  # number of nodes for distributed training
                                 rank=0)  # distributed training node rank
         model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
@@ -837,12 +839,6 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
                     'val/giou_loss', 'val/obj_loss', 'val/cls_loss']
             for x, tag in zip(list(mloss[:-1]) + list(results), tags):
                 tb_writer.add_scalar(tag, x, epoch)
-            if opt.sr:
-                if hasattr(model, 'module'):
-                    bn_weights = gather_bn_weights(model.module.module_list, [idx])
-                else:
-                    bn_weights = gather_bn_weights(model.module_list, [idx])
-                tb_writer.add_histogram('bn_weights/hist', bn_weights.numpy(), epoch, bins='doane')
 
         # Update best mAP
         fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
@@ -919,8 +915,6 @@ if __name__ == '__main__':
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
     parser.add_argument('--ema', action='store_true', help='use ema')
     parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
-    parser.add_argument('--sparsity-regularization', '-sr', dest='sr', action='store_true',
-                        help='train with channel sparsity regularization')
     parser.add_argument('--pretrain', '-pt', dest='pt', action='store_true',
                         help='use pretrain model')
     parser.add_argument('--s', type=float, default=0.001, help='scale sparse rate')

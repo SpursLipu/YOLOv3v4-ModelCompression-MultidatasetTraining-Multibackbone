@@ -5,9 +5,6 @@ import numpy as np
 import torch.nn.functional as F
 
 
-def get_sr_flag(epoch, sr):
-    # return epoch >= 5 and sr
-    return sr
 
 
 def parse_module_defs2(module_defs):

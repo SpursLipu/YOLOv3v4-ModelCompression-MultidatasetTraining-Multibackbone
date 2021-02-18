@@ -2,7 +2,6 @@ import argparse
 import json
 
 from torch.utils.data import DataLoader
-from torchsummary import summary
 from models import *
 from utils.datasets import *
 from utils.utils import *

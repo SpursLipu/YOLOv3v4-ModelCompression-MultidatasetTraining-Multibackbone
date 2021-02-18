@@ -61,6 +61,7 @@ if __name__ == '__main__':
     parser.add_argument('--shortcuts', type=int, default=8, help='how many shortcut layers will be pruned,\
         pruning one shortcut will also prune two CBL,yolov3 has 23 shortcuts')
     parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
+    parser.add_argument('--batch-size', type=int, default=16, help='batch-size')
     opt = parser.parse_args()
     print(opt)
     
@@ -75,7 +76,7 @@ if __name__ == '__main__':
         load_darknet_weights(model, opt.weights)
     print('\nloaded weights from ', opt.weights)
 
-    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=16, imgsz=img_size)
+    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size, imgsz=img_size)
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
     with torch.no_grad():

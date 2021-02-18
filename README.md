@@ -319,7 +319,7 @@ python3 train.py --data ... -pt --batch-size ... --weights ... --cfg ...
 
 2.Sparse training
 
-`-sr`Sparse training，`--s`Specifies the sparsity factor，`--prune`Specify the sparsity type.
+`--s`Specifies the sparsity factor，`--prune`Specify the sparsity type.
 
 `--prune 0` is the sparsity of normal pruning and regular pruning.
 
@@ -330,7 +330,7 @@ python3 train.py --data ... -pt --batch-size ... --weights ... --cfg ...
 command：
 
 ```bash
-python3 train.py --data ... -pt --batch-size 32  --weights ... --cfg ... -sr --s 0.001 --prune 0 
+python3 train.py --data ... -pt --batch-size 32  --weights ... --cfg ... --s 0.001 --prune 0 
 ```
 
 3.Pruning

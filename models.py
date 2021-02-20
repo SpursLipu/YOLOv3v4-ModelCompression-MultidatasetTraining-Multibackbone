@@ -114,7 +114,10 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
                     modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
             if mdef['activation'] == 'leaky':
-                modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                if quantized != 0 and FPGA:
+                    modules.add_module('activation', nn.LeakyReLU(0.125, inplace=True))
+                else:
+                    modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
                 # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                 # modules.add_module('activation', Swish())
             if mdef['activation'] == 'relu6':

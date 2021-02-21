@@ -109,8 +109,8 @@ def train(hyp):
         fencemask = FenceMask(batch_size, img_size, 1).to(device)
         max_epoch = int(epochs * 0.8)
         pg_fencemask = []
-        for k,v in dict(fencemask.named_parameters()).items():
-            pg_fencemask +=[v]
+        for k, v in dict(fencemask.named_parameters()).items():
+            pg_fencemask += [v]
 
     # Optimizer
     pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
@@ -132,11 +132,11 @@ def train(hyp):
     optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
     if opt.fencemask:
         optimizer.add_param_group({'params': pg_fencemask})  # add pg2 (biases)
-        print('Optimizer groups: %g .bias, %g Conv2d.weight,%g fencemask, %g other' % (len(pg2), len(pg1), len(pg_fencemask), len(pg0)))
+        print('Optimizer groups: %g .bias, %g Conv2d.weight,%g fencemask, %g other' % (
+            len(pg2), len(pg1), len(pg_fencemask), len(pg0)))
     else:
         print('Optimizer groups: %g .bias, %g Conv2d.weight, %g other' % (len(pg2), len(pg1), len(pg0)))
     del pg0, pg1, pg2
-
 
     best_fitness = 0.0
     if weights != 'None':
@@ -293,13 +293,13 @@ def train(hyp):
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
-        #if opt.fencemask:
-            #fencemask.set_prob(epoch, max_epoch)
-            # gridmask.set_prob(epoch, max_epoch)
+        # if opt.fencemask:
+        # fencemask.set_prob(epoch, max_epoch)
+        # gridmask.set_prob(epoch, max_epoch)
         model.train()
         # 稀疏化标志
         if opt.prune == -1:
-            sr_flag =False
+            sr_flag = False
         else:
             sr_flag = True
         # Update image weights (optional)
@@ -475,7 +475,7 @@ def train(hyp):
                     'val/giou_loss', 'val/obj_loss', 'val/cls_loss']
             for x, tag in zip(list(mloss[:-1]) + list(results), tags):
                 tb_writer.add_scalar(tag, x, epoch)
-            if opt.prune == -1:
+            if opt.prune != -1:
                 if hasattr(model, 'module'):
                     bn_weights = gather_bn_weights(model.module.module_list, [idx])
                 else:

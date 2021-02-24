@@ -7,7 +7,7 @@ from utils.utils import *
 
 def detect(save_img=False):
     imgsz = (320, 192) if ONNX_EXPORT else opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
-    out, source, weights, half, view_img, save_txt = opt.output, opt.source, opt.weights, opt.half, opt.view_img, opt.save_txt
+    out, source, weights, view_img, save_txt = opt.output, opt.source, opt.weights, opt.view_img, opt.save_txt
     webcam = source == '0' or source.startswith('rtsp') or source.startswith('http') or source.endswith('.txt')
 
     # Initialize
@@ -27,19 +27,8 @@ def detect(save_img=False):
     else:  # darknet format
         load_darknet_weights(model, weights)
 
-    # Second-stage classifier
-    classify = False
-    if classify:
-        modelc = torch_utils.load_classifier(name='resnet101', n=2)  # initialize
-        modelc.load_state_dict(torch.load('weights/resnet101.pt', map_location=device)['model'])  # load weights
-        modelc.to(device).eval()
-
     # Eval mode
     model.to(device).eval()
-
-    # Fuse Conv2d + BatchNorm2d layers
-    if not opt.BN_Fold:
-        model.fuse()
 
     # Export mode
     if ONNX_EXPORT:
@@ -55,11 +44,6 @@ def detect(save_img=False):
         onnx.checker.check_model(model)  # Check that the IR is well formed
         print(onnx.helper.printable_graph(model.graph))  # Print a human readable representation of the graph
         return
-
-    # Half precision
-    half = half and device.type != 'cpu'  # half precision only supported on CUDA
-    if half:
-        model.half()
 
     # Set Dataloader
     vid_path, vid_writer = None, None
@@ -78,10 +62,10 @@ def detect(save_img=False):
     # Run inference
     t0 = time.time()
     img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
-    _ = model(img.half() if half else img.float()) if device.type != 'cpu' else None  # run once
+    _ = model(img.float()) if device.type != 'cpu' else None  # run once
     for path, img, im0s, vid_cap in dataset:
         img = torch.from_numpy(img).to(device)
-        img = img.half() if half else img.float()  # uint8 to fp16/32
+        img = img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
@@ -91,17 +75,9 @@ def detect(save_img=False):
         pred = model(img, augment=opt.augment)[0]
         t2 = torch_utils.time_synchronized()
 
-        # to float
-        if half:
-            pred = pred.float()
-
         # Apply NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres,
                                    multi_label=False, classes=opt.classes, agnostic=opt.agnostic_nms)
-
-        # Apply Classifier
-        if classify:
-            pred = apply_classifier(pred, modelc, img, im0s)
 
         # Process detections
         for i, det in enumerate(pred):  # detections for image i
@@ -177,7 +153,6 @@ if __name__ == '__main__':
     parser.add_argument('--conf-thres', type=float, default=0.3, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.6, help='IOU threshold for NMS')
     parser.add_argument('--fourcc', type=str, default='mp4v', help='output video codec (verify ffmpeg support)')
-    parser.add_argument('--half', action='store_true', help='half precision FP16 inference')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
     parser.add_argument('--view-img', action='store_true', help='display results')
     parser.add_argument('--save-txt', action='store_true', help='save results to *.txt')

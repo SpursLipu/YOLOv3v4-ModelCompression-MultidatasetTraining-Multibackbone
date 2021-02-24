@@ -293,8 +293,8 @@ def train(hyp):
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
-        # if opt.fencemask:
-        # fencemask.set_prob(epoch, max_epoch)
+        if opt.fencemask:
+            fencemask.set_prob(epoch, max_epoch)
         # gridmask.set_prob(epoch, max_epoch)
         model.train()
         # 稀疏化标志
@@ -336,12 +336,15 @@ def train(hyp):
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
             # Forward
             if opt.fencemask:
-                imgs, masks = fencemask(imgs)
+                fence_imgs, masks = fencemask(imgs)
                 # print(torch.sum(fencemask.masks))
-                imgs = imgs.detach()
+                fence_imgs = fence_imgs.detach()
                 # imgs = gridmask(imgs)
-            targets = targets.to(device)
-            pred, feature_s = model(imgs)
+                targets = targets.to(device)
+                pred, feature_s = model(fence_imgs)
+            else:
+                targets = targets.to(device)
+                pred, feature_s = model(imgs)
             # Loss
 
             loss, loss_items = compute_loss(pred, targets, model)

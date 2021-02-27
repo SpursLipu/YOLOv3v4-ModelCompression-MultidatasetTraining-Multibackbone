@@ -302,9 +302,9 @@ python3 train.py --data data/... --batch-size ... -pt --weights weights/yolov4.w
 
 |<center>method</center> |<center>advantage</center>|<center>disadvantage</center> |
 | --- | --- | --- |
-|Normal pruning        |Not prune for shortcut layer. It has a considerable and stable compression rate that requires no fine tuning.|The compression rate is limited.  |
+|Normal pruning        |Not prune for shortcut layer. It has a considerable and stable compression rate but requires no fine tuning.|The compression rate is limited.  |
 |Shortcut pruning      |Very high compression rate.  |Fine-tuning is necessary.  |
-|Silmming              |Shortcut fusion method was used to improve the precision of shear planting.|Best way for shortcut pruning|
+|Silmming              |Shortcut fusion method is used to improve the precision of shear planting.|Best way for shortcut pruning|
 |Regular pruning       |Designed for hardware deployment, the number of filters after pruning is a multiple of 2, no fine-tuning, support tiny-yolov3 and Mobilenet.|Part of the compression ratio is sacrificed for regularization. |
 |layer pruning         |ResBlock is used as the basic unit for purning, which is conducive to hardware deployment. |It can only cut backbone. |
 |layer-channel pruning |First, use channel pruning and then use layer pruning, and pruning rate was very high. |Accuracy may be affected. |

@@ -132,7 +132,7 @@ class Quantizer(nn.Module):
             if self.training == True:
                 self.range_tracker(input)
                 self.update_params()
-            output = self.quantize(input, first)  # 量化
+            output = self.quantize(input)  # 量化
             output = self.round(output)
             output = self.clamp(output)  # 截断
             output = self.dequantize(output)  # 反量化

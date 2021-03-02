@@ -160,11 +160,6 @@ def convert():
                             else:
                                 a = struct.pack('<f', i)
                         b_file.write(a)
-            if mdef['type'] == 'yolo':
-                yolo_layer = module
-                activate_scale = -math.log(yolo_layer.scale.data.numpy(), 2)
-                a = struct.pack('<i', int(activate_scale))
-                a_scale.write(a)
         if opt.quantized == 1:
             w_scale.close()
             a_scale.close()
@@ -174,6 +169,7 @@ def convert():
         b_file.close()
     # Eval mode
     model.to(device).eval()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

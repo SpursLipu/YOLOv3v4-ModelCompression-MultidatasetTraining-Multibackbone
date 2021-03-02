@@ -102,9 +102,7 @@ class Quantizer(nn.Module):
         raise NotImplementedError
 
     # 量化
-    def quantize(self, input, FPGA_first=False):
-        if FPGA_first:
-            self.scale = torch.tensor([2 ** (-(self.bits - 2))]).to(input.device)
+    def quantize(self, input):
         output = input / self.scale + self.zero_point
         return output
 
@@ -230,13 +228,10 @@ class QuantizedConv2d(nn.Conv2d):
 
     def forward(self, input):
         # 量化A和W
-        if input.shape[1] != 3:
-            input = self.activation_quantizer(input)
-        q_input = input
         q_weight = self.weight_quantizer(self.weight)
         # 量化卷积
         output = F.conv2d(
-            input=q_input,
+            input=input,
             weight=q_weight,
             bias=self.bias,
             stride=self.stride,
@@ -244,6 +239,7 @@ class QuantizedConv2d(nn.Conv2d):
             dilation=self.dilation,
             groups=self.groups
         )
+        output = self.activation_quantizer(output)
         return output
 
 
@@ -388,14 +384,11 @@ class BNFold_Conv2d_Q(QuantizedConv2d):
                 bias = self.bias
                 weight = self.weight
         # 量化A和bn融合后的W
-        if input.shape[1] != 3:
-            input = self.activation_quantizer(input)
-        q_input = input
         q_weight = self.weight_quantizer(weight)
         # 量化卷积
         if self.training:  # 训练态
             output = F.conv2d(
-                input=q_input,
+                input=input,
                 weight=q_weight,
                 bias=bias,
                 stride=self.stride,
@@ -413,7 +406,7 @@ class BNFold_Conv2d_Q(QuantizedConv2d):
             # output += reshape_to_activation(bias)
         else:  # 测试态
             output = F.conv2d(
-                input=q_input,
+                input=input,
                 weight=q_weight,
                 bias=bias,  # 注意，这里加bias，做完整的conv+bn
                 stride=self.stride,
@@ -421,6 +414,7 @@ class BNFold_Conv2d_Q(QuantizedConv2d):
                 dilation=self.dilation,
                 groups=self.groups
             )
+        output = self.activation_quantizer(output)
         return output
 
 
@@ -473,16 +467,11 @@ class QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
     def forward(self, input):
         # 量化A和W
-        if input.shape[1] == 3:
-            first = True
-        else:
-            first = False
-        q_input = self.activation_quantizer(input, first)
         q_weight = self.weight_quantizer(self.weight)
         q_bias = self.bias_quantizer(self.bias)
         # 量化卷积
         output = F.conv2d(
-            input=q_input,
+            input=input,
             weight=q_weight,
             bias=q_bias,
             stride=self.stride,
@@ -490,6 +479,7 @@ class QuantizedConv2d_For_FPGA(QuantizedConv2d):
             dilation=self.dilation,
             groups=self.groups
         )
+        output = self.activation_quantizer(output)
         return output
 
 
@@ -627,17 +617,12 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 bias = self.bias
                 weight = self.weight
         # 量化A和bn融合后的W
-        if input.shape[1] == 3:
-            first = True
-        else:
-            first = False
-        q_input = self.activation_quantizer(input, first)
         q_weight = self.weight_quantizer(weight)
         q_bias = self.bias_quantizer(bias)
         # 量化卷积
         if self.training:  # 训练态
             output = F.conv2d(
-                input=q_input,
+                input=input,
                 weight=q_weight,
                 bias=q_bias,
                 stride=self.stride,
@@ -655,7 +640,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             # output += reshape_to_activation(bias)
         else:  # 测试态
             output = F.conv2d(
-                input=q_input,
+                input=input,
                 weight=q_weight,
                 bias=q_bias,  # 注意，这里加bias，做完整的conv+bn
                 stride=self.stride,
@@ -663,6 +648,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 dilation=self.dilation,
                 groups=self.groups
             )
+        output = self.activation_quantizer(output)
         return output
 
     def BN_fuse(self):

@@ -334,6 +334,12 @@ def train(hyp):
                 if sf != 1:
                     ns = [math.ceil(x * sf / gs) * gs for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
+
+            # # FPGA quantized
+            # if opt.FPGA:
+            #     scale = torch.tensor([2 ** (-(opt.a_bit - 2))]).to(imgs.device)
+            #     imgs = torch.round(imgs * scale) / scale
+
             # Forward
             if opt.fencemask:
                 fence_imgs, masks = fencemask(imgs)
@@ -345,8 +351,8 @@ def train(hyp):
             else:
                 targets = targets.to(device)
                 pred, feature_s = model(imgs)
-            # Loss
 
+            # Loss
             loss, loss_items = compute_loss(pred, targets, model)
             if opt.fencemask:
                 loss_FCLM = Failure_Case_Loss_FM(masks, imgs, targets)
@@ -745,6 +751,11 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
                 if sf != 1:
                     ns = [math.ceil(x * sf / gs) * gs for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
+
+            # # FPGA quantized
+            # if opt.FPGA:
+            #     scale = torch.tensor([2 ** (-(a_bit - 2))]).to(imgs.device)
+            #     imgs = torch.round(imgs * scale) / scale
 
             # Forward
             pred, _ = model(imgs)

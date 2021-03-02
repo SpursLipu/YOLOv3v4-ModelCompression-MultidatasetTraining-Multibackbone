@@ -101,7 +101,6 @@ class DorefaConv2d(nn.Conv2d):
             bias=True,
             a_bits=8,
             w_bits=8,
-            first_layer=0
     ):
         super().__init__(
             in_channels=in_channels,
@@ -116,17 +115,13 @@ class DorefaConv2d(nn.Conv2d):
         # 实例化调用A和W量化器
         self.activation_quantizer = activation_quantize(a_bits=a_bits)
         self.weight_quantizer = weight_quantize(w_bits=w_bits)
-        self.first_layer = first_layer
 
     def forward(self, input):
         # 量化A和W
-        if not self.first_layer:
-            input = self.activation_quantizer(input)
-        q_input = input
         q_weight = self.weight_quantizer(self.weight)
         # 量化卷积
         output = F.conv2d(
-            input=q_input,
+            input=input,
             weight=q_weight,
             bias=self.bias,
             stride=self.stride,
@@ -134,6 +129,7 @@ class DorefaConv2d(nn.Conv2d):
             dilation=self.dilation,
             groups=self.groups
         )
+        output = self.activation_quantizer(output)
         return output
 
 
@@ -263,17 +259,15 @@ class BNFold_DorefaConv2d(DorefaConv2d):
                 bias = self.bias
                 weight = self.weight
         # 量化A和bn融合后的W
-        if not self.first_layer:
-            input = self.activation_quantizer(input)
-        q_input = input
         q_weight = self.weight_quantizer(weight)
+        q_bias = self.bias_quantizer(bias)
         # 量化卷积
         if self.training:  # 训练态
             output = F.conv2d(
-                input=q_input,
+                input=input,
                 weight=q_weight,
                 # bias=self.bias,  # 注意，这里不加bias（self.bias为None）
-                bias=bias,
+                bias=q_bias,
                 stride=self.stride,
                 padding=self.padding,
                 dilation=self.dilation,
@@ -286,14 +280,15 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             # output += reshape_to_activation(bias)
         else:  # 测试态
             output = F.conv2d(
-                input=q_input,
+                input=input,
                 weight=q_weight,
-                bias=bias,  # 注意，这里加bias，做完整的conv+bn
+                bias=q_bias,  # 注意，这里加bias，做完整的conv+bn
                 stride=self.stride,
                 padding=self.padding,
                 dilation=self.dilation,
                 groups=self.groups
             )
+        output = self.activation_quantizer(output)
         return output
 
 

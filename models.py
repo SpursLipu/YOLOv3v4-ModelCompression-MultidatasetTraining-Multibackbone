@@ -208,8 +208,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
                                                                    bias=not bn,
                                                                    a_bits=a_bit,
                                                                    w_bits=w_bit))
-                if bn:
-                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
@@ -299,7 +299,7 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
                                 img_size=img_size,  # (416, 416)
                                 yolo_index=yolo_index,  # 0, 1, 2...
                                 layers=layers,  # output layers
-                                stride=stride[yolo_index], quantized=quantized, a_bit=a_bit, FPGA=FPGA)
+                                stride=stride[yolo_index])
 
             # Initialize preceding Conv2d() bias (https://arxiv.org/pdf/1708.02002.pdf section 3.3)
             try:
@@ -326,7 +326,7 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
 
 
 class YOLOLayer(nn.Module):
-    def __init__(self, anchors, nc, img_size, yolo_index, layers, stride, quantized, a_bit=8, FPGA=False):
+    def __init__(self, anchors, nc, img_size, yolo_index, layers, stride):
         super(YOLOLayer, self).__init__()
         self.anchors = torch.Tensor(anchors)
         self.index = yolo_index  # index of this layer in layers
@@ -339,9 +339,6 @@ class YOLOLayer(nn.Module):
         self.nx, self.ny, self.ng = 0, 0, 0  # initialize number of x, y gridpoints
         self.anchor_vec = self.anchors / self.stride
         self.anchor_wh = self.anchor_vec.view(1, self.na, 1, 1, 2)
-        if quantized == 1 and FPGA:
-            self.register_buffer('scale', torch.zeros(torch.Size([])))
-            self.a_bits = a_bit
 
         if ONNX_EXPORT:
             self.training = False
@@ -361,20 +358,6 @@ class YOLOLayer(nn.Module):
             self.anchor_wh = self.anchor_wh.to(device)
 
     def forward(self, p, out):
-        if hasattr(self, 'scale'):
-            min_val = torch.tensor(-(1 << (self.a_bits - 1)))
-            max_val = torch.tensor((1 << (self.a_bits - 1)) - 1)
-            quantized_range = torch.max(torch.abs(min_val), torch.abs(max_val))
-
-            min = torch.abs(torch.min(p))
-            max = torch.abs(torch.max(p))
-            sign_min = min / (min.abs())
-            sign_max = max / (max.abs())
-            min = (2 ** min.abs().log2().ceil()) * sign_min
-            max = (2 ** max.abs().log2().ceil()) * sign_max
-
-            float_range = torch.max(min, max)
-            self.scale = float_range / quantized_range
         ASFF = False  # https://arxiv.org/abs/1911.09516
         if ASFF:
             i, n = self.index, self.nl  # index in layers, number of layers

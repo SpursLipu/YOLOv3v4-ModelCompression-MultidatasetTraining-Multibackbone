@@ -163,7 +163,7 @@ python train.py --data data/visdrone.data --batch-size ... --weights weights/yol
 Training command
 
 ```bash
-python train.py --data data/oxfordhand.data --batch-size ... --weights weights/yolov3-608.weights -pt --cfg cfg/yolov3/yolov3-visdrone.cfg  --img-size ... --epochs ...
+python train.py --data data/oxfordhand.data --batch-size ... --weights weights/yolov3-608.weights -pt --cfg cfg/yolov3/yolov3-hand.cfg  --img-size ... --epochs ...
 ```
 
 ## 1.Dior

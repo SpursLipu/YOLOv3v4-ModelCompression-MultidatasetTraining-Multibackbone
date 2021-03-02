@@ -55,6 +55,9 @@ def detect(save_img=False):
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
 
+        # if opt.FPGA:
+        #     scale = torch.tensor([2 ** (-(opt.a_bit - 2))]).to(img.device)
+        #     img = torch.round(img * scale) / scale
         # Inference
         t1 = torch_utils.time_synchronized()
         pred = model(img, augment=opt.augment)[0]

@@ -11,13 +11,7 @@ from utils.datasets import *
 from utils.utils import *
 from utils.prune_utils import *
 import math
-
-mixed_precision = True
-try:  # Mixed precision training https://github.com/NVIDIA/apex
-    from apex import amp
-except:
-    print('Apex recommended for faster mixed precision training: https://github.com/NVIDIA/apex')
-    mixed_precision = False  # not installed
+from torch.cuda import amp
 
 wdir = 'weights' + os.sep  # weights dir
 last = wdir + 'last.pt'
@@ -178,13 +172,9 @@ def train(hyp):
             load_darknet_weights(t_model, t_weights)
         else:
             raise Exception('pls provide proper teacher weights for knowledge distillation')
-        if not mixed_precision:
-            t_model.eval()
+        t_model.eval()
         print('<.....................using knowledge distillation.......................>')
         print('teacher model:', t_weights, '\n')
-    # Mixed precision training https://github.com/NVIDIA/apex
-    if mixed_precision:
-        model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
 
     # Scheduler https://arxiv.org/pdf/1812.01187.pdf
     lf = lambda x: (((1 + math.cos(x * math.pi / epochs)) / 2) ** 1.0) * 0.95 + 0.05  # cosine
@@ -193,15 +183,15 @@ def train(hyp):
     # https://discuss.pytorch.org/t/a-problem-occured-when-resuming-an-optimizer/28822
 
     # Plot lr schedule
-    # y = []
-    # for _ in range(epochs):
-    #     scheduler.step()
-    #     y.append(optimizer.param_groups[0]['lr'])
-    # plt.plot(y, '.-', label='LambdaLR')
-    # plt.xlabel('epoch')
-    # plt.ylabel('LR')
-    # plt.tight_layout()
-    # plt.savefig('LR.png', dpi=300)
+    y = []
+    for _ in range(epochs):
+        scheduler.step()
+        y.append(optimizer.param_groups[0]['lr'])
+    plt.plot(y, '.-', label='LambdaLR')
+    plt.xlabel('epoch')
+    plt.ylabel('LR')
+    plt.tight_layout()
+    plt.savefig('LR.png', dpi=300)
 
     # Initialize distributed training
     if device.type != 'cpu' and torch.cuda.device_count() > 1 and torch.distributed.is_available():
@@ -292,6 +282,8 @@ def train(hyp):
     print('Image sizes %g - %g train, %g test' % (imgsz_min, imgsz_max, imgsz_test))
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
+    cuda = device.type != 'cpu'
+    scaler = amp.GradScaler(enabled=cuda)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         if opt.fencemask:
             fencemask.set_prob(epoch, max_epoch)
@@ -335,64 +327,53 @@ def train(hyp):
                     ns = [math.ceil(x * sf / gs) * gs for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
-            # # FPGA quantized
-            # if opt.FPGA:
-            #     scale = torch.tensor([2 ** (-(opt.a_bit - 2))]).to(imgs.device)
-            #     imgs = torch.round(imgs * scale) / scale
-
             # Forward
-            if opt.fencemask:
-                fence_imgs, masks = fencemask(imgs)
-                # print(torch.sum(fencemask.masks))
-                fence_imgs = fence_imgs.detach()
-                # imgs = gridmask(imgs)
-                targets = targets.to(device)
-                pred, feature_s = model(fence_imgs)
-            else:
-                targets = targets.to(device)
-                pred, feature_s = model(imgs)
-
-            # Loss
-            loss, loss_items = compute_loss(pred, targets, model)
-            if opt.fencemask:
-                loss_FCLM = Failure_Case_Loss_FM(masks, imgs, targets)
-                loss = loss + loss_FCLM
-            if not torch.isfinite(loss):
-                print('WARNING: non-finite loss, ending training ', loss_items)
-                return results
-
-            soft_target = 0
-            if t_cfg:
-                if mixed_precision:
-                    with torch.no_grad():
-                        output_t, feature_t = t_model(imgs)
+            with amp.autocast(enabled=cuda):
+                if opt.fencemask:
+                    fence_imgs, masks = fencemask(imgs)
+                    # print(torch.sum(fencemask.masks))
+                    fence_imgs = fence_imgs.detach()
+                    # imgs = gridmask(imgs)
+                    targets = targets.to(device)
+                    pred, feature_s = model(fence_imgs)
                 else:
+                    targets = targets.to(device)
+                    pred, feature_s = model(imgs)
+
+                # Loss
+                loss, loss_items = compute_loss(pred, targets, model)
+                if opt.fencemask:
+                    loss_FCLM = Failure_Case_Loss_FM(masks, imgs, targets)
+                    loss = loss + loss_FCLM
+                if not torch.isfinite(loss):
+                    print('WARNING: non-finite loss, ending training ', loss_items)
+                    return results
+
+                soft_target = 0
+                if t_cfg:
                     _, output_t, feature_t = t_model(imgs)
-                if opt.KDstr == 1:
-                    soft_target = compute_lost_KD(pred, output_t, model.nc, imgs.size(0))
-                elif opt.KDstr == 2:
-                    soft_target, reg_ratio = compute_lost_KD2(model, targets, pred, output_t)
-                elif opt.KDstr == 3:
-                    soft_target = compute_lost_KD3(model, targets, pred, output_t)
-                elif opt.KDstr == 4:
-                    soft_target = compute_lost_KD4(model, targets, pred, output_t, feature_s, feature_t,
-                                                   imgs.size(0))
-                elif opt.KDstr == 5:
-                    soft_target = compute_lost_KD5(model, targets, pred, output_t, feature_s, feature_t,
-                                                   imgs.size(0),
-                                                   img_size)
-                else:
-                    print("please select KD strategy!")
-                loss += soft_target
+                    if opt.KDstr == 1:
+                        soft_target = compute_lost_KD(pred, output_t, model.nc, imgs.size(0))
+                    elif opt.KDstr == 2:
+                        soft_target, reg_ratio = compute_lost_KD2(model, targets, pred, output_t)
+                    elif opt.KDstr == 3:
+                        soft_target = compute_lost_KD3(model, targets, pred, output_t)
+                    elif opt.KDstr == 4:
+                        soft_target = compute_lost_KD4(model, targets, pred, output_t, feature_s, feature_t,
+                                                       imgs.size(0))
+                    elif opt.KDstr == 5:
+                        soft_target = compute_lost_KD5(model, targets, pred, output_t, feature_s, feature_t,
+                                                       imgs.size(0),
+                                                       img_size)
+                    else:
+                        print("please select KD strategy!")
+                    loss += soft_target
 
-                # Backward
+            # Backward
             loss *= batch_size / 64  # scale loss
-            if mixed_precision:
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
-            else:
-                loss.backward()
-                # print(torch.sum(fencemask.group_masks.grad))
+            scaler.scale(loss).backward()
+            # loss.backward()
+            # print(torch.sum(fencemask.group_masks.grad))
             # 对要剪枝层的γ参数稀疏化
             if hasattr(model, 'module'):
                 if opt.prune != -1:
@@ -400,12 +381,11 @@ def train(hyp):
             else:
                 if opt.prune != -1:
                     BNOptimizer.updateBN(sr_flag, model.module_list, opt.s, prune_idx)
-            # if opt.fencemask:
-            #     if masks !=None:
-            #         fencemask.group_masks.grad.add_(0.0001 * torch.sign(fencemask.group_masks.data))
             # Optimize
             if ni % accumulate == 0:
-                optimizer.step()
+                # optimizer.step()
+                scaler.step(optimizer)  # optimizer.step
+                scaler.update()
                 optimizer.zero_grad()
                 if opt.ema:
                     ema.update(model)
@@ -635,26 +615,11 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
             # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
             load_darknet_weights(model, weights, pt=opt.pt, FPGA=opt.FPGA)
 
-    # Mixed precision training https://github.com/NVIDIA/apex
-    if mixed_precision:
-        model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
-
     # Scheduler https://arxiv.org/pdf/1812.01187.pdf
     lf = lambda x: (((1 + math.cos(x * math.pi / epochs)) / 2) ** 1.0) * 0.95 + 0.05  # cosine
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch - 1  # see link below
     # https://discuss.pytorch.org/t/a-problem-occured-when-resuming-an-optimizer/28822
-
-    # Plot lr schedule
-    # y = []
-    # for _ in range(epochs):
-    #     scheduler.step()
-    #     y.append(optimizer.param_groups[0]['lr'])
-    # plt.plot(y, '.-', label='LambdaLR')
-    # plt.xlabel('epoch')
-    # plt.ylabel('LR')
-    # plt.tight_layout()
-    # plt.savefig('LR.png', dpi=300)
 
     # Initialize distributed training
     if device.type != 'cpu' and torch.cuda.device_count() > 1 and torch.distributed.is_available():
@@ -713,6 +678,8 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
     print('Image sizes %g - %g train, %g test' % (imgsz_min, imgsz_max, imgsz_test))
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
+    cuda = device.type != 'cpu'
+    scaler = amp.GradScaler(enabled=cuda)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         model.train()
 
@@ -751,31 +718,26 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
                     ns = [math.ceil(x * sf / gs) * gs for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
-            # # FPGA quantized
-            # if opt.FPGA:
-            #     scale = torch.tensor([2 ** (-(a_bit - 2))]).to(imgs.device)
-            #     imgs = torch.round(imgs * scale) / scale
-
             # Forward
-            pred, _ = model(imgs)
+            with amp.autocast(enabled=cuda):
+                targets = targets.to(device)
+                pred, feature_s = model(imgs)
 
-            # Loss
-            loss, loss_items = compute_loss(pred, targets, model)
-            if not torch.isfinite(loss):
-                print('WARNING: non-finite loss, ending training ', loss_items)
-                return results
+                # Loss
+                loss, loss_items = compute_loss(pred, targets, model)
+                if not torch.isfinite(loss):
+                    print('WARNING: non-finite loss, ending training ', loss_items)
+                    return results
 
             # Backward
             loss *= batch_size / 64  # scale loss
-            if mixed_precision:
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
-            else:
-                loss.backward()
+            scaler.scale(loss).backward()
 
             # Optimize
             if ni % accumulate == 0:
-                optimizer.step()
+                # optimizer.step()
+                scaler.step(optimizer)  # optimizer.step
+                scaler.update()
                 optimizer.zero_grad()
                 if opt.ema:
                     ema.update(model)
@@ -947,9 +909,7 @@ if __name__ == '__main__':
     # opt.data = list(glob.iglob(' ./**/' + opt.data, recursive=True))[0]  # find file
     print(opt)
     opt.img_size.extend([opt.img_size[-1]] * (3 - len(opt.img_size)))  # extend to 3 sizes (min, max, test)
-    device = torch_utils.select_device(opt.device, apex=mixed_precision, batch_size=opt.batch_size)
-    if device.type == 'cpu':
-        mixed_precision = False
+    device = torch_utils.select_device(opt.device, batch_size=opt.batch_size)
 
     # scale hyp['obj'] by img_size (evolved at 320)
     # hyp['obj'] *= opt.img_size[0] / 320.

@@ -282,8 +282,9 @@ def train(hyp):
     print('Image sizes %g - %g train, %g test' % (imgsz_min, imgsz_max, imgsz_test))
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
-    cuda = device.type != 'cpu'
-    scaler = amp.GradScaler(enabled=cuda)
+    if opt.mpt:
+        cuda = device.type != 'cpu'
+        scaler = amp.GradScaler(enabled=cuda)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         if opt.fencemask:
             fencemask.set_prob(epoch, max_epoch)
@@ -328,7 +329,48 @@ def train(hyp):
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
             # Forward
-            with amp.autocast(enabled=cuda):
+            if opt.mpt:
+                with amp.autocast(enabled=cuda):
+                    if opt.fencemask:
+                        fence_imgs, masks = fencemask(imgs)
+                        # print(torch.sum(fencemask.masks))
+                        fence_imgs = fence_imgs.detach()
+                        # imgs = gridmask(imgs)
+                        targets = targets.to(device)
+                        pred, feature_s = model(fence_imgs)
+                    else:
+                        targets = targets.to(device)
+                        pred, feature_s = model(imgs)
+
+                    # Loss
+                    loss, loss_items = compute_loss(pred, targets, model)
+                    if opt.fencemask:
+                        loss_FCLM = Failure_Case_Loss_FM(masks, imgs, targets)
+                        loss = loss + loss_FCLM
+                    if not torch.isfinite(loss):
+                        print('WARNING: non-finite loss, ending training ', loss_items)
+                        return results
+
+                    soft_target = 0
+                    if t_cfg:
+                        _, output_t, feature_t = t_model(imgs)
+                        if opt.KDstr == 1:
+                            soft_target = compute_lost_KD(pred, output_t, model.nc, imgs.size(0))
+                        elif opt.KDstr == 2:
+                            soft_target, reg_ratio = compute_lost_KD2(model, targets, pred, output_t)
+                        elif opt.KDstr == 3:
+                            soft_target = compute_lost_KD3(model, targets, pred, output_t)
+                        elif opt.KDstr == 4:
+                            soft_target = compute_lost_KD4(model, targets, pred, output_t, feature_s, feature_t,
+                                                           imgs.size(0))
+                        elif opt.KDstr == 5:
+                            soft_target = compute_lost_KD5(model, targets, pred, output_t, feature_s, feature_t,
+                                                           imgs.size(0),
+                                                           img_size)
+                        else:
+                            print("please select KD strategy!")
+                        loss += soft_target
+            else:
                 if opt.fencemask:
                     fence_imgs, masks = fencemask(imgs)
                     # print(torch.sum(fencemask.masks))
@@ -368,11 +410,12 @@ def train(hyp):
                     else:
                         print("please select KD strategy!")
                     loss += soft_target
-
             # Backward
             loss *= batch_size / 64  # scale loss
-            scaler.scale(loss).backward()
-            # loss.backward()
+            if opt.mpt:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
             # print(torch.sum(fencemask.group_masks.grad))
             # 对要剪枝层的γ参数稀疏化
             if hasattr(model, 'module'):
@@ -383,10 +426,13 @@ def train(hyp):
                     BNOptimizer.updateBN(sr_flag, model.module_list, opt.s, prune_idx)
             # Optimize
             if ni % accumulate == 0:
-                # optimizer.step()
-                scaler.step(optimizer)  # optimizer.step
-                scaler.update()
+                if opt.mpt:
+                    scaler.step(optimizer)  # optimizer.step
+                    scaler.update()
+                else:
+                    optimizer.step()
                 optimizer.zero_grad()
+
                 if opt.ema:
                     ema.update(model)
 
@@ -678,8 +724,9 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
     print('Image sizes %g - %g train, %g test' % (imgsz_min, imgsz_max, imgsz_test))
     print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
-    cuda = device.type != 'cpu'
-    scaler = amp.GradScaler(enabled=cuda)
+    if opt.mpt:
+        cuda = device.type != 'cpu'
+        scaler = amp.GradScaler(enabled=cuda)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         model.train()
 
@@ -719,25 +766,41 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
             # Forward
-            with amp.autocast(enabled=cuda):
-                targets = targets.to(device)
-                pred, feature_s = model(imgs)
+            if opt.mpt:
+                with amp.autocast(enabled=cuda):
+                    targets = targets.to(device)
+                    pred, feature_s = model(imgs)
 
-                # Loss
-                loss, loss_items = compute_loss(pred, targets, model)
-                if not torch.isfinite(loss):
-                    print('WARNING: non-finite loss, ending training ', loss_items)
-                    return results
+                    # Loss
+                    loss, loss_items = compute_loss(pred, targets, model)
+                    if not torch.isfinite(loss):
+                        print('WARNING: non-finite loss, ending training ', loss_items)
+                        return results
+            else:
+                with amp.autocast(enabled=cuda):
+                    targets = targets.to(device)
+                    pred, feature_s = model(imgs)
+
+                    # Loss
+                    loss, loss_items = compute_loss(pred, targets, model)
+                    if not torch.isfinite(loss):
+                        print('WARNING: non-finite loss, ending training ', loss_items)
+                        return results
 
             # Backward
             loss *= batch_size / 64  # scale loss
-            scaler.scale(loss).backward()
-
+            if opt.mpt:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
             # Optimize
             if ni % accumulate == 0:
-                # optimizer.step()
-                scaler.step(optimizer)  # optimizer.step
-                scaler.update()
+                if opt.mpt:
+                    scaler.step(optimizer)  # optimizer.step
+                    scaler.update()
+                else:
+                    optimizer.step()
+
                 optimizer.zero_grad()
                 if opt.ema:
                     ema.update(model)
@@ -891,6 +954,8 @@ if __name__ == '__main__':
     parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--pretrain', '-pt', dest='pt', action='store_true',
                         help='use pretrain model')
+    parser.add_argument('--mixedprecision', '-mpt', dest='mpt', action='store_true',
+                        help='use mixed precision training')
     parser.add_argument('--s', type=float, default=0.001, help='scale sparse rate')
     parser.add_argument('--prune', type=int, default=-1,
                         help='0:nomal prune or regular prune 1:shortcut prune 2:layer prune')

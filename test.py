@@ -23,7 +23,6 @@ def test(cfg,
          quantized=-1,
          a_bit=8,
          w_bit=8,
-         BN_Fold=False,
          FPGA=False):
     # Initialize/load model and set device
     if model is None:
@@ -35,7 +34,7 @@ def test(cfg,
             os.remove(f)
 
         # Initialize model
-        model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit, BN_Fold=BN_Fold,
+        model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit,
                         FPGA=FPGA)
 
         # Load weights
@@ -43,10 +42,10 @@ def test(cfg,
         if weights.endswith('.pt'):  # pytorch format
             model.load_state_dict(torch.load(weights, map_location=device)['model'])
         else:  # darknet format
-            load_darknet_weights(model, weights, BN_Fold=opt.BN_Fold)
+            load_darknet_weights(model, weights, FPGA=FPGA)
 
         # Fuse
-        model.fuse(quantized=quantized, BN_Fold=opt.BN_Fold, FPGA=opt.FPGA)
+        model.fuse(quantized=quantized, FPGA=opt.FPGA)
         model.to(device)
 
         if device.type != 'cpu' and torch.cuda.device_count() > 1:
@@ -268,7 +267,6 @@ if __name__ == '__main__':
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
-    parser.add_argument('--BN_Fold', action='store_true', help='BN_Fold')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
 
     opt = parser.parse_args()
@@ -293,7 +291,6 @@ if __name__ == '__main__':
              quantized=opt.quantized,
              a_bit=opt.a_bit,
              w_bit=opt.w_bit,
-             BN_Fold=opt.BN_Fold,
              FPGA=opt.FPGA)
 
     elif opt.task == 'benchmark':  # mAPs at 256-640 at conf 0.5 and 0.7

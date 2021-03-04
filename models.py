@@ -9,7 +9,7 @@ ONNX_EXPORT = False
 
 
 # YOLO
-def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_Fold=False, FPGA=False):
+def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA=False):
     # Constructs module list of layer blocks from module configuration in module_defs
 
     img_size = [img_size] * 2 if isinstance(img_size, int) else img_size  # expand if necessary
@@ -29,57 +29,45 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
             if quantized == 1:
                 if FPGA:
-                    if BN_Fold:
-                        modules.add_module('Conv2d', BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
-                                                                                     out_channels=filters,
-                                                                                     kernel_size=kernel_size,
-                                                                                     stride=int(mdef['stride']),
-                                                                                     padding=pad,
-                                                                                     groups=mdef[
-                                                                                         'groups'] if 'groups' in mdef else 1,
-                                                                                     bias=not bn,
-                                                                                     a_bits=a_bit,
-                                                                                     w_bits=w_bit,
-                                                                                     bn=bn))
-                    else:
-                        modules.add_module('Conv2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
-                                                                              out_channels=filters,
-                                                                              kernel_size=kernel_size,
-                                                                              stride=int(mdef['stride']),
-                                                                              padding=pad,
-                                                                              groups=mdef[
-                                                                                  'groups'] if 'groups' in mdef else 1,
-                                                                              bias=not bn,
-                                                                              a_bits=a_bit,
-                                                                              w_bits=w_bit))
-                        if bn:
-                            modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                    modules.add_module('Conv2d', BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                                 out_channels=filters,
+                                                                                 kernel_size=kernel_size,
+                                                                                 stride=int(mdef['stride']),
+                                                                                 padding=pad,
+                                                                                 groups=mdef[
+                                                                                     'groups'] if 'groups' in mdef else 1,
+                                                                                 bias=not bn,
+                                                                                 a_bits=a_bit,
+                                                                                 w_bits=w_bit,
+                                                                                 bn=bn,
+                                                                                 activate=mdef['activation']))
                 else:
-                    if BN_Fold:
-                        modules.add_module('Conv2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
-                                                                     out_channels=filters,
-                                                                     kernel_size=kernel_size,
-                                                                     stride=int(mdef['stride']),
-                                                                     padding=pad,
-                                                                     groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                                     bias=not bn,
-                                                                     a_bits=a_bit,
-                                                                     w_bits=w_bit,
-                                                                     bn=bn))
-                    else:
-                        modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
-                                                                     out_channels=filters,
-                                                                     kernel_size=kernel_size,
-                                                                     stride=int(mdef['stride']),
-                                                                     padding=pad,
-                                                                     groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                                     bias=not bn,
-                                                                     a_bits=a_bit,
-                                                                     w_bits=w_bit))
-                        if bn:
-                            modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                    modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
+                                                                 out_channels=filters,
+                                                                 kernel_size=kernel_size,
+                                                                 stride=int(mdef['stride']),
+                                                                 padding=pad,
+                                                                 groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                                 bias=not bn,
+                                                                 a_bits=a_bit,
+                                                                 w_bits=w_bit))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
+                    if mdef['activation'] == 'leaky':
+                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                        # modules.add_module('activation', Swish())
+                    if mdef['activation'] == 'relu6':
+                        modules.add_module('activation', ReLU6())
+                    if mdef['activation'] == 'h_swish':
+                        modules.add_module('activation', HardSwish())
+                    if mdef['activation'] == 'relu':
+                        modules.add_module('activation', nn.ReLU())
+                    if mdef['activation'] == 'mish':
+                        modules.add_module('activation', Mish())
             elif quantized == 2:
-                if BN_Fold:
+                if FPGA:
                     modules.add_module('Conv2d', BNFold_DorefaConv2d(in_channels=output_filters[-1],
                                                                      out_channels=filters,
                                                                      kernel_size=kernel_size,
@@ -89,7 +77,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
                                                                      bias=not bn,
                                                                      a_bits=a_bit,
                                                                      w_bits=w_bit,
-                                                                     bn=bn))
+                                                                     bn=bn,
+                                                                     activate=mdef['activation']))
                 else:
                     modules.add_module('Conv2d', DorefaConv2d(in_channels=output_filters[-1],
                                                               out_channels=filters,
@@ -102,6 +91,19 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
                                                               w_bits=w_bit))
                     if bn:
                         modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
+                    if mdef['activation'] == 'leaky':
+                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                        # modules.add_module('activation', Swish())
+                    if mdef['activation'] == 'relu6':
+                        modules.add_module('activation', ReLU6())
+                    if mdef['activation'] == 'h_swish':
+                        modules.add_module('activation', HardSwish())
+                    if mdef['activation'] == 'relu':
+                        modules.add_module('activation', nn.ReLU())
+                    if mdef['activation'] == 'mish':
+                        modules.add_module('activation', Mish())
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,
@@ -113,21 +115,18 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
                 if bn:
                     modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
-            if mdef['activation'] == 'leaky':
-                if quantized != 0 and FPGA:
-                    modules.add_module('activation', nn.LeakyReLU(0.125, inplace=True))
-                else:
+                if mdef['activation'] == 'leaky':
                     modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
-                # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
-                # modules.add_module('activation', Swish())
-            if mdef['activation'] == 'relu6':
-                modules.add_module('activation', ReLU6())
-            if mdef['activation'] == 'h_swish':
-                modules.add_module('activation', HardSwish())
-            if mdef['activation'] == 'relu':
-                modules.add_module('activation', nn.ReLU())
-            if mdef['activation'] == 'mish':
-                modules.add_module('activation', Mish())
+                    # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                    # modules.add_module('activation', Swish())
+                if mdef['activation'] == 'relu6':
+                    modules.add_module('activation', ReLU6())
+                if mdef['activation'] == 'h_swish':
+                    modules.add_module('activation', HardSwish())
+                if mdef['activation'] == 'relu':
+                    modules.add_module('activation', nn.ReLU())
+                if mdef['activation'] == 'mish':
+                    modules.add_module('activation', Mish())
 
         elif mdef['type'] == 'depthwise':
             bn = int(mdef['batch_normalize'])
@@ -136,58 +135,46 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
             pad = (kernel_size - 1) // 2 if int(mdef['pad']) else 0
             if quantized == 1:
                 if FPGA:
-                    if BN_Fold:
-                        modules.add_module('DepthWise2d',
-                                           BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
-                                                                           out_channels=filters,
-                                                                           kernel_size=kernel_size,
-                                                                           stride=int(mdef['stride']),
-                                                                           padding=pad,
-                                                                           groups=output_filters[-1],
-                                                                           bias=not bn,
-                                                                           a_bits=a_bit,
-                                                                           w_bits=w_bit,
-                                                                           bn=bn))
-
-                    else:
-                        modules.add_module('DepthWise2d', QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
-                                                                                   out_channels=filters,
-                                                                                   kernel_size=kernel_size,
-                                                                                   stride=int(mdef['stride']),
-                                                                                   padding=pad,
-                                                                                   groups=output_filters[-1],
-                                                                                   bias=not bn,
-                                                                                   a_bits=a_bit,
-                                                                                   w_bits=w_bit))
-                        if bn:
-                            modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                    modules.add_module('DepthWise2d',
+                                       BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                       out_channels=filters,
+                                                                       kernel_size=kernel_size,
+                                                                       stride=int(mdef['stride']),
+                                                                       padding=pad,
+                                                                       groups=output_filters[-1],
+                                                                       bias=not bn,
+                                                                       a_bits=a_bit,
+                                                                       w_bits=w_bit,
+                                                                       bn=bn,
+                                                                       activate=mdef['activation']))
                 else:
-                    if BN_Fold:
-                        modules.add_module('DepthWise2d', BNFold_Conv2d_Q(in_channels=output_filters[-1],
-                                                                          out_channels=filters,
-                                                                          kernel_size=kernel_size,
-                                                                          stride=int(mdef['stride']),
-                                                                          padding=pad,
-                                                                          groups=output_filters[-1],
-                                                                          bias=not bn,
-                                                                          a_bits=a_bit,
-                                                                          w_bits=w_bit,
-                                                                          bn=bn))
-                    else:
-                        modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
-                                                                          out_channels=filters,
-                                                                          kernel_size=kernel_size,
-                                                                          stride=int(mdef['stride']),
-                                                                          padding=pad,
-                                                                          groups=output_filters[-1],
-                                                                          bias=not bn,
-                                                                          a_bits=a_bit,
-                                                                          w_bits=w_bit))
-                        if bn:
-                            modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                    modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
+                                                                      out_channels=filters,
+                                                                      kernel_size=kernel_size,
+                                                                      stride=int(mdef['stride']),
+                                                                      padding=pad,
+                                                                      groups=output_filters[-1],
+                                                                      bias=not bn,
+                                                                      a_bits=a_bit,
+                                                                      w_bits=w_bit))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
+                    if mdef['activation'] == 'leaky':
+                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                        # modules.add_module('activation', Swish())
+                    if mdef['activation'] == 'relu6':
+                        modules.add_module('activation', ReLU6())
+                    if mdef['activation'] == 'h_swish':
+                        modules.add_module('activation', HardSwish())
+                    if mdef['activation'] == 'relu':
+                        modules.add_module('activation', nn.ReLU())
+                    if mdef['activation'] == 'mish':
+                        modules.add_module('activation', Mish())
 
             if quantized == 2:
-                if BN_Fold:
+                if FPGA:
                     modules.add_module('DepthWise2d', BNFold_DorefaConv2d(in_channels=output_filters[-1],
                                                                           out_channels=filters,
                                                                           kernel_size=kernel_size,
@@ -197,7 +184,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
                                                                           bias=not bn,
                                                                           a_bits=a_bit,
                                                                           w_bits=w_bit,
-                                                                          bn=bn))
+                                                                          bn=bn,
+                                                                          activate=mdef['activation']))
                 else:
                     modules.add_module('DepthWise2d', DorefaConv2d(in_channels=output_filters[-1],
                                                                    out_channels=filters,
@@ -211,6 +199,19 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
                     if bn:
                         modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
+                    if mdef['activation'] == 'leaky':
+                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                        # modules.add_module('activation', Swish())
+                    if mdef['activation'] == 'relu6':
+                        modules.add_module('activation', ReLU6())
+                    if mdef['activation'] == 'h_swish':
+                        modules.add_module('activation', HardSwish())
+                    if mdef['activation'] == 'relu':
+                        modules.add_module('activation', nn.ReLU())
+                    if mdef['activation'] == 'mish':
+                        modules.add_module('activation', Mish())
+
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
                                                             out_channels=filters,
@@ -222,18 +223,18 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, BN_F
                 if bn:
                     modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
-            if mdef['activation'] == 'leaky':
-                modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
-                # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
-                # modules.add_module('activation', Swish())
-            if mdef['activation'] == 'relu6':
-                modules.add_module('activation', ReLU6())
-            if mdef['activation'] == 'h_swish':
-                modules.add_module('activation', HardSwish())
-            if mdef['activation'] == 'relu':
-                modules.add_module('activation', nn.ReLU())
-            if mdef['activation'] == 'mish':
-                modules.add_module('activation', Mish())
+                if mdef['activation'] == 'leaky':
+                    modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                    # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                    # modules.add_module('activation', Swish())
+                if mdef['activation'] == 'relu6':
+                    modules.add_module('activation', ReLU6())
+                if mdef['activation'] == 'h_swish':
+                    modules.add_module('activation', HardSwish())
+                if mdef['activation'] == 'relu':
+                    modules.add_module('activation', nn.ReLU())
+                if mdef['activation'] == 'mish':
+                    modules.add_module('activation', Mish())
 
         elif mdef['type'] == 'BatchNorm2d':
             filters = output_filters[-1]
@@ -417,8 +418,7 @@ class YOLOLayer(nn.Module):
 class Darknet(nn.Module):
     # YOLOv3 object detection model
 
-    def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, BN_Fold=False,
-                 FPGA=False, ):
+    def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, FPGA=False, ):
         super(Darknet, self).__init__()
 
         if isinstance(cfg, str):
@@ -428,12 +428,10 @@ class Darknet(nn.Module):
         self.quantized = quantized
         self.a_bit = a_bit
         self.w_bit = w_bit
-        self.BN_Fold = BN_Fold
         self.FPGA = FPGA
         self.hyperparams = copy.deepcopy(self.module_defs[0])
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
-                                                      a_bit=self.a_bit, w_bit=self.w_bit, BN_Fold=self.BN_Fold,
-                                                      FPGA=self.FPGA)
+                                                      a_bit=self.a_bit, w_bit=self.w_bit, FPGA=self.FPGA)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 
@@ -524,9 +522,9 @@ class Darknet(nn.Module):
                 x = torch.cat(x, 1)
             return x, p, feature_out
 
-    def fuse(self, quantized=-1, BN_Fold=False, FPGA=False):
+    def fuse(self, quantized=-1, FPGA=False):
         # Fuse Conv2d + BatchNorm2d layers throughout model
-        if quantized != -1 or BN_Fold == True:
+        if quantized != -1 or FPGA == True:
             return
         print('Fusing layers...')
         fused_list = nn.ModuleList()
@@ -551,7 +549,7 @@ def get_yolo_layers(model):
     return [i for i, m in enumerate(model.module_list) if m.__class__.__name__ == 'YOLOLayer']  # [89, 101, 113]
 
 
-def load_darknet_weights(self, weights, cutoff=-1, pt=False, BN_Fold=False):
+def load_darknet_weights(self, weights, cutoff=-1, pt=False, FPGA=False):
     # Parses and loads the weights stored in 'weights'
 
     # Establish cutoffs (load layers between 0 and cutoff. if cutoff = -1 all are loaded)
@@ -574,7 +572,7 @@ def load_darknet_weights(self, weights, cutoff=-1, pt=False, BN_Fold=False):
         if mdef['type'] == 'convolutional':
             conv_layer = module[0]
             if mdef['batch_normalize']:
-                if BN_Fold:
+                if FPGA:
                     # Load BN bias, weights, running mean and running variance
                     num_b = conv_layer.beta.numel()
                     # Bias
@@ -640,7 +638,7 @@ def load_darknet_weights(self, weights, cutoff=-1, pt=False, BN_Fold=False):
         elif mdef['type'] == 'depthwise':
             depthwise_layer = module[0]
             if mdef['batch_normalize']:
-                if BN_Fold:
+                if FPGA:
                     # Load BN bias, weights, running mean and running variance
                     num_b = conv_layer.beta.numel()
                     # Bias

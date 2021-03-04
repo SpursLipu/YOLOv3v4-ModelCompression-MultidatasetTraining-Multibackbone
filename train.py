@@ -97,7 +97,7 @@ def train(hyp):
         os.remove(f)
 
     # Initialize model
-    model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit, BN_Fold=opt.BN_Fold,
+    model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
                     FPGA=opt.FPGA).to(device)
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
@@ -170,7 +170,7 @@ def train(hyp):
 
         elif len(weights) > 0:  # darknet format
             # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-            load_darknet_weights(model, weights, pt=opt.pt, BN_Fold=opt.BN_Fold)
+            load_darknet_weights(model, weights, pt=opt.pt, FPGA=opt.FPGA)
     if t_cfg:
         if t_weights.endswith('.pt'):
             t_model.load_state_dict(torch.load(t_weights, map_location=device)['model'])
@@ -468,7 +468,6 @@ def train(hyp):
                                       quantized=opt.quantized,
                                       a_bit=opt.a_bit,
                                       w_bit=opt.w_bit,
-                                      BN_Fold=opt.BN_Fold,
                                       FPGA=opt.FPGA)
 
         # Write
@@ -547,7 +546,7 @@ def train(hyp):
 def WarmupForQ(hyp, step, a_bit, w_bit):
     cfg = opt.cfg
     data = opt.data
-    epochs = 5
+    epochs = 1
     batch_size = opt.batch_size
     accumulate = max(round(64 / batch_size), 1)  # accumulate n times before optimizer update (bs 64)
     if step > 0:
@@ -581,7 +580,7 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
         os.remove(f)
 
     # Initialize model
-    model = Darknet(cfg, quantized=opt.quantized, a_bit=a_bit, w_bit=w_bit, BN_Fold=opt.BN_Fold,
+    model = Darknet(cfg, quantized=opt.quantized, a_bit=a_bit, w_bit=w_bit,
                     FPGA=opt.FPGA).to(device)
 
     # Optimizer
@@ -634,7 +633,7 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
 
         elif len(weights) > 0:  # darknet format
             # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-            load_darknet_weights(model, weights, pt=opt.pt, BN_Fold=opt.BN_Fold)
+            load_darknet_weights(model, weights, pt=opt.pt, FPGA=opt.FPGA)
 
     # Mixed precision training https://github.com/NVIDIA/apex
     if mixed_precision:
@@ -837,7 +836,6 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
                                       quantized=opt.quantized,
                                       a_bit=opt.a_bit,
                                       w_bit=opt.w_bit,
-                                      BN_Fold=opt.BN_Fold,
                                       FPGA=opt.FPGA)
 
         # Write
@@ -940,7 +938,6 @@ if __name__ == '__main__':
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
-    parser.add_argument('--BN_Fold', action='store_true', help='BN_Fold')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
     parser.add_argument('--fencemask', action='store_true', help='fencemask')
 

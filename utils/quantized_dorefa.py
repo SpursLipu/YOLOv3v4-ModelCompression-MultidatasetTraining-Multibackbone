@@ -118,6 +118,8 @@ class DorefaConv2d(nn.Conv2d):
 
     def forward(self, input):
         # 量化A和W
+        if input.shape[1] != 3:
+            input = self.activation_quantizer(input)
         q_weight = self.weight_quantizer(self.weight)
         # 量化卷积
         output = F.conv2d(
@@ -129,7 +131,6 @@ class DorefaConv2d(nn.Conv2d):
             dilation=self.dilation,
             groups=self.groups
         )
-        output = self.activation_quantizer(output)
         return output
 
 
@@ -161,7 +162,8 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             momentum=0.01,  # 考虑量化带来的抖动影响,对momentum进行调整(0.1 ——> 0.01),削弱batch统计参数占比，一定程度抑制抖动。经实验量化训练效果更好,acc提升1%左右
             a_bits=8,
             w_bits=8,
-            bn=0
+            bn=0,
+            activate='leaky'
     ):
         super().__init__(
             in_channels=in_channels,
@@ -174,6 +176,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             bias=bias
         )
         self.bn = bn
+        self.activate = activate
         self.eps = eps
         self.momentum = momentum
         self.gamma = Parameter(torch.Tensor(out_channels))
@@ -190,6 +193,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
         # 实例化量化器（A-layer级，W-channel级）
         self.activation_quantizer = activation_quantize(a_bits=a_bits)
         self.weight_quantizer = weight_quantize(w_bits=w_bits)
+        self.bias_quantizer = weight_quantize(w_bits=w_bits)
 
     def forward(self, input):
         # 训练态
@@ -288,8 +292,40 @@ class BNFold_DorefaConv2d(DorefaConv2d):
                 dilation=self.dilation,
                 groups=self.groups
             )
+        if self.activate == 'leaky':
+            output = F.leaky_relu(output, 0.125, inplace=True)
+        elif self.activate == 'relu6':
+            output = F.relu6(output, inplace=True)
+        elif self.activate == 'h_swish':
+            output = output * (F.relu6(output + 3.0, inplace=True) / 6.0)
+        elif self.activate == 'relu':
+            output = F.relu(output, inplace=True)
+        elif self.activate == 'mish':
+            output = output * F.softplus(output).tanh()
+        elif self.activate == 'linear':
+            return output
+            # pass
+        else:
+            print(self.activate + " is not supported !")
         output = self.activation_quantizer(output)
         return output
+
+    def BN_fuse(self):
+        if self.bn:
+            # BN融合
+            if self.bias is not None:
+                bias = reshape_to_bias(self.beta + (self.bias - self.running_mean) * (
+                        self.gamma / torch.sqrt(self.running_var + self.eps)))
+            else:
+                bias = reshape_to_bias(
+                    self.beta - self.running_mean * self.gamma / torch.sqrt(
+                        self.running_var + self.eps))  # b融running
+            weight = self.weight * reshape_to_weight(
+                self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
+        else:
+            bias = self.bias
+            weight = self.weight
+        return weight, bias
 
 
 class DorefaLinear(nn.Linear):

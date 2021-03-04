@@ -13,8 +13,8 @@ Source using Pytorch implementation to [ultralytics/yolov3](https://github.com/u
 code. Pruning method based on BN layer
 by [coldlarry/YOLOv3-complete-pruning](https://github.com/coldlarry/YOLOv3-complete-pruning), thanks to both of you.
 
-** If you can't download weights file and datasets from BaiDu, please send e-mail(spurslipu@pku.edu.cn) to me, I will 
-rely as soon as I can. **
+**If you can't download weights file and datasets from BaiDu, please send e-mail(spurslipu@pku.edu.cn) to me, I will 
+rely as soon as I can.**
 
 # Update
 
@@ -416,7 +416,7 @@ python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size .
 python train.py --data ... --batch-size ... --weights ... --cfg ... --img-size ... --epochs ... --quantized 1
 ```
 
-`--BN_Flod` using BN Flod training, `--FPGA` Pow(2) quantization for FPGA.
+`--FPGA` Pow(2) quantization for FPGA.
 
 ### experiment
 

@@ -17,7 +17,7 @@ def detect(save_img=False):
     os.makedirs(out)  # make new output folder
 
     # Initialize model
-    model = Darknet(opt.cfg, imgsz, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit, BN_Fold=opt.BN_Fold,
+    model = Darknet(opt.cfg, imgsz, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
                     FPGA=opt.FPGA)
 
     # Load weights
@@ -153,7 +153,6 @@ if __name__ == '__main__':
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
-    parser.add_argument('--BN_Fold', action='store_true', help='BN_Fold')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
     opt = parser.parse_args()
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file

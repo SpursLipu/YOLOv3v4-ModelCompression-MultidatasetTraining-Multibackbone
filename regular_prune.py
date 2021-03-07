@@ -163,7 +163,8 @@ if __name__ == '__main__':
     valid_path = data_config["valid"]
     class_names = load_classes(data_config["names"])
 
-    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data,batch_size=opt.batch_size,imgsz=opt.img_size)
+    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size,
+                                    imgsz=opt.img_size)
 
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
@@ -241,7 +242,7 @@ if __name__ == '__main__':
     print(AsciiTable(metric_table).table)
 
     # 生成剪枝后的cfg文件并保存模型
-    pruned_cfg_name = opt.cfg.replace('/', f'/prune_{percent}_')
+    pruned_cfg_name = opt.cfg.replace('/', f'/regular_prune_{percent}_')
     # 创建存储目录
     dir_name = pruned_cfg_name.split('/')[0] + '/' + pruned_cfg_name.split('/')[1]
     if not os.path.isdir(dir_name):
@@ -269,7 +270,10 @@ if __name__ == '__main__':
 
     pruned_cfg_file = write_cfg(pruned_cfg_name, [model.hyperparams.copy()] + compact_module_defs)
     print(f'Config file has been saved: {pruned_cfg_file}')
+    weights_dir_name = dir_name.replace('cfg', 'weights')
+    if not os.path.isdir(weights_dir_name):
+        os.makedirs(weights_dir_name)
+    compact_model_name = weights_dir_name + f'/regular_prune_{str(percent)}_percent.weights'
 
-    compact_model_name = opt.weights.replace('/', f'/prune_{str(percent)}_percent_')
     save_weights(compact_model, path=compact_model_name)
     print(f'Compact model has been saved: {compact_model_name}')

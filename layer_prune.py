@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=16, help='batch-size')
     opt = parser.parse_args()
     print(opt)
-    
+
     assert opt.cfg.find("mobilenet") == -1, "Mobilenet doesn't support layer pruning!"
     img_size = opt.img_size
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -174,7 +174,7 @@ if __name__ == '__main__':
     print(AsciiTable(metric_table).table)
 
     # 生成剪枝后的cfg文件并保存模型
-    pruned_cfg_name = opt.cfg.replace('/', f'/prune_{opt.shortcuts}_shortcut_')
+    pruned_cfg_name = opt.cfg.replace('/', f'/layer_prune_{opt.shortcuts}_shortcut_')
     # 创建存储目录
     dir_name = pruned_cfg_name.split('/')[0] + '/' + pruned_cfg_name.split('/')[1]
     if not os.path.isdir(dir_name):
@@ -201,10 +201,10 @@ if __name__ == '__main__':
             item['anchors'] = anchor
     pruned_cfg_file = write_cfg(pruned_cfg_name, [model.hyperparams.copy()] + compact_module_defs)
     print(f'Config file has been saved: {pruned_cfg_file}')
-
-    compact_model_name = opt.weights.replace('/', f'/prune_{opt.shortcuts}_shortcut_')
-    if compact_model_name.endswith('.pt'):
-        compact_model_name = compact_model_name.replace('.pt', '.weights')
+    weights_dir_name = dir_name.replace('cfg', 'weights')
+    if not os.path.isdir(weights_dir_name):
+        os.makedirs(weights_dir_name)
+    compact_model_name = weights_dir_name + f'/layer_prune_{str(opt.shortcuts)}_shortcuts.weights'
 
     save_weights(compact_model, path=compact_model_name)
     print(f'Compact model has been saved: {compact_model_name}')

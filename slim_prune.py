@@ -94,7 +94,8 @@ if __name__ == '__main__':
         _ = load_darknet_weights(model, opt.weights)
     print('\nloaded weights from ', opt.weights)
 
-    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size, imgsz=img_size,)
+    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size,
+                                    imgsz=img_size, )
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
     print("\nlet's test the original model first:")
@@ -168,7 +169,7 @@ if __name__ == '__main__':
     ]
     print(AsciiTable(metric_table).table)
 
-    pruned_cfg_name = opt.cfg.replace('/', f'/prune_{opt.percent}_keep_{opt.layer_keep}_')
+    pruned_cfg_name = opt.cfg.replace('/', f'/slim_prune_{opt.percent}')
     # 创建存储目录
     dir_name = pruned_cfg_name.split('/')[0] + '/' + pruned_cfg_name.split('/')[1]
     if not os.path.isdir(dir_name):
@@ -197,8 +198,10 @@ if __name__ == '__main__':
     pruned_cfg_file = write_cfg(pruned_cfg_name, [model.hyperparams.copy()] + compact_module_defs)
     print(f'Config file has been saved: {pruned_cfg_file}')
 
-    compact_model_name = opt.weights.replace('/', f'/prune_{opt.percent}_keep_{opt.layer_keep}_')
-    if compact_model_name.endswith('.pt'):
-        compact_model_name = compact_model_name.replace('.pt', '.weights')
+    weights_dir_name = dir_name.replace('cfg', 'weights')
+    if not os.path.isdir(weights_dir_name):
+        os.makedirs(weights_dir_name)
+    compact_model_name = weights_dir_name + f'/slim_prune_{str(opt.percent)}_percent.weights'
+
     save_weights(compact_model, path=compact_model_name)
     print(f'Compact model has been saved: {compact_model_name}')

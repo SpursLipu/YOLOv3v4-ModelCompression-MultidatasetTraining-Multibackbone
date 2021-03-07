@@ -274,7 +274,7 @@ if __name__ == '__main__':
     print(AsciiTable(metric_table).table)
 
     pruned_cfg_name = opt.cfg.replace('/',
-                                      f'/prune_{opt.percent}_keep_{opt.layer_keep}_{opt.shortcuts}_shortcut_')
+                                      f'/layer_channel_prune_{opt.percent}_{opt.shortcuts}_shortcut_')
     # 创建存储目录
     dir_name = pruned_cfg_name.split('/')[0] + '/' + pruned_cfg_name.split('/')[1]
     if not os.path.isdir(dir_name):
@@ -301,9 +301,10 @@ if __name__ == '__main__':
     pruned_cfg_file = write_cfg(pruned_cfg_name, [model.hyperparams.copy()] + compact_module_defs)
     print(f'Config file has been saved: {pruned_cfg_file}')
 
-    compact_model_name = opt.weights.replace('/',
-                                             f'/prune_{opt.percent}_keep_{opt.layer_keep}_{opt.shortcuts}_shortcut_')
-    if compact_model_name.endswith('.pt'):
-        compact_model_name = compact_model_name.replace('.pt', '.weights')
+    weights_dir_name = dir_name.replace('cfg', 'weights')
+    if not os.path.isdir(weights_dir_name):
+        os.makedirs(weights_dir_name)
+    compact_model_name = weights_dir_name + f'/layer_channel_prune_{str(opt.shortcuts)}_shortcuts_{str(opt.percent)}_percent.weights'
+
     save_weights(compact_model2, path=compact_model_name)
     print(f'Compact model has been saved: {compact_model_name}')

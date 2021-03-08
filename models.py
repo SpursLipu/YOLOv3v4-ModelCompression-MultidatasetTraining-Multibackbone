@@ -1,7 +1,7 @@
 from utils.google_utils import *
 from utils.parse_config import *
-from utils.quantized_google import *
-from utils.quantized_dorefa import *
+from utils.quantized.quantized_google import *
+from utils.quantized.quantized_dorefa import *
 from utils.layers import *
 import copy
 

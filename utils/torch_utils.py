@@ -3,11 +3,8 @@ import os
 import time
 from copy import deepcopy
 
-import torch
 import torch.backends.cudnn as cudnn
-import torch.nn as nn
-import torch.nn.functional as F
-from utils.quantized_google import *
+from utils.quantized.quantized_google import *
 
 
 def init_seeds(seed=0):

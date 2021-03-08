@@ -777,15 +777,14 @@ def WarmupForQ(hyp, step, a_bit, w_bit):
                         print('WARNING: non-finite loss, ending training ', loss_items)
                         return results
             else:
-                with amp.autocast(enabled=cuda):
-                    targets = targets.to(device)
-                    pred, feature_s = model(imgs)
+                targets = targets.to(device)
+                pred, feature_s = model(imgs)
 
-                    # Loss
-                    loss, loss_items = compute_loss(pred, targets, model)
-                    if not torch.isfinite(loss):
-                        print('WARNING: non-finite loss, ending training ', loss_items)
-                        return results
+                # Loss
+                loss, loss_items = compute_loss(pred, targets, model)
+                if not torch.isfinite(loss):
+                    print('WARNING: non-finite loss, ending training ', loss_items)
+                    return results
 
             # Backward
             loss *= batch_size / 64  # scale loss

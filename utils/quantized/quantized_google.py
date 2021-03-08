@@ -138,7 +138,7 @@ class Quantizer(nn.Module):
             output = self.dequantize(output)  # 反量化
         return output
 
-    def get_weights(self, input):
+    def get_quantize_value(self, input):
         if self.bits == 32:
             output = input
         elif self.bits == 1:
@@ -181,7 +181,7 @@ class AsymmetricQuantizer(Quantizer):
             float_range = self.range_tracker.max_val - self.range_tracker.min_val  # 量化前范围
             float_range = 2 ** float_range.log2().ceil()
         self.scale = float_range / quantized_range  # 量化比例因子
-        self.zero_point = torch.round(max_val - self.range_tracker.max_val/self.scale)  # 量化零点
+        self.zero_point = torch.round(max_val - self.range_tracker.max_val / self.scale)  # 量化零点
 
 
 # ********************* 量化卷积（同时量化A/W，并做卷积） *********************
@@ -274,7 +274,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             momentum=0.01,  # 考虑量化带来的抖动影响,对momentum进行调整(0.1 ——> 0.01),削弱batch统计参数占比，一定程度抑制抖动。经实验量化训练效果更好,acc提升1%左右
             a_bits=8,
             w_bits=8,
-            q_type=1,
+            q_type=0,
             bn=0,
             activate='leaky'
     ):

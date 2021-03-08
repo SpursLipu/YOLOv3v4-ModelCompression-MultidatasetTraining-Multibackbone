@@ -47,7 +47,7 @@ def convert():
                     a = struct.pack('<i', int(weight_scale))
                     w_scale.write(a)
                 # 处理weights
-                para = conv_layer.weight_quantizer.get_weights(weight)
+                para = conv_layer.weight_quantizer.quantize_value(weight)
 
                 if opt.reorder:
                     # 重排序参数
@@ -122,7 +122,7 @@ def convert():
                 # 处理bias
                 if bias != None:
                     # 生成量化后的参数
-                    para = conv_layer.bias_quantizer.get_weights(bias)
+                    para = conv_layer.bias_quantizer.quantize_value(bias)
                     if opt.quantized == 1:
                         bias_scale = -math.log(conv_layer.bias_quantizer.scale.cpu().data.numpy()[0], 2)
                         a = struct.pack('<i', int(bias_scale))

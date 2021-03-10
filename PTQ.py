@@ -65,12 +65,12 @@ def PTQ(cfg,
                               pin_memory=True,
                               collate_fn=t_dataset.collate_fn)
 
-    # test.test(cfg,
-    #           data=opt.t_data,
-    #           batch_size=batch_size,
-    #           imgsz=imgsz,
-    #           model=model,
-    #           dataloader=t_dataloader)
+    test.test(cfg,
+              data=opt.t_data,
+              batch_size=batch_size,
+              imgsz=imgsz,
+              model=model,
+              dataloader=t_dataloader)
 
     q_model.train()
 

@@ -1,7 +1,7 @@
+# Author:LiPu
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import init
 from torch.nn.parameter import Parameter
 from torch.autograd import Function
 
@@ -78,11 +78,6 @@ class Round(Function):
     def forward(self, input):
         output = torch.round(input)
         return output
-
-    @staticmethod
-    def backward(self, grad_output):
-        grad_input = grad_output.clone()
-        return grad_input
 
 
 class Quantizer(nn.Module):
@@ -172,7 +167,12 @@ class SymmetricQuantizer(Quantizer):
                                     torch.abs(self.range_tracker.max_val))  # 量化前范围
         else:
             float_max = torch.max(torch.abs(self.range_tracker.min_val), torch.abs(self.range_tracker.max_val))  # 量化前范围
-            float_range = 2 ** float_max.log2().ceil()
+            floor_float_range = 2 ** float_max.log2().floor()
+            ceil_float_range = 2 ** float_max.log2().ceil()
+            if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                float_range = ceil_float_range
+            else:
+                float_range = floor_float_range
         self.scale = float_range / quantized_range  # 量化比例因子
         self.zero_point = torch.zeros_like(self.scale)  # 量化零点
 
@@ -198,7 +198,7 @@ class AsymmetricQuantizer(Quantizer):
 
 
 # ********************* 量化卷积（同时量化A/W，并做卷积） *********************
-class QuantizedConv2d(nn.Conv2d):
+class PTQuantizedConv2d(nn.Conv2d):
     def __init__(
             self,
             in_channels,
@@ -272,7 +272,7 @@ def reshape_to_bias(input):
 # ********************* bn融合_量化卷积（bn融合后，同时量化A/W，并做卷积） *********************
 
 
-class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
+class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
     def __init__(
             self,
             in_channels,
@@ -312,10 +312,6 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         self.register_buffer('batch_mean', torch.zeros(out_channels))
         self.register_buffer('batch_var', torch.zeros(out_channels))
         self.register_buffer('first_bn', torch.zeros(1))
-        # init.uniform_(self.gamma)
-        # init.ones_(self.gamma)
-        init.normal_(self.gamma, 1, 0.5)
-        init.zeros_(self.beta)
 
         # 实例化量化器（A-layer级，W-channel级）
         if q_type == 0:
@@ -341,104 +337,34 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                                                       out_channels=-1, FPGA=True, sign=False)
 
     def forward(self, input):
-        # 训练态
-        if self.training:
-            if self.bn:
-                # 先做普通卷积得到A，以取得BN参数
-                output = F.conv2d(
-                    input=input,
-                    weight=self.weight,
-                    bias=self.bias,
-                    stride=self.stride,
-                    padding=self.padding,
-                    dilation=self.dilation,
-                    groups=self.groups
-                )
-                # 更新BN统计参数（batch和running）
-                dims = [dim for dim in range(4) if dim != 1]
-                self.batch_mean = torch.mean(output, dim=dims)
-                self.batch_var = torch.var(output, dim=dims)
-                with torch.no_grad():
-                    if self.first_bn == 0 and torch.equal(self.running_mean, torch.zeros_like(
-                            self.running_mean)) and torch.equal(self.running_var, torch.zeros_like(self.running_var)):
-                        self.first_bn.add_(1)
-                        self.running_mean.add_(self.batch_mean)
-                        self.running_var.add_(self.batch_var)
-                    else:
-                        self.running_mean.mul_(1 - self.momentum).add_(self.batch_mean * self.momentum)
-                        self.running_var.mul_(1 - self.momentum).add_(self.batch_var * self.momentum)
-                # BN融合
-                if self.bias is not None:
-                    bias = reshape_to_bias(
-                        self.beta + (self.bias - self.batch_mean) * (
-                                self.gamma / torch.sqrt(self.batch_var + self.eps)))
-                else:
-                    bias = reshape_to_bias(
-                        self.beta - self.batch_mean * (self.gamma / torch.sqrt(self.batch_var + self.eps)))  # b融batch
-                weight = self.weight * reshape_to_weight(
-                    self.gamma / torch.sqrt(self.batch_var + self.eps))  # w融running
-                # if self.bias is not None:
-                #     bias = reshape_to_bias(
-                #         self.beta + (self.bias - self.running_mean) * (
-                #                     self.gamma / torch.sqrt(self.running_var + self.eps)))
-                # else:
-                #     bias = reshape_to_bias(
-                #         self.beta - self.running_mean * (
-                #                     self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融batch
-                # weight = self.weight * reshape_to_weight(
-                #     self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
+        if self.bn:
+            # BN融合
+            if self.bias is not None:
+                bias = reshape_to_bias(self.beta + (self.bias - self.running_mean) * (
+                        self.gamma / torch.sqrt(self.running_var + self.eps)))
             else:
-                bias = self.bias
-                weight = self.weight
-        # 测试态
+                bias = reshape_to_bias(
+                    self.beta - self.running_mean * self.gamma / torch.sqrt(
+                        self.running_var + self.eps))  # b融running
+            weight = self.weight * reshape_to_weight(
+                self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
         else:
-            # print(self.running_mean, self.running_var)
-            if self.bn:
-                # BN融合
-                if self.bias is not None:
-                    bias = reshape_to_bias(self.beta + (self.bias - self.running_mean) * (
-                            self.gamma / torch.sqrt(self.running_var + self.eps)))
-                else:
-                    bias = reshape_to_bias(
-                        self.beta - self.running_mean * self.gamma / torch.sqrt(
-                            self.running_var + self.eps))  # b融running
-                weight = self.weight * reshape_to_weight(
-                    self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
-            else:
-                bias = self.bias
-                weight = self.weight
+            bias = self.bias
+            weight = self.weight
+
         # 量化A和bn融合后的W
         q_weight = self.weight_quantizer(weight)
         q_bias = self.bias_quantizer(bias)
         # 量化卷积
-        if self.training:  # 训练态
-            output = F.conv2d(
-                input=input,
-                weight=q_weight,
-                bias=q_bias,
-                stride=self.stride,
-                padding=self.padding,
-                dilation=self.dilation,
-                groups=self.groups
-            )
-            # （这里将训练态下，卷积中w融合running参数的效果转为融合batch参数的效果）running ——> batch
-            # if self.bn:
-            #     output *= reshape_to_activation(
-            #         torch.sqrt(self.running_var + self.eps) / torch.sqrt(self.batch_var + self.eps))
-            #     output += reshape_to_activation(
-            #         self.gamma * (self.running_mean / (self.running_var + self.eps) - self.batch_mean / (
-            #                 self.batch_var + self.eps)))
-            # output += reshape_to_activation(bias)
-        else:  # 测试态
-            output = F.conv2d(
-                input=input,
-                weight=q_weight,
-                bias=q_bias,  # 注意，这里加bias，做完整的conv+bn
-                stride=self.stride,
-                padding=self.padding,
-                dilation=self.dilation,
-                groups=self.groups
-            )
+        output = F.conv2d(
+            input=input,
+            weight=q_weight,
+            bias=q_bias,  # 注意，这里加bias，做完整的conv+bn
+            stride=self.stride,
+            padding=self.padding,
+            dilation=self.dilation,
+            groups=self.groups
+        )
         if self.activate == 'leaky':
             output = F.leaky_relu(output, 0.125, inplace=True)
         elif self.activate == 'relu6':

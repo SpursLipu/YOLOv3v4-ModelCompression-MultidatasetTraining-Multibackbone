@@ -92,16 +92,6 @@ def test(cfg,
             # Run model
             t = torch_utils.time_synchronized()
 
-            # # FPGA quantized
-            # if hasattr(model, 'module'):
-            #     if model.module.FPGA:
-            #         scale = torch.tensor([2 ** (-(model.module.a_bit - 2))]).to(imgs.device)
-            #         imgs = torch.round(imgs * scale) / scale
-            # else:
-            #     if model.FPGA:
-            #         scale = torch.tensor([2 ** (-(model.a_bit - 2))]).to(imgs.device)
-            #         imgs = torch.round(imgs * scale) / scale
-
             inf_out, train_out, _ = model(imgs, augment=augment)  # inference and training outputs
             t0 += torch_utils.time_synchronized() - t
 
@@ -261,8 +251,6 @@ if __name__ == '__main__':
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--quantized', type=int, default=-1,
                         help='0:quantization way one Ternarized weight and 8bit activation')
-    parser.add_argument('--qlayers', type=int, default=-1,
-                        help='0:no quantization , x:The shallow layer of current quantized layers(from deep to shallow)')
     parser.add_argument('--a-bit', type=int, default=8,
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,

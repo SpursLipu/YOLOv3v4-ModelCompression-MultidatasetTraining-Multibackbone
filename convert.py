@@ -9,8 +9,7 @@ from utils.utils import *
 
 def convert():
     img_size = (320, 192) if ONNX_EXPORT else opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
-    weights, half, view_img = opt.weights, opt.half, opt.view_img
-
+    weights = opt.weights
     # Initialize
     device = torch_utils.select_device(opt.device)
 

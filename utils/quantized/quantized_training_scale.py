@@ -1,3 +1,4 @@
+# Author:LiPu
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -86,12 +87,11 @@ class Round(Function):
 
 
 class Quantizer(nn.Module):
-    def __init__(self, bits, range_tracker, out_channels, FPGA, sign=True):
+    def __init__(self, bits, range_tracker, out_channels, FPGA):
         super().__init__()
         self.bits = bits
         self.range_tracker = range_tracker
         self.FPGA = FPGA
-        self.sign = sign
         if out_channels == -1:
             self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
             self.register_buffer('zero_point', torch.zeros(1))  # 量化零点
@@ -113,12 +113,8 @@ class Quantizer(nn.Module):
 
     # 截断
     def clamp(self, input):
-        if self.sign:
-            min_val = torch.tensor(-(1 << (self.bits - 1)))
-            max_val = torch.tensor((1 << (self.bits - 1)) - 1)
-        if not self.sign:
-            min_val = torch.tensor(0)
-            max_val = torch.tensor((1 << self.bits) - 1)
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
         output = torch.clamp(input, min_val, max_val)
         return output
 
@@ -160,12 +156,8 @@ class Quantizer(nn.Module):
 class SymmetricQuantizer(Quantizer):
 
     def update_params(self):
-        if self.sign:
-            min_val = torch.tensor(-(1 << (self.bits - 1)))
-            max_val = torch.tensor((1 << (self.bits - 1)) - 1)
-        else:
-            min_val = torch.tensor(0)
-            max_val = torch.tensor((1 << self.bits) - 1)
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
         quantized_range = torch.max(torch.abs(min_val), torch.abs(max_val))  # 量化后范围
         if self.FPGA == False:
             float_range = torch.max(torch.abs(self.range_tracker.min_val),
@@ -181,12 +173,8 @@ class SymmetricQuantizer(Quantizer):
 class AsymmetricQuantizer(Quantizer):
 
     def update_params(self):
-        if self.sign:
-            min_val = torch.tensor(-(1 << (self.bits - 1)))
-            max_val = torch.tensor((1 << (self.bits - 1)) - 1)
-        else:
-            min_val = torch.tensor(0)
-            max_val = torch.tensor((1 << self.bits) - 1)
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
         quantized_range = max_val - min_val  # 量化后范围
         if self.FPGA == False:
             float_range = self.range_tracker.max_val - self.range_tracker.min_val  # 量化前范围
@@ -234,10 +222,10 @@ class QuantizedConv2d(nn.Conv2d):
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
                                                             range_tracker=AveragedRangeTracker(q_level='L',
                                                                                                out_channels=-1),
-                                                            out_channels=-1, FPGA=False, sign=False)
+                                                            out_channels=-1, FPGA=False)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
                                                                                                       out_channels=out_channels),
-                                                        out_channels=out_channels, FPGA=False, sign=False)
+                                                        out_channels=out_channels, FPGA=False)
 
     def forward(self, input):
         # 量化A和W
@@ -332,13 +320,13 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
                                                             range_tracker=AveragedRangeTracker(q_level='L',
                                                                                                out_channels=-1),
-                                                            out_channels=-1, FPGA=True, sign=False)
+                                                            out_channels=-1, FPGA=True)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits,
                                                         range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                        out_channels=-1, FPGA=True, sign=False)
+                                                        out_channels=-1, FPGA=True)
             self.bias_quantizer = AsymmetricQuantizer(bits=w_bits,
                                                       range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                      out_channels=-1, FPGA=True, sign=False)
+                                                      out_channels=-1, FPGA=True)
 
     def forward(self, input):
         # 训练态

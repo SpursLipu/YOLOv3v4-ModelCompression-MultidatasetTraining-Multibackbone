@@ -64,7 +64,7 @@ def PTQ(cfg,
                               num_workers=min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8]),
                               pin_memory=True,
                               collate_fn=t_dataset.collate_fn)
-
+    print('<.....................test original model.......................>')
     test.test(cfg,
               data=opt.t_data,
               batch_size=batch_size,
@@ -74,20 +74,21 @@ def PTQ(cfg,
 
     q_model.train()
 
-    s = ('%20s' + '%10s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@0.5', 'F1')
-    for batch_i, (imgs, targets, paths, shapes) in enumerate(tqdm(c_dataloader, desc=s)):
+    print('<.....................Quantize.......................>')
+    for batch_i, (imgs, _, _, _) in enumerate(tqdm(c_dataloader)):
         imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
         # Disable gradients
         with torch.no_grad():
             _, _ = q_model(imgs, augment=augment)  # inference and training outputs
 
+    print('<.....................test quantized model.......................>')
     test.test(cfg,
               data=opt.t_data,
               batch_size=batch_size,
               imgsz=imgsz,
               model=q_model,
               dataloader=t_dataloader,
-              quantized=3,
+              quantized=4,
               a_bit=opt.a_bit,
               w_bit=opt.w_bit,
               FPGA=opt.FPGA)

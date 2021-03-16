@@ -4,6 +4,7 @@ from utils.quantized.quantized_google import *
 from utils.quantized.quantized_dorefa import *
 from utils.quantized.quantized_ptq import *
 from utils.quantized.quantized_ptq_cos import *
+from utils.quantized.quantized_training_scale import *
 from utils.layers import *
 import copy
 
@@ -158,6 +159,47 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA
                                                                                   w_bits=w_bit,
                                                                                   bn=bn,
                                                                                   activate=mdef['activation']))
+            elif quantized == 5:
+                if FPGA:
+                    modules.add_module('Conv2d',
+                                       Training_scale_BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                                      out_channels=filters,
+                                                                                      kernel_size=kernel_size,
+                                                                                      stride=int(mdef['stride']),
+                                                                                      padding=pad,
+                                                                                      groups=mdef[
+                                                                                          'groups'] if 'groups' in mdef else 1,
+                                                                                      bias=not bn,
+                                                                                      a_bits=a_bit,
+                                                                                      w_bits=w_bit,
+                                                                                      bn=bn,
+                                                                                      activate=mdef['activation']))
+                else:
+                    modules.add_module('Conv2d', Training_scale_QuantizedConv2d(in_channels=output_filters[-1],
+                                                                                out_channels=filters,
+                                                                                kernel_size=kernel_size,
+                                                                                stride=int(mdef['stride']),
+                                                                                padding=pad,
+                                                                                groups=mdef[
+                                                                                    'groups'] if 'groups' in mdef else 1,
+                                                                                bias=not bn,
+                                                                                a_bits=a_bit,
+                                                                                w_bits=w_bit))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
+                    if mdef['activation'] == 'leaky':
+                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                        # modules.add_module('activation', Swish())
+                    if mdef['activation'] == 'relu6':
+                        modules.add_module('activation', ReLU6())
+                    if mdef['activation'] == 'h_swish':
+                        modules.add_module('activation', HardSwish())
+                    if mdef['activation'] == 'relu':
+                        modules.add_module('activation', nn.ReLU())
+                    if mdef['activation'] == 'mish':
+                        modules.add_module('activation', Mish())
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,
@@ -302,7 +344,6 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA
                         modules.add_module('activation', nn.ReLU())
                     if mdef['activation'] == 'mish':
                         modules.add_module('activation', Mish())
-
             elif quantized == 4:
                 modules.add_module('DepthWise2d', BNFold_COSPTQuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
                                                                                        out_channels=filters,
@@ -315,7 +356,45 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA
                                                                                        w_bits=w_bit,
                                                                                        bn=bn,
                                                                                        activate=mdef['activation']))
+            elif quantized == 5:
+                if FPGA:
+                    modules.add_module('DepthWise2d',
+                                       Training_scale_BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                                      out_channels=filters,
+                                                                                      kernel_size=kernel_size,
+                                                                                      stride=int(mdef['stride']),
+                                                                                      padding=pad,
+                                                                                      groups=output_filters[-1],
+                                                                                      bias=not bn,
+                                                                                      a_bits=a_bit,
+                                                                                      w_bits=w_bit,
+                                                                                      bn=bn,
+                                                                                      activate=mdef['activation']))
+                else:
+                    modules.add_module('DepthWise2d', Training_scale_QuantizedConv2d(in_channels=output_filters[-1],
+                                                                                     out_channels=filters,
+                                                                                     kernel_size=kernel_size,
+                                                                                     stride=int(mdef['stride']),
+                                                                                     padding=pad,
+                                                                                     groups=output_filters[-1],
+                                                                                     bias=not bn,
+                                                                                     a_bits=a_bit,
+                                                                                     w_bits=w_bit))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
+                    if mdef['activation'] == 'leaky':
+                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                        # modules.add_module('activation', Swish())
+                    if mdef['activation'] == 'relu6':
+                        modules.add_module('activation', ReLU6())
+                    if mdef['activation'] == 'h_swish':
+                        modules.add_module('activation', HardSwish())
+                    if mdef['activation'] == 'relu':
+                        modules.add_module('activation', nn.ReLU())
+                    if mdef['activation'] == 'mish':
+                        modules.add_module('activation', Mish())
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
                                                             out_channels=filters,
@@ -647,6 +726,30 @@ class Darknet(nn.Module):
 
     def info(self, verbose=False):
         torch_utils.model_info(self, verbose)
+
+    def init_scale_open(self):
+        if self.quantized == 5:
+            for i, module in enumerate(self.module_list):
+                if hasattr(module, 'Conv2d'):
+                    if self.FPGA:
+                        module.Conv2d.activation_quantizer.scale_init = True
+                        module.Conv2d.weight_quantizer.scale_init = True
+                        module.Conv2d.bias_quantizer.scale_init = True
+                    else:
+                        module.Conv2d.activation_quantizer.scale_init = True
+                        module.Conv2d.weight_quantizer.scale_init = True
+
+    def init_scale_close(self):
+        if self.quantized == 5:
+            for i, module in enumerate(self.module_list):
+                if hasattr(module, 'Conv2d'):
+                    if self.FPGA:
+                        module.Conv2d.activation_quantizer.scale_init = False
+                        module.Conv2d.weight_quantizer.scale_init = False
+                        module.Conv2d.bias_quantizer.scale_init = False
+                    else:
+                        module.Conv2d.activation_quantizer.scale_init = False
+                        module.Conv2d.weight_quantizer.scale_init = False
 
 
 def get_yolo_layers(model):

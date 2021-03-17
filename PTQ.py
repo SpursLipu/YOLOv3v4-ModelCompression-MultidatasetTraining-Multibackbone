@@ -22,7 +22,8 @@ def PTQ(cfg,
         FPGA=False):
     # Initialize/load model and set device
     device = torch_utils.select_device(opt.device, batch_size=batch_size)
-
+    print('PTQ only support for one gpu!')
+    print('')  # skip a line
     # Initialize model
     model = Darknet(cfg)
     q_model = Darknet(cfg, quantized=4, a_bit=a_bit, w_bit=w_bit, FPGA=FPGA)
@@ -39,9 +40,6 @@ def PTQ(cfg,
     model.to(device)
     q_model.to(device)
 
-    if device.type != 'cpu' and torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
-        q_model = nn.DataParallel(q_model)
     # Configure run
     t_data = parse_data_cfg(t_data)
     t_path = t_data['valid']  # path to test images
@@ -64,6 +62,7 @@ def PTQ(cfg,
                               num_workers=min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8]),
                               pin_memory=True,
                               collate_fn=t_dataset.collate_fn)
+    print('')  # skip a line
     print('<.....................test original model.......................>')
     test.test(cfg,
               data=opt.t_data,
@@ -73,15 +72,17 @@ def PTQ(cfg,
               dataloader=t_dataloader)
 
     q_model.train()
-
+    print('')  # skip a line
     print('<.....................Quantize.......................>')
+
     for batch_i, (imgs, _, _, _) in enumerate(tqdm(c_dataloader)):
         imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
         # Disable gradients
         with torch.no_grad():
             _, _ = q_model(imgs, augment=augment)  # inference and training outputs
-
+    print('')  # skip a line
     print('<.....................test quantized model.......................>')
+    print('')  # skip a line
     test.test(cfg,
               data=opt.t_data,
               batch_size=batch_size,
@@ -98,8 +99,11 @@ def PTQ(cfg,
         model_temp = q_model.module.state_dict()
     else:
         model_temp = q_model.state_dict()
-    chkpt = {'model': model_temp, }
-
+    chkpt = {'epoch': None,
+             'best_fitness': None,
+             'training_results': None,
+             'model': model_temp,
+             'optimizer': None}
     # Save last, best and delete
     torch.save(chkpt, PTQ_weights)
     del chkpt

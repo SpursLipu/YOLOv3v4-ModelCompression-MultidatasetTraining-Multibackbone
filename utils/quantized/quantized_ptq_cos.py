@@ -60,6 +60,7 @@ class Quantizer(nn.Module):
     def forward(self, input):
         if self.bits == 32:
             output = input
+            return output
         elif self.bits == 1:
             print('！Binary quantization is not supported ！')
             assert self.bits != 1

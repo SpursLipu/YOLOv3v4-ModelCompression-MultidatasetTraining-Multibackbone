@@ -172,7 +172,12 @@ class SymmetricQuantizer(Quantizer):
                                     torch.abs(self.range_tracker.max_val))  # 量化前范围
         else:
             float_max = torch.max(torch.abs(self.range_tracker.min_val), torch.abs(self.range_tracker.max_val))  # 量化前范围
-            float_range = 2 ** float_max.log2().ceil()
+            floor_float_range = 2 ** float_max.log2().floor()
+            ceil_float_range = 2 ** float_max.log2().ceil()
+            if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                float_range = ceil_float_range
+            else:
+                float_range = floor_float_range
         self.scale = float_range / quantized_range  # 量化比例因子
         self.zero_point = torch.zeros_like(self.scale)  # 量化零点
 

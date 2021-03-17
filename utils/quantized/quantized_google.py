@@ -197,7 +197,12 @@ class AsymmetricQuantizer(Quantizer):
             float_range = self.range_tracker.max_val - self.range_tracker.min_val  # 量化前范围
         else:
             float_range = self.range_tracker.max_val - self.range_tracker.min_val  # 量化前范围
-            float_range = 2 ** float_range.log2().ceil()
+            ceil_float_range = 2 ** float_range.log2().ceil()
+            floor_float_range = 2 ** float_range.log2().floor()
+            if abs(ceil_float_range - float_range) < abs(floor_float_range - float_range):
+                float_range = ceil_float_range
+            else:
+                float_range = floor_float_range
         self.scale = float_range / quantized_range  # 量化比例因子
         self.zero_point = torch.round(max_val - self.range_tracker.max_val / self.scale)  # 量化零点
 

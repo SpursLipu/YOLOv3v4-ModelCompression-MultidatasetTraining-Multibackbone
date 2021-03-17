@@ -268,16 +268,6 @@ def train(hyp):
     if opt.ema:
         ema = torch_utils.ModelEMA(model)
 
-    if opt.quantized == 5:
-        print('<.....................initialize scale.......................>')
-        model.init_scale_open()
-        s = ('%20s' + '%10s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@0.5', 'F1')
-        for batch_i, (imgs, targets, paths, shapes) in enumerate(tqdm(dataloader, desc=s)):
-            imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
-            # Disable gradients
-            with torch.no_grad():
-                _, _ = model(imgs)  # inference and training outputs
-        model.init_scale_close()
     # Start training
     nb = len(dataloader)  # number of batches
     n_burn = max(3 * nb, 500)  # burn-in iterations, max(3 epochs, 500 iterations)

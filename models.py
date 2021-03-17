@@ -647,30 +647,6 @@ class Darknet(nn.Module):
     def info(self, verbose=False):
         torch_utils.model_info(self, verbose)
 
-    def init_scale_open(self):
-        if self.quantized == 5:
-            for i, module in enumerate(self.module_list):
-                if hasattr(module, 'Conv2d'):
-                    if self.FPGA:
-                        module.Conv2d.activation_quantizer.scale_init = True
-                        module.Conv2d.weight_quantizer.scale_init = True
-                        module.Conv2d.bias_quantizer.scale_init = True
-                    else:
-                        module.Conv2d.activation_quantizer.scale_init = True
-                        module.Conv2d.weight_quantizer.scale_init = True
-
-    def init_scale_close(self):
-        if self.quantized == 5:
-            for i, module in enumerate(self.module_list):
-                if hasattr(module, 'Conv2d'):
-                    if self.FPGA:
-                        module.Conv2d.activation_quantizer.scale_init = False
-                        module.Conv2d.weight_quantizer.scale_init = False
-                        module.Conv2d.bias_quantizer.scale_init = False
-                    else:
-                        module.Conv2d.activation_quantizer.scale_init = False
-                        module.Conv2d.weight_quantizer.scale_init = False
-
 
 def get_yolo_layers(model):
     return [i for i, m in enumerate(model.module_list) if m.__class__.__name__ == 'YOLOLayer']  # [89, 101, 113]

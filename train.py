@@ -89,7 +89,7 @@ def train(hyp):
 
     # Initialize model
     model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
-                    FPGA=opt.FPGA).to(device)
+                    FPGA=opt.FPGA, epochs=epochs).to(device)
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
 

@@ -280,8 +280,6 @@ def reshape_to_bias(input):
 
 
 # ********************* bn融合_量化卷积（bn融合后，同时量化A/W，并做卷积） *********************
-
-
 class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
     def __init__(
             self,
@@ -299,7 +297,8 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             w_bits=8,
             q_type=0,
             bn=0,
-            activate='leaky'
+            activate='leaky',
+            epochs=0,
     ):
         super().__init__(
             in_channels=in_channels,
@@ -315,6 +314,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         self.activate = activate
         self.eps = eps
         self.momentum = momentum
+        self.freeze_epoch = int(epochs * 0.75)
         self.gamma = Parameter(torch.Tensor(out_channels))
         self.beta = Parameter(torch.Tensor(out_channels))
         self.register_buffer('running_mean', torch.zeros(out_channels))
@@ -322,8 +322,8 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         self.register_buffer('batch_mean', torch.zeros(out_channels))
         self.register_buffer('batch_var', torch.zeros(out_channels))
         self.register_buffer('first_bn', torch.zeros(1))
-        # init.uniform_(self.gamma)
-        # init.ones_(self.gamma)
+        self.register_buffer('epoch', torch.zeros(1))
+
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
 
@@ -353,6 +353,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
     def forward(self, input):
         # 训练态
         if self.training:
+            self.epoch += 1
             if self.bn:
                 # 先做普通卷积得到A，以取得BN参数
                 output = F.conv2d(
@@ -378,25 +379,28 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                         self.running_mean.mul_(1 - self.momentum).add_(self.batch_mean * self.momentum)
                         self.running_var.mul_(1 - self.momentum).add_(self.batch_var * self.momentum)
                 # BN融合
-                if self.bias is not None:
-                    bias = reshape_to_bias(
-                        self.beta + (self.bias - self.batch_mean) * (
-                                self.gamma / torch.sqrt(self.batch_var + self.eps)))
+                if self.epoch < self.freeze_epoch:
+                    if self.bias is not None:
+                        bias = reshape_to_bias(
+                            self.beta + (self.bias - self.batch_mean) * (
+                                    self.gamma / torch.sqrt(self.batch_var + self.eps)))
+                    else:
+                        bias = reshape_to_bias(
+                            self.beta - self.batch_mean * (
+                                    self.gamma / torch.sqrt(self.batch_var + self.eps)))  # b融batch
+                    weight = self.weight * reshape_to_weight(
+                        self.gamma / torch.sqrt(self.batch_var + self.eps))  # w融running
                 else:
-                    bias = reshape_to_bias(
-                        self.beta - self.batch_mean * (self.gamma / torch.sqrt(self.batch_var + self.eps)))  # b融batch
-                weight = self.weight * reshape_to_weight(
-                    self.gamma / torch.sqrt(self.batch_var + self.eps))  # w融running
-                # if self.bias is not None:
-                #     bias = reshape_to_bias(
-                #         self.beta + (self.bias - self.running_mean) * (
-                #                     self.gamma / torch.sqrt(self.running_var + self.eps)))
-                # else:
-                #     bias = reshape_to_bias(
-                #         self.beta - self.running_mean * (
-                #                     self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融batch
-                # weight = self.weight * reshape_to_weight(
-                #     self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
+                    if self.bias is not None:
+                        bias = reshape_to_bias(
+                            self.beta + (self.bias - self.running_mean) * (
+                                    self.gamma / torch.sqrt(self.running_var + self.eps)))
+                    else:
+                        bias = reshape_to_bias(
+                            self.beta - self.running_mean * (
+                                        self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融batch
+                    weight = self.weight * reshape_to_weight(
+                        self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
             else:
                 bias = self.bias
                 weight = self.weight
@@ -431,14 +435,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 dilation=self.dilation,
                 groups=self.groups
             )
-            # （这里将训练态下，卷积中w融合running参数的效果转为融合batch参数的效果）running ——> batch
-            # if self.bn:
-            #     output *= reshape_to_activation(
-            #         torch.sqrt(self.running_var + self.eps) / torch.sqrt(self.batch_var + self.eps))
-            #     output += reshape_to_activation(
-            #         self.gamma * (self.running_mean / (self.running_var + self.eps) - self.batch_mean / (
-            #                 self.batch_var + self.eps)))
-            # output += reshape_to_activation(bias)
+
         else:  # 测试态
             output = F.conv2d(
                 input=input,

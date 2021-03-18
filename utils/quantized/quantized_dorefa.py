@@ -164,7 +164,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             w_bits=8,
             bn=0,
             activate='leaky',
-            epochs=0,
+            steps=0,
     ):
         super().__init__(
             in_channels=in_channels,
@@ -180,7 +180,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
         self.activate = activate
         self.eps = eps
         self.momentum = momentum
-        self.freeze_epoch = int(epochs * 0.75)
+        self.freeze_step = int(steps * 0.75)
         self.gamma = Parameter(torch.Tensor(out_channels))
         self.beta = Parameter(torch.Tensor(out_channels))
         self.register_buffer('running_mean', torch.zeros(out_channels))
@@ -188,7 +188,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
         self.register_buffer('batch_mean', torch.zeros(out_channels))
         self.register_buffer('batch_var', torch.zeros(out_channels))
         self.register_buffer('first_bn', torch.zeros(1))
-        self.register_buffer('epoch', torch.zeros(1))
+        self.register_buffer('step', torch.zeros(1))
 
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
@@ -201,7 +201,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
     def forward(self, input):
         # 训练态
         if self.training:
-            self.epoch += 1
+            self.step += 1
             if self.bn:
                 # 先做普通卷积得到A，以取得BN参数
                 output = F.conv2d(
@@ -228,7 +228,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
                         self.running_mean.mul_(1 - self.momentum).add_(self.momentum * self.batch_mean)
                         self.running_var.mul_(1 - self.momentum).add_(self.momentum * self.batch_var)
                 # BN融合
-                if self.epoch < self.freeze_epoch:
+                if self.step < self.freeze_step:
                     if self.bias is not None:
                         bias = reshape_to_bias(
                             self.beta + (self.bias - self.batch_mean) * (
@@ -247,7 +247,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
                     else:
                         bias = reshape_to_bias(
                             self.beta - self.running_mean * (
-                                        self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融batch
+                                    self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融batch
                     weight = self.weight * reshape_to_weight(
                         self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
 

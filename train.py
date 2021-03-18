@@ -88,8 +88,9 @@ def train(hyp):
         os.remove(f)
 
     # Initialize model
+    steps = math.ceil(len(open(train_path).readlines()) / batch_size) * epochs
     model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
-                    FPGA=opt.FPGA, epochs=epochs).to(device)
+                    FPGA=opt.FPGA, steps=steps).to(device)
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
 

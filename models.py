@@ -202,7 +202,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA
                                                                        a_bits=a_bit,
                                                                        w_bits=w_bit,
                                                                        bn=bn,
-                                                                       activate=mdef['activation']))
+                                                                       activate=mdef['activation'],
+                                                                       epochs=epochs))
                 else:
                     modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
                                                                       out_channels=filters,
@@ -240,7 +241,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA
                                                                           a_bits=a_bit,
                                                                           w_bits=w_bit,
                                                                           bn=bn,
-                                                                          activate=mdef['activation']))
+                                                                          activate=mdef['activation'],
+                                                                          epochs=epochs))
                 else:
                     modules.add_module('DepthWise2d', DorefaConv2d(in_channels=output_filters[-1],
                                                                    out_channels=filters,

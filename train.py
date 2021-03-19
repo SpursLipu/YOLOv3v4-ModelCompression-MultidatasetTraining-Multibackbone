@@ -126,8 +126,7 @@ def train(hyp):
             pg1 += [v]  # apply weight_decay
         else:
             pg0 += [v]  # all else
-    if opt.quantized == 1 or opt.quantized == 2:
-        hyp['lr0'] = hyp['lr0'] * 3
+
     if opt.adam:
         # hyp['lr0'] *= 0.1  # reduce lr (i.e. SGD=5E-3, Adam=5E-4)
         optimizer = optim.Adam(pg0, lr=hyp['lr0'])

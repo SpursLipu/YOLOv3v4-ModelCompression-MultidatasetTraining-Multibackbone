@@ -180,7 +180,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
         self.activate = activate
         self.eps = eps
         self.momentum = momentum
-        self.freeze_step = int(steps * 0.75)
+        self.freeze_step = int(steps * 0.9)
         self.gamma = Parameter(torch.Tensor(out_channels))
         self.beta = Parameter(torch.Tensor(out_channels))
         self.register_buffer('running_mean', torch.zeros(out_channels))

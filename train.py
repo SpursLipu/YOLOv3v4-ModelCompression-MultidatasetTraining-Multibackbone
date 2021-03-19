@@ -14,7 +14,7 @@ import math
 from torch.cuda import amp
 
 from utils.torch_utils import ModelEMA, select_device  # DDP import
-import torch.distributed as dist  
+import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 wdir = 'weights' + os.sep  # weights dir
@@ -92,21 +92,21 @@ def train(hyp):
         os.remove(f)
 
     # DDP  init
-    if opt.local_rank != -1 :
-        if opt.local_rank == 0 :
+    if opt.local_rank != -1:
+        if opt.local_rank == 0:
             print("--------------using ddp---------------")
         assert torch.cuda.device_count() > opt.local_rank
         torch.cuda.set_device(opt.local_rank)
         dist.init_process_group(backend='nccl', init_method='env://')  # distributed backend
-        
+
         assert opt.batch_size % opt.world_size == 0, '--batch-size must be multiple of CUDA device count'
         opt.batch_size = opt.batch_size // opt.world_size
-    else :
+    else:
         dist.init_process_group(backend='nccl',  # 'distributed backend'
                                 init_method='tcp://127.0.0.1:9999',  # distributed training init method
                                 world_size=1,  # number of nodes for distributed training
                                 rank=0)  # distributed training node rank
-        print("device is:",device)
+        print("device is:", device)
 
     # Initialize model
     steps = math.ceil(len(open(train_path).readlines()) / batch_size) * epochs
@@ -117,13 +117,6 @@ def train(hyp):
 
     # print('<.....................using gridmask.......................>')
     # gridmask = GridMask(d1=96, d2=224, rotate=360, ratio=0.6, mode=1, prob=0.8)
-    if opt.fencemask:
-        print('<.....................using fencemask.......................>')
-        fencemask = FenceMask(batch_size, img_size, 1).to(device)
-        max_epoch = int(epochs * 0.8)
-        pg_fencemask = []
-        for k, v in dict(fencemask.named_parameters()).items():
-            pg_fencemask += [v]
 
     # Optimizer
     pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
@@ -134,7 +127,8 @@ def train(hyp):
             pg1 += [v]  # apply weight_decay
         else:
             pg0 += [v]  # all else
-
+    if opt.quantized == 1 or opt.quantized == 2:
+        hyp['lr0'] = hyp['lr0'] * 3
     if opt.adam:
         # hyp['lr0'] *= 0.1  # reduce lr (i.e. SGD=5E-3, Adam=5E-4)
         optimizer = optim.Adam(pg0, lr=hyp['lr0'])
@@ -143,12 +137,7 @@ def train(hyp):
         optimizer = optim.SGD(pg0, lr=hyp['lr0'], momentum=hyp['momentum'], nesterov=True)
     optimizer.add_param_group({'params': pg1, 'weight_decay': hyp['weight_decay']})  # add pg1 with weight_decay
     optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
-    if opt.fencemask:
-        optimizer.add_param_group({'params': pg_fencemask})  # add pg2 (biases)
-        print('Optimizer groups: %g .bias, %g Conv2d.weight,%g fencemask, %g other' % (
-            len(pg2), len(pg1), len(pg_fencemask), len(pg0)))
-    else:
-        print('Optimizer groups: %g .bias, %g Conv2d.weight, %g other' % (len(pg2), len(pg1), len(pg0)))
+    print('Optimizer groups: %g .bias, %g Conv2d.weight, %g other' % (len(pg2), len(pg1), len(pg0)))
     del pg0, pg1, pg2
 
     best_fitness = 0.0
@@ -216,22 +205,22 @@ def train(hyp):
         model = DDP(model, device_ids=[opt.local_rank], output_device=opt.local_rank)
     else:
         model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
-    
+
     model.yolo_layers = model.module.yolo_layers  # move yolo layer indices to top level
 
     # Dataset
     dataset = LoadImagesAndLabels(train_path, img_size, batch_size,
-                                    augment=True,
-                                    hyp=hyp,  # augmentation hyperparameters
-                                    rect=opt.rect,  # rectangular training
-                                    cache_images=opt.cache_images,
-                                    single_cls=opt.single_cls)
+                                  augment=True,
+                                  hyp=hyp,  # augmentation hyperparameters
+                                  rect=opt.rect,  # rectangular training
+                                  cache_images=opt.cache_images,
+                                  single_cls=opt.single_cls)
 
     testset = LoadImagesAndLabels(test_path, imgsz_test, batch_size,
-                                    hyp=hyp,
-                                    rect=True,
-                                    cache_images=opt.cache_images,
-                                    single_cls=opt.single_cls)
+                                  hyp=hyp,
+                                  rect=True,
+                                  cache_images=opt.cache_images,
+                                  single_cls=opt.single_cls)
 
     # 获得要剪枝的层
     if hasattr(model, 'module'):
@@ -259,20 +248,20 @@ def train(hyp):
             print('layer sparse training')
             _, _, prune_idx = parse_module_defs4(model.module_defs)
 
-    train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)        # ddp sampler
-    test_sampler = torch.utils.data.distributed.DistributedSampler(testset)        
+    train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)  # ddp sampler
+    test_sampler = torch.utils.data.distributed.DistributedSampler(testset)
 
     # Dataloader
     batch_size = min(batch_size, len(dataset))
     nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8])  # number of workers
     dataloader = torch.utils.data.DataLoader(dataset,
-                                            batch_size=int(batch_size / opt.world_size),
-                                            num_workers=nw,
-                                            shuffle= False if (opt.local_rank != -1) else not opt.rect,
-                                            pin_memory=True,
-                                            collate_fn=dataset.collate_fn,
-                                            sampler= train_sampler if (opt.local_rank != -1) else None   
-                                            )
+                                             batch_size=int(batch_size / opt.world_size),
+                                             num_workers=nw,
+                                             shuffle=False if (opt.local_rank != -1) else not opt.rect,
+                                             pin_memory=True,
+                                             collate_fn=dataset.collate_fn,
+                                             sampler=train_sampler if (opt.local_rank != -1) else None
+                                             )
     # Testloader
     testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(test_path, imgsz_test, batch_size,
                                                                  hyp=hyp,
@@ -314,10 +303,8 @@ def train(hyp):
         cuda = device.type != 'cpu'
         scaler = amp.GradScaler(enabled=cuda)
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
-        if opt.local_rank != -1: 
+        if opt.local_rank != -1:
             dataloader.sampler.set_epoch(epoch)  # DDP set seed
-        if opt.fencemask:
-            fencemask.set_prob(epoch, max_epoch)
         # gridmask.set_prob(epoch, max_epoch)
         model.train()
         # 稀疏化标志
@@ -361,22 +348,11 @@ def train(hyp):
             # Forward
             if opt.mpt:
                 with amp.autocast(enabled=cuda):
-                    if opt.fencemask:
-                        fence_imgs, masks = fencemask(imgs)
-                        # print(torch.sum(fencemask.masks))
-                        fence_imgs = fence_imgs.detach()
-                        # imgs = gridmask(imgs)
-                        targets = targets.to(device)
-                        pred, feature_s = model(fence_imgs)
-                    else:
-                        targets = targets.to(device)
-                        pred, feature_s = model(imgs)
+                    targets = targets.to(device)
+                    pred, feature_s = model(imgs)
 
                     # Loss
                     loss, loss_items = compute_loss(pred, targets, model)
-                    if opt.fencemask:
-                        loss_FCLM = Failure_Case_Loss_FM(masks, imgs, targets)
-                        loss = loss + loss_FCLM
                     if not torch.isfinite(loss):
                         print('WARNING: non-finite loss, ending training ', loss_items)
                         return results
@@ -401,22 +377,11 @@ def train(hyp):
                             print("please select KD strategy!")
                         loss += soft_target
             else:
-                if opt.fencemask:
-                    fence_imgs, masks = fencemask(imgs)
-                    # print(torch.sum(fencemask.masks))
-                    fence_imgs = fence_imgs.detach()
-                    # imgs = gridmask(imgs)
-                    targets = targets.to(device)
-                    pred, feature_s = model(fence_imgs)
-                else:
-                    targets = targets.to(device)
-                    pred, feature_s = model(imgs)
+                targets = targets.to(device)
+                pred, feature_s = model(imgs)
 
                 # Loss
                 loss, loss_items = compute_loss(pred, targets, model)
-                if opt.fencemask:
-                    loss_FCLM = Failure_Case_Loss_FM(masks, imgs, targets)
-                    loss = loss + loss_FCLM
                 if not torch.isfinite(loss):
                     print('WARNING: non-finite loss, ending training ', loss_items)
                     return results
@@ -446,7 +411,6 @@ def train(hyp):
                 scaler.scale(loss).backward()
             else:
                 loss.backward()
-            # print(torch.sum(fencemask.group_masks.grad))
             # 对要剪枝层的γ参数稀疏化
             if hasattr(model, 'module'):
                 if opt.prune != -1:
@@ -563,7 +527,7 @@ def train(hyp):
                 model_temp = model.module.state_dict()
             else:
                 model_temp = model.state_dict()
-        if save and dist.get_rank() == 0:   # DDP save model only once
+        if save and dist.get_rank() == 0:  # DDP save model only once
             with open(results_file, 'r') as f:  # create checkpoint
                 chkpt = {'epoch': epoch,
                          'best_fitness': best_fitness,
@@ -637,14 +601,11 @@ if __name__ == '__main__':
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
-    parser.add_argument('--fencemask', action='store_true', help='fencemask')
-    
-    
+
     # DDP get local-rank
     parser.add_argument('--rank', default=0, help='rank of current process')
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
 
-    
     opt = parser.parse_args()
     opt.weights = last if opt.resume else opt.weights
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
@@ -656,17 +617,15 @@ if __name__ == '__main__':
     opt.world_size = int(os.environ['WORLD_SIZE']) if 'WORLD_SIZE' in os.environ else 1
     opt.global_rank = int(os.environ['RANK']) if 'RANK' in os.environ else -1
 
-    
-
     # scale hyp['obj'] by img_size (evolved at 320)
     # hyp['obj'] *= opt.img_size[0] / 320.
 
     # DDP set device
     if opt.local_rank != -1:
-            device = select_device(opt.device, batch_size=opt.batch_size)
-            device = torch.device('cuda', opt.local_rank)
+        device = select_device(opt.device, batch_size=opt.batch_size)
+        device = torch.device('cuda', opt.local_rank)
     else:
-            device = torch_utils.select_device(opt.device, batch_size=opt.batch_size)
+        device = torch_utils.select_device(opt.device, batch_size=opt.batch_size)
 
     tb_writer = None
     if not opt.evolve:  # Train normally

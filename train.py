@@ -106,7 +106,6 @@ def train(hyp):
                                 init_method='tcp://127.0.0.1:9999',  # distributed training init method
                                 world_size=1,  # number of nodes for distributed training
                                 rank=0)  # distributed training node rank
-        print("device is:", device)
 
     # Initialize model
     steps = math.ceil(len(open(train_path).readlines()) / batch_size) * epochs
@@ -202,7 +201,7 @@ def train(hyp):
 
     # Initialize distributed training
     if opt.local_rank != -1:
-        model = DDP(model, device_ids=[opt.local_rank], output_device=opt.local_rank)
+        model = DDP(model, device_ids=[opt.local_rank], output_device=opt.local_rank, find_unused_parameters=True)
     else:
         model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
 

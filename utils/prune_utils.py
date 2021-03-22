@@ -5,8 +5,6 @@ import numpy as np
 import torch.nn.functional as F
 
 
-
-
 def parse_module_defs2(module_defs):
     CBL_idx = []
     Other_idx = []
@@ -403,3 +401,16 @@ def update_activation(i, pruned_model, activation, CBL_idx):
             next_bn.running_mean.data.sub_(offset)
         else:
             next_conv.bias.data.add_(offset)
+
+
+def prune_model_keep_size_forEagleEye(model, prune_idx, CBLidx2mask):
+    pruned_model = deepcopy(model)
+    for i, model_def in enumerate(model.module_defs):
+
+        if model_def['type'] == 'convolutional' or model_def['type'] == 'depthwise' or model_def['type'] == 'se':
+            if i in prune_idx:
+                mask = torch.from_numpy(CBLidx2mask[i]).cuda()
+                bn_module = pruned_model.module_list[i][1]
+                bn_module.weight.data.mul_(mask)
+                bn_module.bias.data.mul_(mask)
+    return pruned_model

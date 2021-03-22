@@ -12,16 +12,6 @@ import os
 import argparse
 
 
-# 该函数有很重要的意义：
-# ①先用深拷贝将原始模型拷贝下来，得到model_copy
-# ②将model_copy中，BN层中低于阈值的α参数赋值为0
-# ③在BN层中，输出y=α*x+β，由于α参数的值被赋值为0，因此输入仅加了一个偏置β
-# ④很神奇的是，network slimming中是将α参数和β参数都置0，该处只将α参数置0，但效果却很好：其实在另外一篇论文中，已经提到，可以先将β参数的效果移到
-# 下一层卷积层，再去剪掉本层的α参数
-
-# 该函数用最简单的方法，让我们看到了，如何快速看到剪枝后的效果
-
-
 def prune_and_eval(model, sorted_bn, percent=.0):
     model_copy = deepcopy(model)
     thre_index = int(len(sorted_bn) * percent)

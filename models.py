@@ -11,7 +11,7 @@ ONNX_EXPORT = False
 
 
 # YOLO
-def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA=False, steps=0):
+def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bit=8, w_bit=8, FPGA=False, steps=0):
     # Constructs module list of layer blocks from module configuration in module_defs
 
     img_size = [img_size] * 2 if isinstance(img_size, int) else img_size  # expand if necessary
@@ -43,7 +43,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA
                                                                                  w_bits=w_bit,
                                                                                  bn=bn,
                                                                                  activate=mdef['activation'],
-                                                                                 steps=steps))
+                                                                                 steps=steps,
+                                                                                 quantizer_output=quantizer_output))
                 else:
                     modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
                                                                  out_channels=filters,
@@ -159,7 +160,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA
                                                                                   a_bits=a_bit,
                                                                                   w_bits=w_bit,
                                                                                   bn=bn,
-                                                                                  activate=mdef['activation']))
+                                                                                  activate=mdef['activation'],
+                                                                                  quantizer_output = quantizer_output))
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,
@@ -203,7 +205,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA
                                                                        w_bits=w_bit,
                                                                        bn=bn,
                                                                        activate=mdef['activation'],
-                                                                       steps=steps))
+                                                                       steps=steps,
+                                                                       quantizer_output = quantizer_output))
                 else:
                     modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
                                                                       out_channels=filters,
@@ -317,7 +320,8 @@ def create_modules(module_defs, img_size, cfg, quantized, a_bit=8, w_bit=8, FPGA
                                                                                        a_bits=a_bit,
                                                                                        w_bits=w_bit,
                                                                                        bn=bn,
-                                                                                       activate=mdef['activation']))
+                                                                                       activate=mdef['activation'],
+                                                                                       quantizer_output = quantizer_output))
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
                                                             out_channels=filters,
@@ -525,7 +529,7 @@ class YOLOLayer(nn.Module):
 class Darknet(nn.Module):
     # YOLOv3 object detection model
 
-    def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, FPGA=False, steps=0):
+    def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, FPGA=False, quantizer_output=False, steps=0):
         super(Darknet, self).__init__()
 
         if isinstance(cfg, str):
@@ -536,9 +540,10 @@ class Darknet(nn.Module):
         self.a_bit = a_bit
         self.w_bit = w_bit
         self.FPGA = FPGA
+        self.quantizer_output = quantizer_output####输出设置超参数
         self.hyperparams = copy.deepcopy(self.module_defs[0])
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
-                                                      a_bit=self.a_bit, w_bit=self.w_bit, FPGA=self.FPGA, steps=steps)
+                                                      quantizer_output=self.quantizer_output,a_bit=self.a_bit, w_bit=self.w_bit, FPGA=self.FPGA, steps=steps)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 

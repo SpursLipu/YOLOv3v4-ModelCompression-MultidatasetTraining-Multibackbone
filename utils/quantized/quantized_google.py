@@ -1,3 +1,9 @@
+import math
+import time
+import numpy as np
+import pandas as pd
+import scipy.io as io
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -154,6 +160,12 @@ class Quantizer(nn.Module):
             output = self.round(output)
             output = self.clamp(output)  # 截断
         return output
+################获得量化因子所对应的移位数
+    def get_scale(self):
+        #############移位修正
+        move_scale = math.log2(self.scale)
+        move_scale = np.array(move_scale).reshape(1, -1)
+        return move_scale
 
 
 # 对称量化
@@ -299,6 +311,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             bn=0,
             activate='leaky',
             steps=0,
+            quantizer_output=False
     ):
         super().__init__(
             in_channels=in_channels,
@@ -323,6 +336,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         self.register_buffer('batch_var', torch.zeros(out_channels))
         self.register_buffer('first_bn', torch.zeros(1))
         self.register_buffer('step', torch.zeros(1))
+        self.quantizer_output = quantizer_output
 
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
@@ -424,6 +438,28 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         # 量化A和bn融合后的W
         q_weight = self.weight_quantizer(weight)
         q_bias = self.bias_quantizer(bias)
+
+        if self.quantizer_output == True:
+            #######################输出当前层的权重量化因子
+            weight_scale = self.weight_quantizer.get_scale()
+            np.savetxt(('./w_scale_out/scale %f.txt' % time.time()), weight_scale, delimiter='\n')
+            #######################输出当前层的量化权重
+            q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
+            q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
+            q_weight_max = [np.max(q_weight_txt)]
+            # q_weight_max = np.argmax(q_weight_txt)
+            np.savetxt(('./q_weight_max/max_weight %f.txt' % time.time()), q_weight_max)
+            np.savetxt(('./q_weight_out/weight %f.txt' % time.time()), q_weight_txt, delimiter='\n')
+            # io.savemat('save.mat',{'q_weight_txt':q_weight_txt})
+
+            #######################输出当前层偏置的量化因子
+            bias_scale = self.bias_quantizer.get_scale()
+            np.savetxt(('./b_scale_out/scale %f.txt' % time.time()), bias_scale, delimiter='\n')
+            #######################输出当前层的量化偏置
+            q_bias_txt = self.bias_quantizer.get_quantize_value(bias)
+            q_bias_txt = np.array(q_bias_txt.cpu()).reshape(1, -1)
+            np.savetxt(('./q_bias_out/bias %f.txt' % time.time()), q_bias_txt, delimiter='\n')
+
         # 量化卷积
         if self.training:  # 训练态
             output = F.conv2d(
@@ -461,6 +497,19 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             pass
         else:
             print(self.activate + "%s is not supported !")
+
+        if self.quantizer_output == True:
+            ##################输出当前激活的量化因子
+            activation_scale = self.activation_quantizer.get_scale()
+            np.savetxt(('./a_scale_out/scale %f.txt' % time.time()), activation_scale, delimiter='\n')
+            ##################输出当前层的量化激活
+            q_activation_txt = self.activation_quantizer.get_quantize_value(output)
+            q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
+            q_activation_max = [np.max(q_activation_txt)]
+            # q_weight_max = np.argmax(q_weight_txt)
+            np.savetxt(('./q_activation_max/max_activation %f.txt' % time.time()), q_activation_max)
+            np.savetxt(('./q_activation_out/activation %f.txt' % time.time()), q_activation_txt, delimiter='\n')
+
         output = self.activation_quantizer(output)
         return output
 

@@ -17,15 +17,19 @@ def detect(save_img=False):
     os.makedirs(out)  # make new output folder
 
     # Initialize model
-    model = Darknet(opt.cfg, imgsz, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
+    model = Darknet(opt.cfg, imgsz, quantized=opt.quantized,quantizer_output=opt.quantizer_output, a_bit=opt.a_bit, w_bit=opt.w_bit,
                     FPGA=opt.FPGA)
 
     # Load weights
     attempt_download(weights)
     if weights.endswith('.pt'):  # pytorch format
-        model.load_state_dict(torch.load(weights, map_location=device)['model'], strict=False)
+        model.load_state_dict(torch.load(weights, map_location=device)['model'],strict=False)
     else:  # darknet format
         load_darknet_weights(model, weights)
+#################打印model_list
+    '''AWEIGHT = torch.load(weights, map_location=device)['model']
+    for k,v in AWEIGHT.items():
+        print(k)'''
 
     # Eval mode
     model.to(device).eval()
@@ -154,6 +158,7 @@ if __name__ == '__main__':
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
+    parser.add_argument('--quantizer_output', type=bool, default=False, help='output')
     opt = parser.parse_args()
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
     opt.names = list(glob.iglob('./**/' + opt.names, recursive=True))[0]  # find file
@@ -161,3 +166,84 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         detect()
+
+if opt.quantizer_output == True:
+    path='./q_bias_out'
+    i=1
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path,file))==True:
+            new_name=file.replace(file,"q_bias-modulelist_Conv2d_%d.txt"%(151-i))
+            os.rename(os.path.join(path,file),os.path.join(path,new_name))
+            i+=1
+
+    path='./q_weight_out'
+    i=1
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path,file))==True:
+            new_name=file.replace(file,"q_weight-modulelist_Conv2d_%d.txt"%(151-i))
+            os.rename(os.path.join(path,file),os.path.join(path,new_name))
+            i+=1
+
+    path='./q_activation_out'
+    i=1
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path,file))==True:
+            new_name=file.replace(file,"q_activation-modulelist_Conv2d_%d.txt"%(151-i))
+            os.rename(os.path.join(path,file),os.path.join(path,new_name))
+            i+=1
+
+    path='./b_scale_out'
+    i=1
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path,file))==True:
+            new_name=file.replace(file,"scale_bias-modulelist_Conv2d_%d.txt"%(151-i))
+            os.rename(os.path.join(path,file),os.path.join(path,new_name))
+            i+=1
+
+
+    path='./w_scale_out'
+    i=1
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path,file))==True:
+            new_name=file.replace(file,"scale_weight-modulelist_Conv2d_%d.txt"%(151-i))
+            os.rename(os.path.join(path,file),os.path.join(path,new_name))
+            i+=1
+
+    path='./a_scale_out'
+    i=1
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path,file))==True:
+            new_name=file.replace(file,"scale_activation-modulelist_Conv2d_%d.txt"%(151-i))
+            os.rename(os.path.join(path,file),os.path.join(path,new_name))
+            i+=1
+
+    path='./q_weight_max'
+    i=1
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path,file))==True:
+            new_name=file.replace(file,"max_weight-modulelist_Conv2d_%d.txt"%(151-i))
+            os.rename(os.path.join(path,file),os.path.join(path,new_name))
+            #########合并最大值文档,按行合并86layers
+            file = open(os.path.join(path,new_name), "r", encoding="utf-8", errors="ignore")
+            mystr1 = file.readline()  # 表示一次读取一行
+            file_max = open('./q_weight_max/q_weight_max.txt', "a", encoding="utf-8", errors="ignore")
+            file_max.write(mystr1[:-1]+'\n')
+            file.close()
+            file_max.close()
+            i+=1
+
+    path = './q_activation_max'
+    i = 1
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path, file)) == True:
+            new_name = file.replace(file, "max_activation-modulelist_Conv2d_%d.txt" % (151 - i))
+            os.rename(os.path.join(path, file), os.path.join(path, new_name))
+            #########合并最大值文档150layers
+            file = open(os.path.join(path, new_name), "r", encoding="utf-8", errors="ignore")
+            mystr1 = file.readline()  # 表示一次读取一行
+            file_max = open('./q_activation_max/q_activation_max.txt', "a", encoding="utf-8", errors="ignore")
+            file_max.write(mystr1[:-1] + '\n')
+            file.close()
+            file_max.close()
+            i += 1
+

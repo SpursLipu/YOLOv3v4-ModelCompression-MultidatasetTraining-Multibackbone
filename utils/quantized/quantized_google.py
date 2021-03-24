@@ -538,7 +538,6 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             np.savetxt(('./quantier_output/a_scale_out/scale %f.txt' % time.time()), activation_scale, delimiter='\n')
             ##################输出当前层的量化激活
             q_activation_txt = self.activation_quantizer.get_quantize_value(output)
-            print(q_activation_txt.shape)
             q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
             q_activation_max = [np.max(q_activation_txt)]#统计该层的最大值(即查看是否有溢出)
             max_activation_count = [np.sum(abs(q_activation_txt) >= 127)]#统计该层溢出的数目

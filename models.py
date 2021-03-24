@@ -550,6 +550,7 @@ class Darknet(nn.Module):
         # Darknet Header https://github.com/AlexeyAB/darknet/issues/2914#issuecomment-496675346
         self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
+        #输出modelsummary
         self.info(verbose) if not ONNX_EXPORT else None  # print model description
 
     def forward(self, x, augment=False):

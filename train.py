@@ -294,9 +294,10 @@ def train(hyp):
     # torch.autograd.set_detect_anomaly(True)
     results = (0, 0, 0, 0, 0, 0, 0)  # 'P', 'R', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification'
     t0 = time.time()
-    print('Image sizes %g - %g train, %g test' % (imgsz_min, imgsz_max, imgsz_test))
-    print('Using %g dataloader workers' % nw)
-    print('Starting training for %g epochs...' % epochs)
+    if opt.local_rank == -1 or opt.local_rank == 0:
+        print('Image sizes %g - %g train, %g test' % (imgsz_min, imgsz_max, imgsz_test))
+        print('Using %g dataloader workers' % nw)
+        print('Starting training for %g epochs...' % epochs)
     if opt.mpt:
         cuda = device.type != 'cpu'
         scaler = amp.GradScaler(enabled=cuda)
@@ -316,7 +317,8 @@ def train(hyp):
             image_weights = labels_to_image_weights(dataset.labels, nc=nc, class_weights=w)
             dataset.indices = random.choices(range(dataset.n), weights=image_weights, k=dataset.n)  # rand weighted idx
         mloss = torch.zeros(4).to(device)  # mean losses
-        print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
+        if opt.local_rank == -1 or opt.local_rank == 0:
+            print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
         pbar = tqdm(enumerate(dataloader), total=nb)  # progress bar
         for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
             ni = i + nb * epoch  # number integrated batches (since train start)
@@ -486,7 +488,8 @@ def train(hyp):
                                       quantized=opt.quantized,
                                       a_bit=opt.a_bit,
                                       w_bit=opt.w_bit,
-                                      FPGA=opt.FPGA)
+                                      FPGA=opt.FPGA,
+                                      rank=opt.local_rank)
 
         # Write
         with open(results_file, 'a') as f:
@@ -555,7 +558,8 @@ def train(hyp):
 
     if not opt.evolve:
         plot_results()  # save as results.png
-    print('%g epochs completed in %.3f hours.\n' % (epoch - start_epoch + 1, (time.time() - t0) / 3600))
+    if opt.local_rank in [-1, 0]:
+        print('%g epochs completed in %.3f hours.\n' % (epoch - start_epoch + 1, (time.time() - t0) / 3600))
     dist.destroy_process_group() if torch.cuda.device_count() > 1 else None
     torch.cuda.empty_cache()
     return results
@@ -608,7 +612,8 @@ if __name__ == '__main__':
     opt.weights = last if opt.resume else opt.weights
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
     # opt.data = list(glob.iglob(' ./**/' + opt.data, recursive=True))[0]  # find file
-    print(opt)
+    if opt.local_rank in [-1, 0]:
+        print(opt) 
     opt.img_size.extend([opt.img_size[-1]] * (3 - len(opt.img_size)))  # extend to 3 sizes (min, max, test)
 
     # DDP set variables
@@ -620,14 +625,16 @@ if __name__ == '__main__':
 
     # DDP set device
     if opt.local_rank != -1:
-        device = select_device(opt.device, batch_size=opt.batch_size)
+        if opt.local_rank == 0:
+            device = select_device(opt.device, batch_size=opt.batch_size)
         device = torch.device('cuda', opt.local_rank)
     else:
         device = torch_utils.select_device(opt.device, batch_size=opt.batch_size)
 
     tb_writer = None
     if not opt.evolve:  # Train normally
-        print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
+        if opt.local_rank in [-1, 0]:
+            print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
         tb_writer = SummaryWriter(comment=opt.name)
         train(hyp)  # train normally
 

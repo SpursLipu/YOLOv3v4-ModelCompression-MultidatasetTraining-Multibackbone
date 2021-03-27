@@ -282,7 +282,8 @@ if __name__ == '__main__':
              quantized=opt.quantized,
              a_bit=opt.a_bit,
              w_bit=opt.w_bit,
-             FPGA=opt.FPGA)
+             FPGA=opt.FPGA,
+             rank=-1)
 
     elif opt.task == 'benchmark':  # mAPs at 256-640 at conf 0.5 and 0.7
         y = []

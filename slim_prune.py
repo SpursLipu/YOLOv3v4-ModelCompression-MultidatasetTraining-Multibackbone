@@ -95,7 +95,7 @@ if __name__ == '__main__':
     print('\nloaded weights from ', opt.weights)
 
     eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size,
-                                    imgsz=img_size, )
+                                    imgsz=img_size, rank=-1)
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
     print("\nlet's test the original model first:")

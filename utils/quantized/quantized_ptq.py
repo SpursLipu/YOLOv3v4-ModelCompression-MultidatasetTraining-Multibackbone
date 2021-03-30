@@ -157,14 +157,12 @@ class Quantizer(nn.Module):
             output = self.clamp(output)  # 截断
         return output
 
-################获得量化因子所对应的移位数
+    ################获得量化因子所对应的移位数
     def get_scale(self):
         #############移位修正
         move_scale = math.log2(self.scale)
         move_scale = np.array(move_scale).reshape(1, -1)
         return move_scale
-
-
 
 
 # 对称量化

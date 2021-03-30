@@ -613,7 +613,7 @@ if __name__ == '__main__':
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
     # opt.data = list(glob.iglob(' ./**/' + opt.data, recursive=True))[0]  # find file
     if opt.local_rank in [-1, 0]:
-        print(opt) 
+        print(opt)
     opt.img_size.extend([opt.img_size[-1]] * (3 - len(opt.img_size)))  # extend to 3 sizes (min, max, test)
 
     # DDP set variables

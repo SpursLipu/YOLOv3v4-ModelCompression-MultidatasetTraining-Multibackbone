@@ -38,7 +38,6 @@ class activation_quantize(nn.Module):
         output = Round.apply(input)
         return output
 
-
     def get_quantize_value(self, input):
         output = torch.clamp(input * 0.1, 0, 1)  # 特征A截断前先进行缩放（* 0.1），以减小截断误差
         scale = float(2 ** self.a_bits - 1)
@@ -47,12 +46,13 @@ class activation_quantize(nn.Module):
         return output
 
         ################获得量化因子所对应的移位数
+
     def get_scale(self):
-            #############移位修正
-            #scale = float(2 ** self.a_bits - 1)
-            #move_scale = math.log2(scale)
-            scale = np.array(self.a_bits).reshape(1, -1)
-            return scale
+        #############移位修正
+        # scale = float(2 ** self.a_bits - 1)
+        # move_scale = math.log2(scale)
+        scale = np.array(self.a_bits).reshape(1, -1)
+        return scale
 
     def forward(self, input):
         if self.a_bits == 32:
@@ -67,7 +67,6 @@ class activation_quantize(nn.Module):
             output = self.round(output)
             output = output / scale
         return output
-
 
 
 # ********************* W(模型参数)量化 ***********************
@@ -86,16 +85,17 @@ class weight_quantize(nn.Module):
         scale = float(2 ** self.w_bits - 1)
         output = output * scale
         output = self.round(output)
-        #output = 2 * output - 1
+        # output = 2 * output - 1
         return output
 
         ################获得量化因子所对应的移位数
+
     def get_scale(self):
-            #############移位修正
-            #scale = float(2 ** self.w_bits - 1)
-            #scale = math.log2(scale)
-            scale = np.array(self.w_bits).reshape(1, -1)
-            return scale
+        #############移位修正
+        # scale = float(2 ** self.w_bits - 1)
+        # scale = math.log2(scale)
+        scale = np.array(self.w_bits).reshape(1, -1)
+        return scale
 
     def forward(self, input):
         if self.w_bits == 32:
@@ -156,7 +156,6 @@ class DorefaConv2d(nn.Conv2d):
         # 实例化调用A和W量化器
         self.activation_quantizer = activation_quantize(a_bits=a_bits)
         self.weight_quantizer = weight_quantize(w_bits=w_bits)
-
 
     def forward(self, input):
         # 量化A和W
@@ -319,9 +318,9 @@ class BNFold_DorefaConv2d(DorefaConv2d):
         q_weight = self.weight_quantizer(weight)
         q_bias = self.bias_quantizer(bias)
 
-        if self.quantizer_output == True:#输出量化参数txt文档
+        if self.quantizer_output == True:  # 输出量化参数txt文档
 
-            #创建的quantizer_output输出文件夹
+            # 创建的quantizer_output输出文件夹
             if not os.path.isdir('./quantier_output'):
                 os.makedirs('./quantier_output')
 
@@ -341,7 +340,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
             q_weight_max = [np.max(q_weight_txt)]
             # q_weight_max = np.argmax(q_weight_txt)
-            max_weight_count = [np.sum( abs(q_weight_txt) >= 255)]  # 统计该层溢出的数目
+            max_weight_count = [np.sum(abs(q_weight_txt) >= 255)]  # 统计该层溢出的数目
             np.savetxt(('./quantier_output/max_weight_count/max_weight_count %f.txt' % time.time()), max_weight_count)
             np.savetxt(('./quantier_output/q_weight_max/max_weight %f.txt' % time.time()), q_weight_max)
             np.savetxt(('./quantier_output/q_weight_out/weight %f.txt' % time.time()), q_weight_txt, delimiter='\n')
@@ -361,8 +360,6 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             q_bias_txt = self.bias_quantizer.get_quantize_value(bias)
             q_bias_txt = np.array(q_bias_txt.cpu()).reshape(1, -1)
             np.savetxt(('./quantier_output/q_bias_out/bias %f.txt' % time.time()), q_bias_txt, delimiter='\n')
-
-
 
         # 量化卷积
         if self.training:  # 训练态

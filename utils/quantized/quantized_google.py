@@ -161,7 +161,8 @@ class Quantizer(nn.Module):
             output = self.round(output)
             output = self.clamp(output)  # 截断
         return output
-################获得量化因子所对应的移位数
+
+    ################获得量化因子所对应的移位数
     def get_scale(self):
         #############移位修正
         move_scale = math.log2(self.scale)
@@ -442,9 +443,9 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         q_weight = self.weight_quantizer(weight)
         q_bias = self.bias_quantizer(bias)
 
-        if self.quantizer_output == True:#输出量化参数txt文档
+        if self.quantizer_output == True:  # 输出量化参数txt文档
 
-            #创建的quantizer_output输出文件夹
+            # 创建的quantizer_output输出文件夹
             if not os.path.isdir('./quantier_output'):
                 os.makedirs('./quantier_output')
 
@@ -464,7 +465,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
             q_weight_max = [np.max(q_weight_txt)]
             # q_weight_max = np.argmax(q_weight_txt)
-            max_weight_count = [np.sum( abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
+            max_weight_count = [np.sum(abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
             np.savetxt(('./quantier_output/max_weight_count/max_weight_count %f.txt' % time.time()), max_weight_count)
             np.savetxt(('./quantier_output/q_weight_max/max_weight %f.txt' % time.time()), q_weight_max)
             np.savetxt(('./quantier_output/q_weight_out/weight %f.txt' % time.time()), q_weight_txt, delimiter='\n')
@@ -539,12 +540,14 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             ##################输出当前层的量化激活
             q_activation_txt = self.activation_quantizer.get_quantize_value(output)
             q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
-            q_activation_max = [np.max(q_activation_txt)]#统计该层的最大值(即查看是否有溢出)
-            max_activation_count = [np.sum(abs(q_activation_txt) >= 127)]#统计该层溢出的数目
+            q_activation_max = [np.max(q_activation_txt)]  # 统计该层的最大值(即查看是否有溢出)
+            max_activation_count = [np.sum(abs(q_activation_txt) >= 127)]  # 统计该层溢出的数目
             # q_weight_max = np.argmax(q_weight_txt)
-            np.savetxt(('./quantier_output/max_activation_count/max_activation_count %f.txt' % time.time()), max_activation_count)
+            np.savetxt(('./quantier_output/max_activation_count/max_activation_count %f.txt' % time.time()),
+                       max_activation_count)
             np.savetxt(('./quantier_output/q_activation_max/max_activation %f.txt' % time.time()), q_activation_max)
-            np.savetxt(('./quantier_output/q_activation_out/activation %f.txt' % time.time()), q_activation_txt, delimiter='\n')
+            np.savetxt(('./quantier_output/q_activation_out/activation %f.txt' % time.time()), q_activation_txt,
+                       delimiter='\n')
 
         output = self.activation_quantizer(output)
         return output

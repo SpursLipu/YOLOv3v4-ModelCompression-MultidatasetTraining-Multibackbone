@@ -17,16 +17,17 @@ def detect(save_img=False):
     os.makedirs(out)  # make new output folder
 
     # Initialize model
-    model = Darknet(opt.cfg, imgsz, quantized=opt.quantized,quantizer_output=opt.quantizer_output, a_bit=opt.a_bit, w_bit=opt.w_bit,
+    model = Darknet(opt.cfg, imgsz, quantized=opt.quantized, quantizer_output=opt.quantizer_output, a_bit=opt.a_bit,
+                    w_bit=opt.w_bit,
                     FPGA=opt.FPGA)
 
     # Load weights
     attempt_download(weights)
     if weights.endswith('.pt'):  # pytorch format
-        model.load_state_dict(torch.load(weights, map_location=device)['model'],strict=False)
+        model.load_state_dict(torch.load(weights, map_location=device)['model'], strict=False)
     else:  # darknet format
         load_darknet_weights(model, weights)
-#################打印model_list
+    #################打印model_list
     '''AWEIGHT = torch.load(weights, map_location=device)['model']
     for k,v in AWEIGHT.items():
         print(k)'''
@@ -51,7 +52,7 @@ def detect(save_img=False):
     # Run inference
     t0 = time.time()
     img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
-    #_ = model(img.float()) if device.type != 'cpu' else None  # run once
+    # _ = model(img.float()) if device.type != 'cpu' else None  # run once
     for path, img, im0s, vid_cap in dataset:
         img = torch.from_numpy(img).to(device)
         img = img.float()  # uint8 to fp16/32
@@ -169,99 +170,99 @@ if __name__ == '__main__':
 
 if opt.quantizer_output == True:
 
-    path='./quantier_output/q_bias_out'
-    i=1
+    path = './quantier_output/q_bias_out'
+    i = 1
     for file in os.listdir(path):
-        if os.path.isfile(os.path.join(path,file))==True:
-            new_name=file.replace(file,"q_bias-modulelist_Conv2d_%d.txt"%(76-i))
-            os.rename(os.path.join(path,file),os.path.join(path,new_name))
-            i+=1
+        if os.path.isfile(os.path.join(path, file)) == True:
+            new_name = file.replace(file, "q_bias-modulelist_Conv2d_%d.txt" % (76 - i))
+            os.rename(os.path.join(path, file), os.path.join(path, new_name))
+            i += 1
 
-    path='./quantier_output/q_weight_out'
-    i=1
+    path = './quantier_output/q_weight_out'
+    i = 1
     for file in os.listdir(path):
-        if os.path.isfile(os.path.join(path,file))==True:
-            new_name=file.replace(file,"q_weight-modulelist_Conv2d_%d.txt"%(76-i))
-            os.rename(os.path.join(path,file),os.path.join(path,new_name))
-            i+=1
+        if os.path.isfile(os.path.join(path, file)) == True:
+            new_name = file.replace(file, "q_weight-modulelist_Conv2d_%d.txt" % (76 - i))
+            os.rename(os.path.join(path, file), os.path.join(path, new_name))
+            i += 1
 
-    path='./quantier_output/q_activation_out'
-    i=1
+    path = './quantier_output/q_activation_out'
+    i = 1
     for file in os.listdir(path):
-        if os.path.isfile(os.path.join(path,file))==True:
-            new_name=file.replace(file,"q_activation-modulelist_Conv2d_%d.txt"%(76-i))
-            os.rename(os.path.join(path,file),os.path.join(path,new_name))
-            i+=1
+        if os.path.isfile(os.path.join(path, file)) == True:
+            new_name = file.replace(file, "q_activation-modulelist_Conv2d_%d.txt" % (76 - i))
+            os.rename(os.path.join(path, file), os.path.join(path, new_name))
+            i += 1
 
-    path='./quantier_output/b_scale_out'
-    i=1
+    path = './quantier_output/b_scale_out'
+    i = 1
     for file in os.listdir(path):
-        if os.path.isfile(os.path.join(path,file))==True:
-            new_name=file.replace(file,"scale_bias-modulelist_Conv2d_%d.txt"%(76-i))
-            os.rename(os.path.join(path,file),os.path.join(path,new_name))
-            i+=1
+        if os.path.isfile(os.path.join(path, file)) == True:
+            new_name = file.replace(file, "scale_bias-modulelist_Conv2d_%d.txt" % (76 - i))
+            os.rename(os.path.join(path, file), os.path.join(path, new_name))
+            i += 1
 
-
-    path='./quantier_output/w_scale_out'
-    i=1
+    path = './quantier_output/w_scale_out'
+    i = 1
     for file in os.listdir(path):
-        if os.path.isfile(os.path.join(path,file))==True:
-            new_name=file.replace(file,"scale_weight-modulelist_Conv2d_%d.txt"%(76-i))
-            os.rename(os.path.join(path,file),os.path.join(path,new_name))
-            i+=1
+        if os.path.isfile(os.path.join(path, file)) == True:
+            new_name = file.replace(file, "scale_weight-modulelist_Conv2d_%d.txt" % (76 - i))
+            os.rename(os.path.join(path, file), os.path.join(path, new_name))
+            i += 1
 
-    path='./quantier_output/a_scale_out'
-    i=1
+    path = './quantier_output/a_scale_out'
+    i = 1
     for file in os.listdir(path):
-        if os.path.isfile(os.path.join(path,file))==True:
-            new_name=file.replace(file,"scale_activation-modulelist_Conv2d_%d.txt"%(76-i))
-            os.rename(os.path.join(path,file),os.path.join(path,new_name))
-            i+=1
+        if os.path.isfile(os.path.join(path, file)) == True:
+            new_name = file.replace(file, "scale_activation-modulelist_Conv2d_%d.txt" % (76 - i))
+            os.rename(os.path.join(path, file), os.path.join(path, new_name))
+            i += 1
 
-#################输出每一层量化后的最大权值
-    path='./quantier_output/q_weight_max'
-    i=1
+    #################输出每一层量化后的最大权值
+    path = './quantier_output/q_weight_max'
+    i = 1
     for file in os.listdir(path):
-        if os.path.isfile(os.path.join(path,file))==True:
-            new_name=file.replace(file,"max_weight-modulelist_Conv2d_%d.txt"%(76-i))
-            os.rename(os.path.join(path,file),os.path.join(path,new_name))
-            file = open(os.path.join(path,new_name), "r", encoding="utf-8")
+        if os.path.isfile(os.path.join(path, file)) == True:
+            new_name = file.replace(file, "max_weight-modulelist_Conv2d_%d.txt" % (76 - i))
+            os.rename(os.path.join(path, file), os.path.join(path, new_name))
+            file = open(os.path.join(path, new_name), "r", encoding="utf-8")
             mystr1 = file.readline()  # 表示一次读取一行
             file_max = open('./quantier_output/q_weight_max/q_weight_max.txt', "a", encoding="utf-8")
-            file_max.write(mystr1[:-1]+'\n')
+            file_max.write(mystr1[:-1] + '\n')
             file_max.close()
             file.close()
-            i+=1
-#################输出每一层量化后的最大激活
+            i += 1
+    #################输出每一层量化后的最大激活
     path = './quantier_output/q_activation_max'
     i = 1
     for file in os.listdir(path):
         if os.path.isfile(os.path.join(path, file)) == True:
             new_name = file.replace(file, "max_activation-modulelist_Conv2d_%d.txt" % (76 - i))
             os.rename(os.path.join(path, file), os.path.join(path, new_name))
-            #合并最大值文档
+            # 合并最大值文档
             file = open(os.path.join(path, new_name), "r", encoding="utf-8", errors="ignore")
             mystr1 = file.readline()  # 表示一次读取一行
-            file_max = open('./quantier_output/q_activation_max/q_activation_max.txt', "a", encoding="utf-8", errors="ignore")
+            file_max = open('./quantier_output/q_activation_max/q_activation_max.txt', "a", encoding="utf-8",
+                            errors="ignore")
             file_max.write(mystr1[:-1] + '\n')
             file_max.close()
             file.close()
             i += 1
 
-##########从这一行开始合并count文件
-    path='./quantier_output/max_weight_count'
-    i=1
+    ##########从这一行开始合并count文件
+    path = './quantier_output/max_weight_count'
+    i = 1
     for file in os.listdir(path):
-        if os.path.isfile(os.path.join(path,file))==True:
-            new_name=file.replace(file,"max_weight_count-modulelist_Conv2d_%d.txt"%(76-i))
-            os.rename(os.path.join(path,file),os.path.join(path,new_name))
-            file = open(os.path.join(path,new_name), "r", encoding="utf-8")
+        if os.path.isfile(os.path.join(path, file)) == True:
+            new_name = file.replace(file, "max_weight_count-modulelist_Conv2d_%d.txt" % (76 - i))
+            os.rename(os.path.join(path, file), os.path.join(path, new_name))
+            file = open(os.path.join(path, new_name), "r", encoding="utf-8")
             mystr1 = file.readline()  # 表示一次读取一行
             file_max = open('./quantier_output/max_weight_count/max_weight_count.txt', "a", encoding="utf-8")
-            file_max.write(mystr1[:-1]+'\n')
+            file_max.write(mystr1[:-1] + '\n')
             file_max.close()
             file.close()
-            i+=1
+            i += 1
 
     path = './quantier_output/max_activation_count'
     i = 1
@@ -271,7 +272,8 @@ if opt.quantizer_output == True:
             os.rename(os.path.join(path, file), os.path.join(path, new_name))
             file = open(os.path.join(path, new_name), "r", encoding="utf-8", errors="ignore")
             mystr1 = file.readline()  # 表示一次读取一行
-            file_max = open('./quantier_output/max_activation_count/max_activation_count.txt', "a", encoding="utf-8", errors="ignore")
+            file_max = open('./quantier_output/max_activation_count/max_activation_count.txt', "a", encoding="utf-8",
+                            errors="ignore")
             file_max.write(mystr1[:-1] + '\n')
             file_max.close()
             file.close()

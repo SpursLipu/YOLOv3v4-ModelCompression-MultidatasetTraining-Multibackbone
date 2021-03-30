@@ -114,12 +114,13 @@ class Quantizer(nn.Module):
         a = np.array(move_scale).reshape(1, -1)
         np.savetxt(('./b_scale_out/scale %f.txt' % time.time()), a, delimiter='\n')'''
 
-################获得量化因子所对应的移位数
+    ################获得量化因子所对应的移位数
     def get_scale(self):
         #############移位修正
         move_scale = math.log2(self.scale)
         move_scale = np.array(move_scale).reshape(1, -1)
         return move_scale
+
 
 def reshape_to_activation(input):
     return input.reshape(1, -1, 1, 1)
@@ -153,7 +154,7 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
             w_bits=8,
             bn=0,
             activate='leaky',
-            quantizer_output = False
+            quantizer_output=False
     ):
         super().__init__(
             in_channels=in_channels,
@@ -296,7 +297,6 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
             np.savetxt(('./quantier_output/q_activation_max/max_activation %f.txt' % time.time()), q_activation_max)
             np.savetxt(('./quantier_output/q_activation_out/activation %f.txt' % time.time()), q_activation_txt,
                        delimiter='\n')
-
 
         output = self.activation_quantizer(output)
         return output

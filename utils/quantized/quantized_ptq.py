@@ -1,4 +1,11 @@
 # Author:LiPu
+import math
+import time
+import numpy as np
+import pandas as pd
+import scipy.io as io
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -150,6 +157,15 @@ class Quantizer(nn.Module):
             output = self.clamp(output)  # 截断
         return output
 
+################获得量化因子所对应的移位数
+    def get_scale(self):
+        #############移位修正
+        move_scale = math.log2(self.scale)
+        move_scale = np.array(move_scale).reshape(1, -1)
+        return move_scale
+
+
+
 
 # 对称量化
 class SymmetricQuantizer(Quantizer):
@@ -294,7 +310,8 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
             w_bits=8,
             q_type=0,
             bn=0,
-            activate='leaky'
+            activate='leaky',
+            quantizer_output=False,
     ):
         super().__init__(
             in_channels=in_channels,
@@ -317,6 +334,7 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
         self.register_buffer('batch_mean', torch.zeros(out_channels))
         self.register_buffer('batch_var', torch.zeros(out_channels))
         self.register_buffer('first_bn', torch.zeros(1))
+        self.quantizer_output = quantizer_output
 
         # 实例化量化器（A-layer级，W-channel级）
         if q_type == 0:
@@ -360,6 +378,49 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
         # 量化A和bn融合后的W
         q_weight = self.weight_quantizer(weight)
         q_bias = self.bias_quantizer(bias)
+        if self.quantizer_output == True:  # 输出量化参数txt文档
+
+            # 创建的quantizer_output输出文件夹
+            if not os.path.isdir('./quantier_output'):
+                os.makedirs('./quantier_output')
+
+            if not os.path.isdir('./quantier_output/q_weight_out'):
+                os.makedirs('./quantier_output/q_weight_out')
+            if not os.path.isdir('./quantier_output/w_scale_out'):
+                os.makedirs('./quantier_output/w_scale_out')
+            if not os.path.isdir('./quantier_output/q_weight_max'):
+                os.makedirs('./quantier_output/q_weight_max')
+            if not os.path.isdir('./quantier_output/max_weight_count'):
+                os.makedirs('./quantier_output/max_weight_count')
+            #######################输出当前层的权重量化因子
+            weight_scale = self.weight_quantizer.get_scale()
+            np.savetxt(('./quantier_output/w_scale_out/scale %f.txt' % time.time()), weight_scale, delimiter='\n')
+            #######################输出当前层的量化权重
+            q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
+            q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
+            q_weight_max = [np.max(q_weight_txt)]
+            # q_weight_max = np.argmax(q_weight_txt)
+            max_weight_count = [np.sum(abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
+            np.savetxt(('./quantier_output/max_weight_count/max_weight_count %f.txt' % time.time()), max_weight_count)
+            np.savetxt(('./quantier_output/q_weight_max/max_weight %f.txt' % time.time()), q_weight_max)
+            np.savetxt(('./quantier_output/q_weight_out/weight %f.txt' % time.time()), q_weight_txt, delimiter='\n')
+            # io.savemat('save.mat',{'q_weight_txt':q_weight_txt})
+
+            #######################创建输出偏置txt的文件夹
+            if not os.path.isdir('./quantier_output/q_bias_out'):
+                os.makedirs('./quantier_output/q_bias_out')
+            if not os.path.isdir('./quantier_output/b_scale_out'):
+                os.makedirs('./quantier_output/b_scale_out')
+            if not os.path.isdir('./quantier_output/max_bias_count'):
+                os.makedirs('./quantier_output/max_bias_count')
+            #######################输出当前层偏置的量化因子
+            bias_scale = self.bias_quantizer.get_scale()
+            np.savetxt(('./quantier_output/b_scale_out/scale %f.txt' % time.time()), bias_scale, delimiter='\n')
+            #######################输出当前层的量化偏置
+            q_bias_txt = self.bias_quantizer.get_quantize_value(bias)
+            q_bias_txt = np.array(q_bias_txt.cpu()).reshape(1, -1)
+            np.savetxt(('./quantier_output/q_bias_out/bias %f.txt' % time.time()), q_bias_txt, delimiter='\n')
+
         # 量化卷积
         output = F.conv2d(
             input=input,
@@ -385,6 +446,32 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
             pass
         else:
             print(self.activate + "%s is not supported !")
+
+        if self.quantizer_output == True:
+
+            if not os.path.isdir('./quantier_output/q_activation_out'):
+                os.makedirs('./quantier_output/q_activation_out')
+            if not os.path.isdir('./quantier_output/a_scale_out'):
+                os.makedirs('./quantier_output/a_scale_out')
+            if not os.path.isdir('./quantier_output/q_activation_max'):
+                os.makedirs('./quantier_output/q_activation_max')
+            if not os.path.isdir('./quantier_output/max_activation_count'):
+                os.makedirs('./quantier_output/max_activation_count')
+            ##################输出当前激活的量化因子
+            activation_scale = self.activation_quantizer.get_scale()
+            np.savetxt(('./quantier_output/a_scale_out/scale %f.txt' % time.time()), activation_scale, delimiter='\n')
+            ##################输出当前层的量化激活
+            q_activation_txt = self.activation_quantizer.get_quantize_value(output)
+            q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
+            q_activation_max = [np.max(q_activation_txt)]  # 统计该层的最大值(即查看是否有溢出)
+            max_activation_count = [np.sum(abs(q_activation_txt) >= 127)]  # 统计该层溢出的数目
+            # q_weight_max = np.argmax(q_weight_txt)
+            np.savetxt(('./quantier_output/max_activation_count/max_activation_count %f.txt' % time.time()),
+                       max_activation_count)
+            np.savetxt(('./quantier_output/q_activation_max/max_activation %f.txt' % time.time()), q_activation_max)
+            np.savetxt(('./quantier_output/q_activation_out/activation %f.txt' % time.time()), q_activation_txt,
+                       delimiter='\n')
+
         output = self.activation_quantizer(output)
         return output
 

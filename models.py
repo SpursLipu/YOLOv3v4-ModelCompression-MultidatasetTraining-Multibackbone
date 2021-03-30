@@ -83,7 +83,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                      w_bits=w_bit,
                                                                      bn=bn,
                                                                      activate=mdef['activation'],
-                                                                     steps=steps))
+                                                                     steps=steps,
+                                                                     quantizer_output = quantizer_output))
                 else:
                     modules.add_module('Conv2d', DorefaConv2d(in_channels=output_filters[-1],
                                                               out_channels=filters,
@@ -122,7 +123,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                                    a_bits=a_bit,
                                                                                    w_bits=w_bit,
                                                                                    bn=bn,
-                                                                                   activate=mdef['activation']))
+                                                                                   activate=mdef['activation'],
+                                                                                   quantizer_output = quantizer_output))
                 else:
                     modules.add_module('Conv2d', PTQuantizedConv2d(in_channels=output_filters[-1],
                                                                    out_channels=filters,
@@ -245,7 +247,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                           w_bits=w_bit,
                                                                           bn=bn,
                                                                           activate=mdef['activation'],
-                                                                          steps=steps))
+                                                                          steps=steps,
+                                                                          quantizer_output = quantizer_output))
                 else:
                     modules.add_module('DepthWise2d', DorefaConv2d(in_channels=output_filters[-1],
                                                                    out_channels=filters,
@@ -283,7 +286,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                                         a_bits=a_bit,
                                                                                         w_bits=w_bit,
                                                                                         bn=bn,
-                                                                                        activate=mdef['activation']))
+                                                                                        activate=mdef['activation'],
+                                                                                        quantizer_output = quantizer_output))
                 else:
                     modules.add_module('DepthWise2d', PTQuantizedConv2d(in_channels=output_filters[-1],
                                                                         out_channels=filters,

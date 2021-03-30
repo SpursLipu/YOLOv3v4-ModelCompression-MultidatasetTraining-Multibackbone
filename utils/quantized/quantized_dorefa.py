@@ -49,9 +49,9 @@ class activation_quantize(nn.Module):
         ################获得量化因子所对应的移位数
     def get_scale(self):
             #############移位修正
-            scale = float(2 ** self.a_bits - 1)
+            #scale = float(2 ** self.a_bits - 1)
             #move_scale = math.log2(scale)
-            scale = np.array(scale).reshape(1, -1)
+            scale = np.array(self.a_bits).reshape(1, -1)
             return scale
 
     def forward(self, input):
@@ -92,9 +92,9 @@ class weight_quantize(nn.Module):
         ################获得量化因子所对应的移位数
     def get_scale(self):
             #############移位修正
-            scale = float(2 ** self.w_bits - 1)
-            #move_scale = math.log2(scale)
-            scale = np.array(scale).reshape(1, -1)
+            #scale = float(2 ** self.w_bits - 1)
+            #scale = math.log2(scale)
+            scale = np.array(self.w_bits).reshape(1, -1)
             return scale
 
     def forward(self, input):
@@ -341,7 +341,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
             q_weight_max = [np.max(q_weight_txt)]
             # q_weight_max = np.argmax(q_weight_txt)
-            max_weight_count = [np.sum( abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
+            max_weight_count = [np.sum( abs(q_weight_txt) >= 255)]  # 统计该层溢出的数目
             np.savetxt(('./quantier_output/max_weight_count/max_weight_count %f.txt' % time.time()), max_weight_count)
             np.savetxt(('./quantier_output/q_weight_max/max_weight %f.txt' % time.time()), q_weight_max)
             np.savetxt(('./quantier_output/q_weight_out/weight %f.txt' % time.time()), q_weight_txt, delimiter='\n')
@@ -420,7 +420,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             q_activation_txt = self.activation_quantizer.get_quantize_value(output)
             q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
             q_activation_max = [np.max(q_activation_txt)]  # 统计该层的最大值(即查看是否有溢出)
-            max_activation_count = [np.sum(abs(q_activation_txt) >= 127)]  # 统计该层溢出的数目
+            max_activation_count = [np.sum(abs(q_activation_txt) >= 255)]  # 统计该层溢出的数目
             # q_weight_max = np.argmax(q_weight_txt)
             np.savetxt(('./quantier_output/max_activation_count/max_activation_count %f.txt' % time.time()),
                        max_activation_count)

@@ -225,7 +225,6 @@ if opt.quantizer_output == True:
         if os.path.isfile(os.path.join(path,file))==True:
             new_name=file.replace(file,"max_weight-modulelist_Conv2d_%d.txt"%(76-i))
             os.rename(os.path.join(path,file),os.path.join(path,new_name))
-            #########合并最大值文档,按行合并86layers
             file = open(os.path.join(path,new_name), "r", encoding="utf-8")
             mystr1 = file.readline()  # 表示一次读取一行
             file_max = open('./quantier_output/q_weight_max/q_weight_max.txt', "a", encoding="utf-8")
@@ -240,7 +239,7 @@ if opt.quantizer_output == True:
         if os.path.isfile(os.path.join(path, file)) == True:
             new_name = file.replace(file, "max_activation-modulelist_Conv2d_%d.txt" % (76 - i))
             os.rename(os.path.join(path, file), os.path.join(path, new_name))
-            #########合并最大值文档150layers
+            #合并最大值文档
             file = open(os.path.join(path, new_name), "r", encoding="utf-8", errors="ignore")
             mystr1 = file.readline()  # 表示一次读取一行
             file_max = open('./quantier_output/q_activation_max/q_activation_max.txt', "a", encoding="utf-8", errors="ignore")
@@ -256,7 +255,6 @@ if opt.quantizer_output == True:
         if os.path.isfile(os.path.join(path,file))==True:
             new_name=file.replace(file,"max_weight_count-modulelist_Conv2d_%d.txt"%(76-i))
             os.rename(os.path.join(path,file),os.path.join(path,new_name))
-            #########合并最大值文档,按行合并86layers
             file = open(os.path.join(path,new_name), "r", encoding="utf-8")
             mystr1 = file.readline()  # 表示一次读取一行
             file_max = open('./quantier_output/max_weight_count/max_weight_count.txt', "a", encoding="utf-8")
@@ -271,7 +269,6 @@ if opt.quantizer_output == True:
         if os.path.isfile(os.path.join(path, file)) == True:
             new_name = file.replace(file, "max_activation_count-modulelist_Conv2d_%d.txt" % (76 - i))
             os.rename(os.path.join(path, file), os.path.join(path, new_name))
-            #########合并最大值文档150layers
             file = open(os.path.join(path, new_name), "r", encoding="utf-8", errors="ignore")
             mystr1 = file.readline()  # 表示一次读取一行
             file_max = open('./quantier_output/max_activation_count/max_activation_count.txt', "a", encoding="utf-8", errors="ignore")

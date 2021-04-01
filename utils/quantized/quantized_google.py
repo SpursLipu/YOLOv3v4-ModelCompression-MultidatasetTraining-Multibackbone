@@ -476,8 +476,6 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 os.makedirs('./quantier_output/q_bias_out')
             if not os.path.isdir('./quantier_output/b_scale_out'):
                 os.makedirs('./quantier_output/b_scale_out')
-            if not os.path.isdir('./quantier_output/max_bias_count'):
-                os.makedirs('./quantier_output/max_bias_count')
             #######################输出当前层偏置的量化因子
             bias_scale = self.bias_quantizer.get_scale()
             np.savetxt(('./quantier_output/b_scale_out/scale %f.txt' % time.time()), bias_scale, delimiter='\n')

@@ -147,7 +147,7 @@ if __name__ == '__main__':
     # 指定GPU
     # torch.cuda.set_device(2)
 
-    filter_switch = [each for each in range(1024) if (each % 32 == 0)]
+    filter_switch = [each for each in range(2048) if (each % 32 == 0)]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Darknet(opt.cfg).to(device)

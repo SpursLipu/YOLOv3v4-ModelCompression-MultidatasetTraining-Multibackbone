@@ -8,7 +8,7 @@ import time
 from utils.prune_utils import *
 import argparse
 
-filter_switch = [each for each in range(1024) if (each % 32 == 0)]
+filter_switch = [each for each in range(2048) if (each % 32 == 0)]
 
 
 # %%

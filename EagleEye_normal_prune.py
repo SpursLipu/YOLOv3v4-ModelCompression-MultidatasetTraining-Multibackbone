@@ -120,7 +120,14 @@ def rand_prune_and_eval(model, min_rate, max_rate):
                     break
 
         with torch.no_grad():
-            mAP = eval_model(compact_model)[0][2]
+            mAP = test.test(opt.cfg,
+                            opt.data,
+                            batch_size=batch_size,
+                            imgsz=img_size,
+                            model=compact_model,
+                            dataloader=testloader,
+                            rank=-1,
+                            plot=False)[0][2]
 
         print('candidate: ' + str(candidates), end=" ")
         print('remain_ratio: ' + str(current_parameters / origin_nparameters))
@@ -183,9 +190,6 @@ if __name__ == '__main__':
     train_path = data_config["train"]
     class_names = load_classes(data_config["names"])
 
-    eval_model = lambda model: test(model=model, cfg=opt.model_def, data=opt.data_config, rank=-1, plot=False)
-    # eval_model2 = lambda model: test(model=model, cfg=opt.model_def, data=opt.data_config, fast_eval=True)
-
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
     img_size = 416
@@ -196,18 +200,31 @@ if __name__ == '__main__':
                                   augment=True,
                                   hyp=hyp,  # augmentation hyperparameters
                                   rect=opt.rect,  # rectangular training
-                                  image_weights=opt.img_weights,
                                   cache_images=False)
 
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=batch_size,
-                                             num_workers=min([os.cpu_count(), batch_size, 16]),
+                                             num_workers=min([os.cpu_count(), batch_size, 8]),
                                              shuffle=not opt.rect,  # Shuffle=True unless rectangular training is used
+                                             pin_memory=True,
+                                             collate_fn=dataset.collate_fn)
+    testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(valid_path, img_size, batch_size,
+                                                                 hyp=hyp,
+                                                                 rect=True),
+                                             batch_size=batch_size,
+                                             num_workers=min([os.cpu_count(), batch_size, 8]),
                                              pin_memory=True,
                                              collate_fn=dataset.collate_fn)
 
     with torch.no_grad():
-        origin_model_metric = eval_model(model)
+        origin_model_metric = test.test(opt.cfg,
+                                        opt.data,
+                                        batch_size=batch_size,
+                                        imgsz=img_size,
+                                        model=model,
+                                        dataloader=testloader,
+                                        rank=-1,
+                                        plot=False)
     origin_nparameters = obtain_num_parameters(model)
 
     CBL_idx, Conv_idx, prune_idx = parse_module_defs(model.module_defs)
@@ -229,7 +246,14 @@ if __name__ == '__main__':
 
     # 在测试集上测试剪枝后的模型, 并统计模型的参数数量
     with torch.no_grad():
-        compact_model_metric = eval_model(compact_model)
+        compact_model_metric = test.test(opt.cfg,
+                                         opt.data,
+                                         batch_size=batch_size,
+                                         imgsz=img_size,
+                                         model=compact_model,
+                                         dataloader=testloader,
+                                         rank=-1,
+                                         plot=False)
 
     # 比较剪枝前后参数数量的变化、指标性能的变化
     metric_table = [

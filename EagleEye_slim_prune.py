@@ -4,6 +4,7 @@ from utils.utils import *
 from utils.prune_utils import *
 from utils.datasets import *
 import os
+import test
 
 
 def obtain_avg_forward_time(input, model, repeat=200):
@@ -116,9 +117,15 @@ def rand_prune_and_eval(model, min_rate, max_rate):
                 compact_model(imgs)
                 if batch_i > 1000:
                     break
-
         with torch.no_grad():
-            mAP = eval_model(compact_model)[0][2]
+            mAP = test.test(opt.cfg,
+                            opt.data,
+                            batch_size=batch_size,
+                            imgsz=img_size,
+                            model=compact_model,
+                            dataloader=testloader,
+                            rank=-1,
+                            plot=False)[0][2]
 
         print('candidate: ' + str(candidates), end=" ")
         print('remain_ratio: ' + str(current_parameters / origin_nparameters))
@@ -139,9 +146,9 @@ def rand_prune_and_eval(model, min_rate, max_rate):
 
 if __name__ == '__main__':
     class opt():
-        model_def = "cfg/yolov3/yolov3.cfg"
-        data_config = "data/coco2017.data"
-        model = 'weights/pretrain_weights/yolov3.weights'
+        cfg = "cfg/yolov3/yolov3.cfg"
+        data = "data/coco2017.data"
+        weights = 'weights/pretrain_weights/yolov3.weights'
         rect = False
         img_weights = False
 
@@ -166,22 +173,19 @@ if __name__ == '__main__':
            'shear': 0.641 * 0}  # image shear (+/- deg)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Darknet(opt.model_def).to(device)
+    model = Darknet(opt.cfg).to(device)
 
-    if opt.model:
-        if opt.model.endswith(".pt"):
-            model.load_state_dict(torch.load(opt.model, map_location=device)['model'])
+    if opt.weights:
+        if opt.weights.endswith(".pt"):
+            model.load_state_dict(torch.load(opt.weights, map_location=device)['model'])
         else:
-            _ = load_darknet_weights(model, opt.model)
+            _ = load_darknet_weights(model, opt.weights)
 
-    data_config = parse_data_cfg(opt.data_config)
+    data_config = parse_data_cfg(opt.data)
 
     valid_path = data_config["valid"]
     train_path = data_config["train"]
     class_names = load_classes(data_config["names"])
-
-    eval_model = lambda model: test(model=model, cfg=opt.model_def, data=opt.data_config, rank=-1, plot=False)
-    # eval_model2 = lambda model: test(model=model, cfg=opt.model_def, data=opt.data_config, fast_eval=True)
 
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
@@ -198,13 +202,26 @@ if __name__ == '__main__':
 
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=batch_size,
-                                             num_workers=min([os.cpu_count(), batch_size, 16]),
+                                             num_workers=min([os.cpu_count(), batch_size, 8]),
                                              shuffle=not opt.rect,  # Shuffle=True unless rectangular training is used
                                              pin_memory=True,
                                              collate_fn=dataset.collate_fn)
-
+    testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(valid_path, img_size, batch_size,
+                                                                 hyp=hyp,
+                                                                 rect=True),
+                                             batch_size=batch_size,
+                                             num_workers=min([os.cpu_count(), batch_size, 8]),
+                                             pin_memory=True,
+                                             collate_fn=dataset.collate_fn)
     with torch.no_grad():
-        origin_model_metric = eval_model(model)
+        origin_model_metric = test.test(opt.cfg,
+                                        opt.data,
+                                        batch_size=batch_size,
+                                        imgsz=img_size,
+                                        model=model,
+                                        dataloader=testloader,
+                                        rank=-1,
+                                        plot=False)
     origin_nparameters = obtain_num_parameters(model)
 
     CBL_idx, Conv_idx, prune_idx, _, _ = parse_module_defs2(model.module_defs)
@@ -225,7 +242,14 @@ if __name__ == '__main__':
 
     # 在测试集上测试剪枝后的模型, 并统计模型的参数数量
     with torch.no_grad():
-        compact_model_metric = eval_model(compact_model)
+        compact_model_metric = test.test(opt.cfg,
+                                         opt.data,
+                                         batch_size=batch_size,
+                                         imgsz=img_size,
+                                         model=compact_model,
+                                         dataloader=testloader,
+                                         rank=-1,
+                                         plot=False)
 
     # 比较剪枝前后参数数量的变化、指标性能的变化
     metric_table = [

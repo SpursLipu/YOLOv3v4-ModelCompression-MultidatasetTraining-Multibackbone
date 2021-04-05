@@ -116,7 +116,7 @@ def rand_prune_and_eval(model, min_rate, max_rate):
             for batch_i, (imgs, targets, paths, shapes) in enumerate(tqdm(dataloader)):
                 imgs = imgs.cuda().float() / 255.0
                 compact_model(imgs)
-                if batch_i > 20:
+                if batch_i > 1000:
                     break
 
         with torch.no_grad():
@@ -142,9 +142,9 @@ def rand_prune_and_eval(model, min_rate, max_rate):
 
 if __name__ == '__main__':
     class opt():
-        model_def = "cfg/yolov3/yolov3-hand.cfg"
-        data_config = "data/oxfordhand.data"
-        model = 'weights/pretrain_weights/yolov3-hand-best.weights'
+        model_def = "cfg/yolov3/yolov3.cfg"
+        data_config = "data/coco2017.data"
+        model = 'weights/pretrain_weights/yolov3.weights'
         rect = False
         img_weights = False
 
@@ -183,7 +183,7 @@ if __name__ == '__main__':
     train_path = data_config["train"]
     class_names = load_classes(data_config["names"])
 
-    eval_model = lambda model: test(model=model, cfg=opt.model_def, data=opt.data_config)
+    eval_model = lambda model: test(model=model, cfg=opt.model_def, data=opt.data_config, rank=-1, plot=False)
     # eval_model2 = lambda model: test(model=model, cfg=opt.model_def, data=opt.data_config, fast_eval=True)
 
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])

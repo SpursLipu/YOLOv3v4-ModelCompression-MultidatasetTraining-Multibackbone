@@ -1,9 +1,9 @@
 from models import *
-from test import test
 from utils.utils import *
 from utils.prune_utils import *
 from utils.datasets import *
 import os
+import test
 
 
 def obtain_avg_forward_time(input, model, repeat=200):
@@ -17,7 +17,7 @@ def obtain_avg_forward_time(input, model, repeat=200):
     return avg_infer_time, output
 
 
-def obtain_filters_mask2(model, CBL_idx, prune_idx, idx_mask):
+def obtain_filters_mask(model, CBL_idx, prune_idx, idx_mask):
     pruned = 0
     total = 0
     num_filters = []
@@ -67,10 +67,6 @@ def obtain_l1_mask(conv_module, random_rate):
 
 
 def rand_prune_and_eval(model, min_rate, max_rate):
-    np.random.seed(int(time.time()))
-    candidates = 0
-    max_mAP = 0
-
     while True:
         model_copy = deepcopy(model)
         remain_num = 0
@@ -88,7 +84,7 @@ def rand_prune_and_eval(model, min_rate, max_rate):
             # bn_module.weight.data.mul_(mask)
 
         # ---------------
-        num_filters, filters_mask = obtain_filters_mask2(model_copy, CBL_idx, prune_idx, idx_new)
+        num_filters, filters_mask = obtain_filters_mask(model_copy, CBL_idx, prune_idx, idx_new)
         CBLidx2mask = {idx: mask for idx, mask in zip(CBL_idx, filters_mask)}
 
         compact_module_defs = deepcopy(model.module_defs)
@@ -97,11 +93,14 @@ def rand_prune_and_eval(model, min_rate, max_rate):
             compact_module_defs[idx]['filters'] = str(num)
         compact_model = Darknet([model.hyperparams.copy()] + compact_module_defs).to(device)
         current_parameters = obtain_num_parameters(compact_model)
-        remain_ratio = 0.3  # 0.2
+        remain_ratio = 0.6  # 0.2
         delta = 0.05  # 0.03
         # print(current_parameters/origin_nparameters, end='；')
         if current_parameters / origin_nparameters > remain_ratio + delta or current_parameters / origin_nparameters < remain_ratio - delta:
             # print('missing')
+            model_copy.cpu()
+            compact_model.cpu()
+            torch.cuda.empty_cache()
             continue
 
         print("yes---")
@@ -118,42 +117,18 @@ def rand_prune_and_eval(model, min_rate, max_rate):
                 compact_model(imgs)
                 if batch_i > 1000:
                     break
-
-        with torch.no_grad():
-            mAP = test.test(opt.cfg,
-                            opt.data,
-                            batch_size=batch_size,
-                            imgsz=img_size,
-                            model=compact_model,
-                            dataloader=testloader,
-                            rank=-1,
-                            plot=False)[0][2]
-
-        print('candidate: ' + str(candidates), end=" ")
-        print('remain_ratio: ' + str(current_parameters / origin_nparameters))
-        print(f'mAP of the pruned model is {mAP:.4f}')
-        if mAP > max_mAP:
-            max_mAP = mAP
-            compact_model_winnner = deepcopy(compact_model)
-            cfg_name = 'cfg_backup/' + str(candidates) + '.cfg'
-            if not os.path.isdir('cfg_backup/'):
-                os.makedirs('cfg_backup/')
-            pruned_cfg_file = write_cfg(cfg_name, [model.hyperparams.copy()] + compact_module_defs)
-
-        candidates = candidates + 1
-        if candidates > 1000:  # 20
-            break
-
-    return model_copy, compact_model_winnner
+        del model_copy
+        torch.cuda.empty_cache()
+        break
+    return compact_module_defs, current_parameters, compact_model
 
 
 if __name__ == '__main__':
     class opt():
-        model_def = "cfg/yolov3/yolov3.cfg"
-        data_config = "data/coco2017.data"
-        model = 'weights/pretrain_weights/yolov3.weights'
+        cfg = "cfg/yolov3/yolov3.cfg"
+        data = "data/coco2017.data"
+        weights = 'weights/pretrain_weights/yolov3.weights'
         rect = False
-        img_weights = False
 
 
     hyp = {'giou': 3.54,  # giou loss gain
@@ -176,15 +151,15 @@ if __name__ == '__main__':
            'shear': 0.641 * 0}  # image shear (+/- deg)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Darknet(opt.model_def).to(device)
+    model = Darknet(opt.cfg).to(device)
 
-    if opt.model:
-        if opt.model.endswith(".pt"):
-            model.load_state_dict(torch.load(opt.model, map_location=device)['model'])
+    if opt.weights:
+        if opt.weights.endswith(".pt"):
+            model.load_state_dict(torch.load(opt.weights, map_location=device)['model'])
         else:
-            _ = load_darknet_weights(model, opt.model)
+            _ = load_darknet_weights(model, opt.weights)
 
-    data_config = parse_data_cfg(opt.data_config)
+    data_config = parse_data_cfg(opt.data)
 
     valid_path = data_config["valid"]
     train_path = data_config["train"]
@@ -194,27 +169,32 @@ if __name__ == '__main__':
 
     img_size = 416
     batch_size = 16
+
     dataset = LoadImagesAndLabels(train_path,
                                   img_size,
                                   batch_size,
                                   augment=True,
                                   hyp=hyp,  # augmentation hyperparameters
-                                  rect=opt.rect,  # rectangular training
+                                  rect=False,  # rectangular training
                                   cache_images=False)
 
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=batch_size,
-                                             num_workers=min([os.cpu_count(), batch_size, 8]),
-                                             shuffle=not opt.rect,  # Shuffle=True unless rectangular training is used
+                                             num_workers=min([os.cpu_count(), batch_size, 16]),
+                                             shuffle=True,  # Shuffle=True unless rectangular training is used
                                              pin_memory=True,
                                              collate_fn=dataset.collate_fn)
-    testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(valid_path, img_size, batch_size,
-                                                                 hyp=hyp,
-                                                                 rect=True),
+
+    test_dataset = LoadImagesAndLabels(valid_path, img_size, batch_size,
+                                       hyp=hyp,
+                                       rect=True,
+                                       cache_images=False)
+    testloader = torch.utils.data.DataLoader(test_dataset,
                                              batch_size=batch_size,
                                              num_workers=min([os.cpu_count(), batch_size, 8]),
+                                             shuffle=False,
                                              pin_memory=True,
-                                             collate_fn=dataset.collate_fn)
+                                             collate_fn=test_dataset.collate_fn)
 
     with torch.no_grad():
         origin_model_metric = test.test(opt.cfg,
@@ -232,17 +212,41 @@ if __name__ == '__main__':
     print("-------------------------------------------------------")
 
     percent = 1
-    pruning_model, compact_model = rand_prune_and_eval(model, 0, percent)
-
+    max_mAP = 0
+    for i in range(1000):
+        compact_module_defs, current_parameters, compact_model = rand_prune_and_eval(model, 0, percent)
+        with torch.no_grad():
+            # 防止随机生成的较差的模型撑爆显存，增大nmsconf阈值
+            mAP = test.test(opt.cfg,
+                            opt.data,
+                            batch_size=batch_size,
+                            imgsz=img_size,
+                            conf_thres=0.1,
+                            model=compact_model,
+                            dataloader=testloader,
+                            rank=-1,
+                            plot=False)[0][2]
+        print('candidate: ' + str(i), end=" ")
+        print('remain_ratio: ' + str(current_parameters / origin_nparameters))
+        print(f'mAP of the pruned model is {mAP:.4f}')
+        if mAP > max_mAP:
+            max_mAP = mAP
+            compact_model_winnner = deepcopy(compact_model)
+            cfg_name = 'cfg_backup/' + str(i) + '.cfg'
+            if not os.path.isdir('cfg_backup/'):
+                os.makedirs('cfg_backup/')
+            pruned_cfg_file = write_cfg(cfg_name, [model.hyperparams.copy()] + compact_module_defs)
+        del compact_model
+        torch.cuda.empty_cache()
     # 获得原始模型的module_defs，并修改该defs中的卷积核数量
-    compact_module_defs = deepcopy(compact_model.module_defs)
+    compact_module_defs = deepcopy(compact_model_winnner.module_defs)
 
-    compact_nparameters = obtain_num_parameters(compact_model)
+    compact_nparameters = obtain_num_parameters(compact_model_winnner)
 
     random_input = torch.rand((16, 3, 416, 416)).to(device)
 
-    pruned_forward_time, pruned_output = obtain_avg_forward_time(random_input, pruning_model)
-    compact_forward_time, compact_output = obtain_avg_forward_time(random_input, compact_model)
+    pruned_forward_time, pruned_output = obtain_avg_forward_time(random_input, model)
+    compact_forward_time, compact_output = obtain_avg_forward_time(random_input, compact_model_winnner)
 
     # 在测试集上测试剪枝后的模型, 并统计模型的参数数量
     with torch.no_grad():
@@ -250,7 +254,7 @@ if __name__ == '__main__':
                                          opt.data,
                                          batch_size=batch_size,
                                          imgsz=img_size,
-                                         model=compact_model,
+                                         model=compact_model_winnner,
                                          dataloader=testloader,
                                          rank=-1,
                                          plot=False)
@@ -272,7 +276,7 @@ if __name__ == '__main__':
         os.makedirs(dir_name)
 
     # 由于原始的compact_module_defs将anchor从字符串变为了数组，因此这里将anchors重新变为字符串
-    file = open(opt.model_def, 'r')
+    file = open(opt.cfg, 'r')
     lines = file.read().split('\n')
     for line in lines:
         if line.split(' = ')[0] == 'anchors':
@@ -297,5 +301,5 @@ if __name__ == '__main__':
         os.makedirs(weights_dir_name)
     compact_model_name = weights_dir_name + 'rand-normal_0-' + str(percent) + '_1000.weights'
 
-    save_weights(compact_model, path=compact_model_name)
+    save_weights(compact_model_winnner, path=compact_model_name)
     print(f'Compact model has been saved: {compact_model_name}')

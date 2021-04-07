@@ -235,7 +235,7 @@ Based on mobilenetv3, two network structures are designed.
 1. YOLOv3,YOLOv3tiny and YOLOv4 were trained and tested on coco2014, and Yolov3-Mobilenetv3 and YOLOv3tiny
    Mobilenetv3-Small were trained and tested on coco2017.
 
-2. The reasoning speed is tested on GTX2080ti*4, and the image size is 608.
+2. The inference speed test on GTX2080ti*4, and image size is 608.
 
 3. The training set should match the testing set, because mismatch will cause the mistakes of mAP.
    Read [issue](https://github.com/ultralytics/yolov3/issues/970) for detial.

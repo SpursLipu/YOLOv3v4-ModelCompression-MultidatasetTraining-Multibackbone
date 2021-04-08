@@ -1,5 +1,4 @@
 # Author:LiPu
-# Author:LiPu
 import math
 import torch
 import torch.nn as nn

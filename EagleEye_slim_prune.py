@@ -271,7 +271,7 @@ if __name__ == '__main__':
         os.makedirs(dir_name)
 
     # 由于原始的compact_module_defs将anchor从字符串变为了数组，因此这里将anchors重新变为字符串
-    file = open(opt.model_def, 'r')
+    file = open(opt.cfg, 'r')
     lines = file.read().split('\n')
     for line in lines:
         if line.split(' = ')[0] == 'anchors':

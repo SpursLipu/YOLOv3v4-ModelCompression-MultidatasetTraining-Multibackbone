@@ -26,7 +26,7 @@ def PTQ(cfg,
     print('')  # skip a line
     # Initialize model
     model = Darknet(cfg)
-    q_model = Darknet(cfg, quantized=4, a_bit=a_bit, w_bit=w_bit, FPGA=FPGA)
+    q_model = Darknet(cfg, quantized=5, a_bit=a_bit, w_bit=w_bit, FPGA=FPGA)
 
     # Load weights
     attempt_download(weights)

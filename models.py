@@ -4,6 +4,7 @@ from utils.quantized.quantized_google import *
 from utils.quantized.quantized_dorefa import *
 from utils.quantized.quantized_ptq import *
 from utils.quantized.quantized_ptq_cos import *
+from utils.quantized.quantized_pact import *
 from utils.layers import *
 import copy
 
@@ -84,7 +85,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                      bn=bn,
                                                                      activate=mdef['activation'],
                                                                      steps=steps,
-                                                                     quantizer_output = quantizer_output))
+                                                                     quantizer_output=quantizer_output))
                 else:
                     modules.add_module('Conv2d', DorefaConv2d(in_channels=output_filters[-1],
                                                               out_channels=filters,
@@ -124,7 +125,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                                    w_bits=w_bit,
                                                                                    bn=bn,
                                                                                    activate=mdef['activation'],
-                                                                                   quantizer_output = quantizer_output))
+                                                                                   quantizer_output=quantizer_output))
                 else:
                     modules.add_module('Conv2d', PTQuantizedConv2d(in_channels=output_filters[-1],
                                                                    out_channels=filters,
@@ -151,6 +152,47 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                     if mdef['activation'] == 'mish':
                         modules.add_module('activation', Mish())
             elif quantized == 4:
+                if FPGA:
+                    modules.add_module('Conv2d', Pact_BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                                      out_channels=filters,
+                                                                                      kernel_size=kernel_size,
+                                                                                      stride=int(mdef['stride']),
+                                                                                      padding=pad,
+                                                                                      groups=mdef[
+                                                                                          'groups'] if 'groups' in mdef else 1,
+                                                                                      bias=not bn,
+                                                                                      a_bits=a_bit,
+                                                                                      w_bits=w_bit,
+                                                                                      bn=bn,
+                                                                                      activate=mdef['activation'],
+                                                                                      steps=steps,
+                                                                                      quantizer_output=quantizer_output))
+                else:
+                    modules.add_module('Conv2d', Pact_QuantizedConv2d(in_channels=output_filters[-1],
+                                                                      out_channels=filters,
+                                                                      kernel_size=kernel_size,
+                                                                      stride=int(mdef['stride']),
+                                                                      padding=pad,
+                                                                      groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                                      bias=not bn,
+                                                                      a_bits=a_bit,
+                                                                      w_bits=w_bit))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
+                    if mdef['activation'] == 'leaky':
+                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                        # modules.add_module('activation', Swish())
+                    if mdef['activation'] == 'relu6':
+                        modules.add_module('activation', ReLU6())
+                    if mdef['activation'] == 'h_swish':
+                        modules.add_module('activation', HardSwish())
+                    if mdef['activation'] == 'relu':
+                        modules.add_module('activation', nn.ReLU())
+                    if mdef['activation'] == 'mish':
+                        modules.add_module('activation', Mish())
+            elif quantized == 5:
                 modules.add_module('Conv2d', BNFold_COSPTQuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
                                                                                   out_channels=filters,
                                                                                   kernel_size=kernel_size,
@@ -163,7 +205,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                                   w_bits=w_bit,
                                                                                   bn=bn,
                                                                                   activate=mdef['activation'],
-                                                                                  quantizer_output = quantizer_output))
+                                                                                  quantizer_output=quantizer_output))
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,
@@ -208,7 +250,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                        bn=bn,
                                                                        activate=mdef['activation'],
                                                                        steps=steps,
-                                                                       quantizer_output = quantizer_output))
+                                                                       quantizer_output=quantizer_output))
                 else:
                     modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
                                                                       out_channels=filters,
@@ -248,7 +290,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                           bn=bn,
                                                                           activate=mdef['activation'],
                                                                           steps=steps,
-                                                                          quantizer_output = quantizer_output))
+                                                                          quantizer_output=quantizer_output))
                 else:
                     modules.add_module('DepthWise2d', DorefaConv2d(in_channels=output_filters[-1],
                                                                    out_channels=filters,
@@ -287,7 +329,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                                         w_bits=w_bit,
                                                                                         bn=bn,
                                                                                         activate=mdef['activation'],
-                                                                                        quantizer_output = quantizer_output))
+                                                                                        quantizer_output=quantizer_output))
                 else:
                     modules.add_module('DepthWise2d', PTQuantizedConv2d(in_channels=output_filters[-1],
                                                                         out_channels=filters,
@@ -313,7 +355,48 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                         modules.add_module('activation', nn.ReLU())
                     if mdef['activation'] == 'mish':
                         modules.add_module('activation', Mish())
-            elif quantized == 4:
+            if quantized == 4:
+                if FPGA:
+                    modules.add_module('DepthWise2d',
+                                       Pact_BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                                                            out_channels=filters,
+                                                                            kernel_size=kernel_size,
+                                                                            stride=int(mdef['stride']),
+                                                                            padding=pad,
+                                                                            groups=output_filters[-1],
+                                                                            bias=not bn,
+                                                                            a_bits=a_bit,
+                                                                            w_bits=w_bit,
+                                                                            bn=bn,
+                                                                            activate=mdef['activation'],
+                                                                            steps=steps,
+                                                                            quantizer_output=quantizer_output))
+                else:
+                    modules.add_module('DepthWise2d', Pact_QuantizedConv2d(in_channels=output_filters[-1],
+                                                                           out_channels=filters,
+                                                                           kernel_size=kernel_size,
+                                                                           stride=int(mdef['stride']),
+                                                                           padding=pad,
+                                                                           groups=output_filters[-1],
+                                                                           bias=not bn,
+                                                                           a_bits=a_bit,
+                                                                           w_bits=w_bit))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+
+                    if mdef['activation'] == 'leaky':
+                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+                        # modules.add_module('activation', Swish())
+                    if mdef['activation'] == 'relu6':
+                        modules.add_module('activation', ReLU6())
+                    if mdef['activation'] == 'h_swish':
+                        modules.add_module('activation', HardSwish())
+                    if mdef['activation'] == 'relu':
+                        modules.add_module('activation', nn.ReLU())
+                    if mdef['activation'] == 'mish':
+                        modules.add_module('activation', Mish())
+            elif quantized == 5:
                 modules.add_module('DepthWise2d', BNFold_COSPTQuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
                                                                                        out_channels=filters,
                                                                                        kernel_size=kernel_size,
@@ -325,7 +408,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                                                                                        w_bits=w_bit,
                                                                                        bn=bn,
                                                                                        activate=mdef['activation'],
-                                                                                       quantizer_output = quantizer_output))
+                                                                                       quantizer_output=quantizer_output))
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
                                                             out_channels=filters,
@@ -422,7 +505,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, a_bi
                     j = layers[yolo_index] if 'from' in mdef else -1
                     bias_ = module_list[j][0].bias  # shape(255,)
                     bias = bias_[:modules.no * modules.na].view(modules.na, -1)  # shape(3,85)
-                    bias[:, 4] = bias[:, 4] - 4.5  # obj
+                    bias[:, 4] = bias[:, 4] - 4.5  # obj ln((1-0.01)/0.01)约等于4.5
                     bias[:, 5:] = bias[:, 5:] + math.log(0.6 / (modules.nc - 0.99))  # cls (sigmoid(p) = 1/nc)
                     module_list[j][0].bias = torch.nn.Parameter(bias_, requires_grad=bias_.requires_grad)
             except:
@@ -533,7 +616,8 @@ class YOLOLayer(nn.Module):
 class Darknet(nn.Module):
     # YOLOv3 object detection model
 
-    def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, FPGA=False, quantizer_output=False, steps=0):
+    def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, FPGA=False,
+                 quantizer_output=False, steps=0):
         super(Darknet, self).__init__()
 
         if isinstance(cfg, str):
@@ -544,17 +628,18 @@ class Darknet(nn.Module):
         self.a_bit = a_bit
         self.w_bit = w_bit
         self.FPGA = FPGA
-        self.quantizer_output = quantizer_output####输出设置超参数
+        self.quantizer_output = quantizer_output  ####输出设置超参数
         self.hyperparams = copy.deepcopy(self.module_defs[0])
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
-                                                      quantizer_output=self.quantizer_output,a_bit=self.a_bit, w_bit=self.w_bit, FPGA=self.FPGA, steps=steps)
+                                                      quantizer_output=self.quantizer_output, a_bit=self.a_bit,
+                                                      w_bit=self.w_bit, FPGA=self.FPGA, steps=steps)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 
         # Darknet Header https://github.com/AlexeyAB/darknet/issues/2914#issuecomment-496675346
         self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
-        #输出modelsummary
+        # 输出modelsummary
         self.info(verbose) if not ONNX_EXPORT else None  # print model description
 
     def forward(self, x, augment=False):

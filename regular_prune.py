@@ -147,7 +147,7 @@ if __name__ == '__main__':
     # 指定GPU
     # torch.cuda.set_device(2)
 
-    filter_switch = [each for each in range(2048) if (each % 32 == 0)]
+    filter_switch = [each for each in range(1024) if (each % 8 == 0)]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Darknet(opt.cfg).to(device)
@@ -164,7 +164,7 @@ if __name__ == '__main__':
     class_names = load_classes(data_config["names"])
 
     eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size,
-                                    imgsz=opt.img_size, rank=-1)
+                                    imgsz=opt.img_size)
 
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 

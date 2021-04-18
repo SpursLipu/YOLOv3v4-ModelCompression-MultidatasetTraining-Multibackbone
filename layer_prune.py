@@ -76,8 +76,7 @@ if __name__ == '__main__':
         load_darknet_weights(model, opt.weights)
     print('\nloaded weights from ', opt.weights)
 
-    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size, imgsz=img_size,
-                                    rank=-1)
+    eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size, imgsz=img_size)
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
     with torch.no_grad():

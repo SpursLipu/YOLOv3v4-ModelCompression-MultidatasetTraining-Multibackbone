@@ -1,4 +1,5 @@
 # Author:LiPu
+# Author:LiPu
 import math
 import torch
 import torch.nn as nn
@@ -140,3 +141,5 @@ class BinaryConv2d(nn.Conv2d):
             self.bias.data.zero_()
 
         self.weight.lr_scale = 1. / stdv
+
+

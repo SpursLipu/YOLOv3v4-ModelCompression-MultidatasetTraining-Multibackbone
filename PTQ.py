@@ -13,7 +13,7 @@ def PTQ(cfg,
         t_data,
         c_data,
         weights=None,
-        batch_size=16,
+        batch_size=64,
         imgsz=416,
         single_cls=False,
         augment=False,
@@ -26,7 +26,7 @@ def PTQ(cfg,
     print('')  # skip a line
     # Initialize model
     model = Darknet(cfg)
-    q_model = Darknet(cfg, quantized=4, a_bit=a_bit, w_bit=w_bit, FPGA=FPGA)
+    q_model = Darknet(cfg, quantized=5, a_bit=a_bit, w_bit=w_bit, FPGA=FPGA)
 
     # Load weights
     attempt_download(weights)
@@ -69,7 +69,8 @@ def PTQ(cfg,
               batch_size=batch_size,
               imgsz=imgsz,
               model=model,
-              dataloader=t_dataloader)
+              dataloader=t_dataloader,
+              rank=-1)
 
     q_model.train()
     print('')  # skip a line
@@ -92,7 +93,8 @@ def PTQ(cfg,
               quantized=4,
               a_bit=opt.a_bit,
               w_bit=opt.w_bit,
-              FPGA=opt.FPGA)
+              FPGA=opt.FPGA,
+              rank=-1)
     # Save model
 
     if hasattr(q_model, 'module'):
@@ -115,7 +117,7 @@ if __name__ == '__main__':
     parser.add_argument('--t_data', type=str, default='data/coco2014.data', help='*.data path')
     parser.add_argument('--c_data', type=str, default='data/coco2014.data', help='*.data path')
     parser.add_argument('--weights', type=str, default='weights/yolov3-spp-ultralytics.pt', help='weights path')
-    parser.add_argument('--batch-size', type=int, default=16, help='size of each image batch')
+    parser.add_argument('--batch-size', type=int, default=64, help='size of each image batch')
     parser.add_argument('--img-size', type=int, default=512, help='inference size (pixels)')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
     parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')

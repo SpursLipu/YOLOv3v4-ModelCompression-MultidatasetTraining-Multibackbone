@@ -1,8 +1,8 @@
 # Author:LiPu
-import time
 import numpy as np
 import os
-
+import time
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,6 +11,7 @@ from torch.nn.parameter import Parameter
 from torch.autograd import Function
 
 
+# ********************* quantizers（量化器，量化） *********************
 class Round(Function):
 
     @staticmethod
@@ -24,108 +25,249 @@ class Round(Function):
         return grad_input
 
 
-# ********************* A(特征)量化 ***********************
-class activation_quantize(nn.Module):
-    def __init__(self, a_bits):
+class Ceil(Function):
+
+    @staticmethod
+    def forward(self, input):
+        output = torch.ceil(input)
+        return output
+
+    @staticmethod
+    def backward(self, grad_output):
+        grad_input = grad_output.clone()
+        return grad_input
+
+
+class Search_Pow2(Function):
+
+    @staticmethod
+    def forward(self, input):
+        ceil_float_range = 2 ** input.log2().ceil()
+        floor_float_range = 2 ** input.log2().floor()
+        if abs(ceil_float_range - input) < abs(floor_float_range - input):
+            output = ceil_float_range
+        else:
+            output = floor_float_range
+        return output
+
+    @staticmethod
+    def backward(self, grad_output):
+        # 线性
+        grad_input = 0.8985 * (grad_output.clone())
+        # 多项式
+        # temp = grad_output.clone()
+        # grad_input = -0.668 * temp + 1.335
+
+        return grad_input
+
+
+class Quantizer(nn.Module):
+    def __init__(self, bits, out_channels, FPGA):
         super().__init__()
-        self.a_bits = a_bits
+        self.bits = bits
+        self.FPGA = FPGA
+        self.first = True
+        self.momentum = 0.1
+
+        self.out_channels = out_channels
+        if self.out_channels == -1:
+            self.register_buffer('min_val', torch.zeros(1))
+            self.register_buffer('max_val', torch.zeros(1))
+            self.scale = Parameter(torch.Tensor(1))  # 量化比例因子
+        else:
+            self.register_buffer('min_val', torch.zeros(out_channels, 1, 1, 1))
+            self.register_buffer('max_val', torch.zeros(out_channels, 1, 1, 1))
+            self.scale = Parameter(torch.Tensor(self.out_channels, 1, 1, 1))  # 量化比例因子
+        init.ones_(self.scale)
+
+    # 截断
+    def clamp(self, input):
+        if self.FPGA:
+            output = 0.5 * (
+                    torch.abs(input + Search_Pow2.apply(self.scale)) - torch.abs(input - Search_Pow2.apply(self.scale)))
+        else:
+            output = 0.5 * (
+                    torch.abs(input + self.scale) - torch.abs(input - self.scale))
+        return output
+
+    # 量化
+    def quantize(self, input):
+        quantized_range = torch.tensor((1 << (self.bits - 1)) - 1)
+        if self.FPGA:
+            output = (input * quantized_range) / Search_Pow2.apply(self.scale)
+        else:
+            output = (input * quantized_range) / self.scale
+        return output
 
     def round(self, input):
         output = Round.apply(input)
         return output
 
-    def get_quantize_value(self, input):
-        output = torch.clamp(input * 0.1, 0, 1)  # 特征A截断前先进行缩放（* 0.1），以减小截断误差
-        scale = float(2 ** self.a_bits - 1)
-        output = output * scale
-        output = self.round(output)
+    def ceil(self, input):
+        output = Ceil.apply(input)
         return output
 
-        ################获得量化因子所对应的移位数
-
-    def get_scale(self):
-        #############移位修正
-        # scale = float(2 ** self.a_bits - 1)
-        # move_scale = math.log2(scale)
-        scale = np.array(self.a_bits).reshape(1, -1)
-        return scale
+    # 反量化
+    def dequantize(self, input):
+        quantized_range = torch.tensor((1 << (self.bits - 1)))
+        if self.FPGA:
+            output = (input * Search_Pow2.apply(self.scale)) / quantized_range
+        else:
+            output = (input * self.scale) / quantized_range
+        return output
 
     def forward(self, input):
-        if self.a_bits == 32:
+        if self.bits == 32:
             output = input
-        elif self.a_bits == 1:
+        elif self.bits == 1:
             print('！Binary quantization is not supported ！')
-            assert self.a_bits != 1
+            assert self.bits != 1
         else:
-            output = torch.clamp(input * 0.1, 0, 1)  # 特征A截断前先进行缩放（* 0.1），以减小截断误差
-            scale = float(2 ** self.a_bits - 1)
-            output = output * scale
+            output = self.clamp(input)  # 截断
+            output = self.quantize(output)  # 量化
+            if self.FPGA:
+                # output = self.ceil(output)
+                output = self.round(output)
+            else:
+                output = self.round(output)
+            output = self.dequantize(output)  # 反量化
+
+        return output
+
+    def get_quantize_value(self, input):
+        if self.bits == 32:
+            output = input
+        elif self.bits == 1:
+            print('！Binary quantization is not supported ！')
+            assert self.bits != 1
+        else:
+            output = self.quantize(input)  # 量化
             output = self.round(output)
-            output = output / scale
+            output = self.clamp(output)  # 截断
         return output
 
 
-# ********************* W(模型参数)量化 ***********************
-class weight_quantize(nn.Module):
-    def __init__(self, w_bits):
+class RangeTracker(nn.Module):
+    def __init__(self):
         super().__init__()
-        self.w_bits = w_bits
+
+    def update_range(self, min_val, max_val):
+        raise NotImplementedError
+
+    @torch.no_grad()
+    def forward(self, input):
+        min_val = torch.min(input)
+        max_val = torch.max(input)
+        self.update_range(min_val, max_val)
+
+
+class GlobalRangeTracker(RangeTracker):  # W,min_max_shape=(N, 1, 1, 1),channel级,取本次和之前相比的min_max —— (N, C, W, H)
+    def __init__(self):
+        super().__init__()
+        self.register_buffer('min_val', torch.zeros(1))
+        self.register_buffer('max_val', torch.zeros(1))
+        self.register_buffer('first_w', torch.zeros(1))
+
+    def update_range(self, min_val, max_val):
+        temp_minval = self.min_val
+        temp_maxval = self.max_val
+        if self.first_w == 0:
+            self.first_w.add_(1)
+            self.min_val.add_(min_val)
+            self.max_val.add_(max_val)
+        else:
+            self.min_val.add_(-temp_minval).add_(torch.min(temp_minval, min_val))
+            self.max_val.add_(-temp_maxval).add_(torch.max(temp_maxval, max_val))
+
+
+class Bias_Quantizer(nn.Module):
+    def __init__(self, bits, range_tracker):
+        super().__init__()
+        self.bits = bits
+        self.range_tracker = range_tracker
+        self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
+
+    def update_params(self):
+        raise NotImplementedError
+
+    # 量化
+    def quantize(self, input):
+        output = input / self.scale
+        return output
 
     def round(self, input):
         output = Round.apply(input)
         return output
 
-    def get_quantize_value(self, input):
-        output = torch.tanh(input)
-        output = output / 2 / torch.max(torch.abs(output)) + 0.5  # 归一化-[0,1]
-        scale = float(2 ** self.w_bits - 1)
-        output = output * scale
-        output = self.round(output)
-        # output = 2 * output - 1
+    # 截断
+    def clamp(self, input):
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+        output = torch.clamp(input, min_val, max_val)
         return output
 
-        ################获得量化因子所对应的移位数
-
-    def get_scale(self):
-        #############移位修正
-        # scale = float(2 ** self.w_bits - 1)
-        # scale = math.log2(scale)
-        scale = np.array(self.w_bits).reshape(1, -1)
-        return scale
+    # 反量化
+    def dequantize(self, input):
+        output = (input) * self.scale
+        return output
 
     def forward(self, input):
-        if self.w_bits == 32:
+        if self.bits == 32:
             output = input
-        elif self.w_bits == 1:
+        elif self.bits == 1:
             print('！Binary quantization is not supported ！')
-            assert self.w_bits != 1
+            assert self.bits != 1
         else:
-            output = torch.tanh(input)
-            output = output / 2 / torch.max(torch.abs(output)) + 0.5  # 归一化-[0,1]
-            scale = float(2 ** self.w_bits - 1)
-            output = output * scale
+            if self.training == True:
+                self.range_tracker(input)
+                self.update_params()
+            output = self.quantize(input)  # 量化
             output = self.round(output)
-            output = output / scale
-            output = 2 * output - 1
+            output = self.clamp(output)  # 截断
+            output = self.dequantize(output)  # 反量化
         return output
 
-    def get_weights(self, input):
-        if self.w_bits == 32:
+    def get_quantize_value(self, input):
+        if self.bits == 32:
             output = input
-        elif self.w_bits == 1:
+        elif self.bits == 1:
             print('！Binary quantization is not supported ！')
-            assert self.w_bits != 1
+            assert self.bits != 1
         else:
-            output = torch.tanh(input)
-            output = output / 2 / torch.max(torch.abs(output)) + 0.5  # 归一化-[0,1]
-            scale = float(2 ** self.w_bits - 1)
-            output = output * scale
+            output = self.quantize(input)  # 量化
             output = self.round(output)
+            output = self.clamp(output)  # 截断
         return output
 
+    ################获得量化因子所对应的移位数
+    def get_scale(self):
+        #############移位修正
+        move_scale = math.log2(self.scale)
+        move_scale = np.array(move_scale).reshape(1, -1)
+        return move_scale
 
-# ********************* 量化卷积（同时量化A/W，并做卷积） ***********************
-class DorefaConv2d(nn.Conv2d):
+
+# 对称量化
+class SymmetricQuantizer(Bias_Quantizer):
+
+    def update_params(self):
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+
+        quantized_range = torch.max(torch.abs(min_val), torch.abs(max_val))  # 量化后范围
+
+        float_max = torch.max(torch.abs(self.range_tracker.min_val), torch.abs(self.range_tracker.max_val))  # 量化前范围
+        floor_float_range = 2 ** float_max.log2().floor()
+        ceil_float_range = 2 ** float_max.log2().ceil()
+        if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+            float_range = ceil_float_range
+        else:
+            float_range = floor_float_range
+        self.scale = float_range / quantized_range  # 量化比例因子
+
+
+# ********************* 量化卷积（同时量化A/W，并做卷积） *********************
+class Pact_QuantizedConv2d(nn.Conv2d):
     def __init__(
             self,
             in_channels,
@@ -137,8 +279,7 @@ class DorefaConv2d(nn.Conv2d):
             groups=1,
             bias=True,
             a_bits=8,
-            w_bits=8,
-    ):
+            w_bits=8):
         super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -149,9 +290,9 @@ class DorefaConv2d(nn.Conv2d):
             groups=groups,
             bias=bias
         )
-        # 实例化调用A和W量化器
-        self.activation_quantizer = activation_quantize(a_bits=a_bits)
-        self.weight_quantizer = weight_quantize(w_bits=w_bits)
+        # 实例化量化器（A-layer级，W-channel级）
+        self.activation_quantizer = Quantizer(bits=a_bits, out_channels=-1, FPGA=False)
+        self.weight_quantizer = Quantizer(bits=w_bits, out_channels=-1, FPGA=False)
 
     def forward(self, input):
         # 量化A和W
@@ -183,8 +324,8 @@ def reshape_to_bias(input):
     return input.reshape(-1)
 
 
-class BNFold_DorefaConv2d(DorefaConv2d):
-
+# ********************* bn融合_量化卷积（bn融合后，同时量化A/W，并做卷积） *********************
+class Pact_BNFold_QuantizedConv2d_For_FPGA(Pact_QuantizedConv2d):
     def __init__(
             self,
             in_channels,
@@ -202,7 +343,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             bn=0,
             activate='leaky',
             steps=0,
-            quantizer_output=False,
+            quantizer_output=False
     ):
         super().__init__(
             in_channels=in_channels,
@@ -232,10 +373,10 @@ class BNFold_DorefaConv2d(DorefaConv2d):
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
 
-        # 实例化量化器（A-layer级，W-channel级）
-        self.activation_quantizer = activation_quantize(a_bits=a_bits)
-        self.weight_quantizer = weight_quantize(w_bits=w_bits)
-        self.bias_quantizer = weight_quantize(w_bits=w_bits)
+        self.activation_quantizer = Quantizer(bits=a_bits, out_channels=-1, FPGA=True)
+        self.weight_quantizer = Quantizer(bits=w_bits, out_channels=-1, FPGA=True)
+        self.bias_quantizer = SymmetricQuantizer(bits=w_bits,
+                                                 range_tracker=GlobalRangeTracker())
 
     def forward(self, input):
         # 训练态
@@ -256,7 +397,6 @@ class BNFold_DorefaConv2d(DorefaConv2d):
                 dims = [dim for dim in range(4) if dim != 1]
                 self.batch_mean = torch.mean(output, dim=dims)
                 self.batch_var = torch.var(output, dim=dims)
-
                 with torch.no_grad():
                     if self.first_bn == 0 and torch.equal(self.running_mean, torch.zeros_like(
                             self.running_mean)) and torch.equal(self.running_var, torch.zeros_like(self.running_var)):
@@ -264,8 +404,8 @@ class BNFold_DorefaConv2d(DorefaConv2d):
                         self.running_mean.add_(self.batch_mean)
                         self.running_var.add_(self.batch_var)
                     else:
-                        self.running_mean.mul_(1 - self.momentum).add_(self.momentum * self.batch_mean)
-                        self.running_var.mul_(1 - self.momentum).add_(self.momentum * self.batch_var)
+                        self.running_mean.mul_(1 - self.momentum).add_(self.batch_mean * self.momentum)
+                        self.running_var.mul_(1 - self.momentum).add_(self.batch_var * self.momentum)
                 # BN融合
                 if self.step < self.freeze_step:
                     if self.bias is not None:
@@ -289,22 +429,21 @@ class BNFold_DorefaConv2d(DorefaConv2d):
                                     self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融batch
                     weight = self.weight * reshape_to_weight(
                         self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
-
             else:
                 bias = self.bias
                 weight = self.weight
         # 测试态
         else:
             # print(self.running_mean, self.running_var)
-            # BN融合
             if self.bn:
+                # BN融合
                 if self.bias is not None:
                     bias = reshape_to_bias(self.beta + (self.bias - self.running_mean) * (
                             self.gamma / torch.sqrt(self.running_var + self.eps)))
                 else:
                     bias = reshape_to_bias(
-                        self.beta - self.running_mean * (
-                                self.gamma / torch.sqrt(self.running_var + self.eps)))  # b融running
+                        self.beta - self.running_mean * self.gamma / torch.sqrt(
+                            self.running_var + self.eps))  # b融running
                 weight = self.weight * reshape_to_weight(
                     self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
             else:
@@ -336,7 +475,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
             q_weight_max = [np.max(q_weight_txt)]
             # q_weight_max = np.argmax(q_weight_txt)
-            max_weight_count = [np.sum(abs(q_weight_txt) >= 255)]  # 统计该层溢出的数目
+            max_weight_count = [np.sum(abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
             np.savetxt(('./quantier_output/max_weight_count/max_weight_count %f.txt' % time.time()), max_weight_count)
             np.savetxt(('./quantier_output/q_weight_max/max_weight %f.txt' % time.time()), q_weight_max)
             np.savetxt(('./quantier_output/q_weight_out/weight %f.txt' % time.time()), q_weight_txt, delimiter='\n')
@@ -360,7 +499,6 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             output = F.conv2d(
                 input=input,
                 weight=q_weight,
-                # bias=self.bias,  # 注意，这里不加bias（self.bias为None）
                 bias=q_bias,
                 stride=self.stride,
                 padding=self.padding,
@@ -389,10 +527,10 @@ class BNFold_DorefaConv2d(DorefaConv2d):
         elif self.activate == 'mish':
             output = output * F.softplus(output).tanh()
         elif self.activate == 'linear':
-            return output
-            # pass
+            # return output
+            pass
         else:
-            print(self.activate + " is not supported !")
+            print(self.activate + "%s is not supported !")
 
         if self.quantizer_output == True:
 
@@ -411,7 +549,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             q_activation_txt = self.activation_quantizer.get_quantize_value(output)
             q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
             q_activation_max = [np.max(q_activation_txt)]  # 统计该层的最大值(即查看是否有溢出)
-            max_activation_count = [np.sum(abs(q_activation_txt) >= 255)]  # 统计该层溢出的数目
+            max_activation_count = [np.sum(abs(q_activation_txt) >= 127)]  # 统计该层溢出的数目
             # q_weight_max = np.argmax(q_weight_txt)
             np.savetxt(('./quantier_output/max_activation_count/max_activation_count %f.txt' % time.time()),
                        max_activation_count)
@@ -438,18 +576,3 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             bias = self.bias
             weight = self.weight
         return weight, bias
-
-
-class DorefaLinear(nn.Linear):
-    def __init__(self, in_features, out_features, bias=True, a_bits=2, w_bits=2):
-        super().__init__(in_features=in_features, out_features=out_features, bias=bias)
-        self.activation_quantizer = activation_quantize(a_bits=a_bits)
-        self.weight_quantizer = weight_quantize(w_bits=w_bits)
-
-    def forward(self, input):
-        # 量化A和W
-        q_input = self.activation_quantizer(input)
-        q_weight = self.weight_quantizer(self.weight)
-        # 量化全连接
-        output = F.linear(input=q_input, weight=q_weight, bias=self.bias)
-        return output

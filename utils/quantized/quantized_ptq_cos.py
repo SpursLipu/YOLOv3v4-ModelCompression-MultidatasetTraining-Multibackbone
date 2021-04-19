@@ -1,10 +1,7 @@
 # Author:LiPu
-# Author:LiPu
 import math
 import time
 import numpy as np
-import pandas as pd
-import scipy.io as io
 import os
 
 import torch
@@ -33,7 +30,7 @@ class Quantizer(nn.Module):
         else:
             self.register_buffer('scale', torch.zeros(out_channels, 1, 1, 1))  # 量化比例因子
             self.register_buffer('float_range', torch.zeros(out_channels, 1, 1, 1))
-        self.scale_list = [0 for i in range(bits)]
+        self.scale_list = [0 for i in range(2 * bits)]
 
     def update_params(self, step):
         min_val = torch.tensor(-(1 << (self.bits - 1)))
@@ -67,6 +64,7 @@ class Quantizer(nn.Module):
     def forward(self, input):
         if self.bits == 32:
             output = input
+            return output
         elif self.bits == 1:
             print('！Binary quantization is not supported ！')
             assert self.bits != 1
@@ -74,7 +72,7 @@ class Quantizer(nn.Module):
             if self.training == True:
                 max_metrics = -1
                 max_step = 0
-                for i in range(self.bits):
+                for i in range(-self.bits, self.bits):
                     self.update_params(i)
                     output = self.quantize(input)  # 量化
                     output = self.round(output)
@@ -83,15 +81,38 @@ class Quantizer(nn.Module):
                     cosine_similarity = torch.cosine_similarity(input.view(-1), output.view(-1), dim=0)
                     if cosine_similarity > max_metrics:
                         max_metrics = cosine_similarity
-                        max_step = i
+                        max_step = i + self.bits
                 self.scale_list[max_step] += 1
-                Global_max_step = self.scale_list.index(max(self.scale_list))
+                Global_max_step = self.scale_list.index(max(self.scale_list)) - self.bits
                 self.update_params(Global_max_step)
 
             output = self.quantize(input)  # 量化
             output = self.round(output)
             output = self.clamp(output)  # 截断
             output = self.dequantize(output)  # 反量化
+            # import matplotlib.pyplot as plt
+            # group = [i / 10 for i in range(-50, 100)]
+            #
+            # plt.hist(input.view(-1).cpu().numpy(), group, histtype='bar', rwidth=0.8)
+            #
+            # plt.legend()
+            #
+            # plt.xlabel('x')
+            # plt.ylabel('y')
+            #
+            # plt.title('original')
+            # plt.show()
+            #
+            # plt.hist(output.view(-1).cpu().numpy(), group, histtype='bar', rwidth=0.8)
+            #
+            # plt.legend()
+            #
+            # plt.xlabel('x')
+            # plt.ylabel('y')
+            #
+            # plt.title('quantization')
+            #
+            # plt.show()
             return output
 
     def get_quantize_value(self, input):
@@ -237,8 +258,6 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                 os.makedirs('./quantier_output/q_bias_out')
             if not os.path.isdir('./quantier_output/b_scale_out'):
                 os.makedirs('./quantier_output/b_scale_out')
-            if not os.path.isdir('./quantier_output/max_bias_count'):
-                os.makedirs('./quantier_output/max_bias_count')
             #######################输出当前层偏置的量化因子
             bias_scale = self.bias_quantizer.get_scale()
             np.savetxt(('./quantier_output/b_scale_out/scale %f.txt' % time.time()), bias_scale, delimiter='\n')

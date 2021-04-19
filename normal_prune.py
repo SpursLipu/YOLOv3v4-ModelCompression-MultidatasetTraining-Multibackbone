@@ -115,7 +115,7 @@ if __name__ == '__main__':
     class_names = load_classes(data_config["names"])
     # test model
     eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size,
-                                    imgsz=opt.img_size)
+                                    imgsz=opt.img_size, rank=-1)
     # 获取参数个数
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 

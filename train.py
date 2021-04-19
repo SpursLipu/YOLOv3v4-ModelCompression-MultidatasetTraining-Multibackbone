@@ -492,10 +492,11 @@ def train(hyp):
                                       rank=opt.local_rank)
 
         # Write
-        with open(results_file, 'a') as f:
-            f.write(s + '%10.3g' * 7 % results + '\n')  # P, R, mAP, F1, test_losses=(GIoU, obj, cls)
-        if len(opt.name) and opt.bucket:
-            os.system('gsutil cp results.txt gs://%s/results/results%s.txt' % (opt.bucket, opt.name))
+        if opt.local_rank in [-1, 0]:
+            with open(results_file, 'a') as f:
+                f.write(s + '%10.3g' * 7 % results + '\n')  # P, R, mAP, F1, test_losses=(GIoU, obj, cls)
+            if len(opt.name) and opt.bucket:
+                os.system('gsutil cp results.txt gs://%s/results/results%s.txt' % (opt.bucket, opt.name))
 
         # Tensorboard
         if tb_writer:
@@ -635,7 +636,7 @@ if __name__ == '__main__':
     if not opt.evolve:  # Train normally
         if opt.local_rank in [-1, 0]:
             print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
-            tb_writer = SummaryWriter(comment=opt.name)
+        tb_writer = SummaryWriter(comment=opt.name)
         train(hyp)  # train normally
 
     else:  # Evolve hyperparameters (optional)

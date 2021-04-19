@@ -1,11 +1,15 @@
 # Author:LiPu
+import math
 import time
 import numpy as np
+import pandas as pd
+import scipy.io as io
 import os
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Function
 from torch.nn import init
 from torch.nn.parameter import Parameter
 from torch.autograd import Function
@@ -347,6 +351,8 @@ class BNFold_DorefaConv2d(DorefaConv2d):
                 os.makedirs('./quantier_output/q_bias_out')
             if not os.path.isdir('./quantier_output/b_scale_out'):
                 os.makedirs('./quantier_output/b_scale_out')
+            if not os.path.isdir('./quantier_output/max_bias_count'):
+                os.makedirs('./quantier_output/max_bias_count')
             #######################输出当前层偏置的量化因子
             bias_scale = self.bias_quantizer.get_scale()
             np.savetxt(('./quantier_output/b_scale_out/scale %f.txt' % time.time()), bias_scale, delimiter='\n')

@@ -24,8 +24,7 @@ def test(cfg,
          a_bit=8,
          w_bit=8,
          FPGA=False,
-         rank=None,
-         plot=True):
+         rank=None):
     # Initialize/load model and set device
     if model is None:
         device = torch_utils.select_device(opt.device, batch_size=batch_size)
@@ -172,7 +171,7 @@ def test(cfg,
             stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
 
         # Plot images
-        if batch_i < 1 and plot:
+        if batch_i < 1:
             f = 'test_batch%g_gt.jpg' % batch_i  # filename
             plot_images(imgs, targets, paths=paths, names=names, fname=f)  # ground truth
             f = 'test_batch%g_pred.jpg' % batch_i

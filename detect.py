@@ -59,6 +59,9 @@ def detect(save_img=False):
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
 
+        # if opt.FPGA:
+        #     scale = torch.tensor([2 ** (-(opt.a_bit - 2))]).to(img.device)
+        #     img = torch.round(img * scale) / scale
         # Inference
         t1 = torch_utils.time_synchronized()
         pred = model(img, augment=opt.augment)[0]
@@ -170,6 +173,7 @@ if __name__ == '__main__':
 
 if opt.quantizer_output == True:
 
+
     #统计层数
     file_num=[]
     path='./quantizer_output/q_activation_out'
@@ -278,15 +282,19 @@ if opt.quantizer_output == True:
 #################输出每一层量化后的最大激活
     path = './quantizer_output/q_activation_max'
     dir_sorted = sorted(os.listdir(path))
+
     i = 1
     for file in dir_sorted:
         if os.path.isfile(os.path.join(path, file)) == True:
+
             new_name = file.replace(file, "max_activation-modulelist_Conv2d_%d.txt" % i)
             os.rename(os.path.join(path, file), os.path.join(path, new_name))
-            #合并最大值文档
+            # 合并最大值文档
             file = open(os.path.join(path, new_name), "r", encoding="utf-8", errors="ignore")
             mystr1 = file.readline()  # 表示一次读取一行
+
             file_max = open('./quantizer_output/q_activation_max/q_activation_max.txt', "a", encoding="utf-8", errors="ignore")
+
             file_max.write(mystr1[:-1] + '\n')
             file_max.close()
             file.close()
@@ -304,9 +312,10 @@ if opt.quantizer_output == True:
             mystr1 = file.readline()  # 表示一次读取一行
             file_max = open('./quantizer_output/max_weight_count/max_weight_count.txt', "a", encoding="utf-8")
             file_max.write(mystr1[:-1]+'\n')
+
             file_max.close()
             file.close()
-            i+=1
+            i += 1
 
     path = './quantizer_output/max_activation_count'
     dir_sorted = sorted(os.listdir(path))
@@ -318,6 +327,7 @@ if opt.quantizer_output == True:
             file = open(os.path.join(path, new_name), "r", encoding="utf-8", errors="ignore")
             mystr1 = file.readline()  # 表示一次读取一行
             file_max = open('./quantizer_output/max_activation_count/max_activation_count.txt', "a", encoding="utf-8", errors="ignore")
+
             file_max.write(mystr1[:-1] + '\n')
             file_max.close()
             file.close()

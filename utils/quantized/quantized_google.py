@@ -626,7 +626,6 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             q_activation_txt = self.activation_quantizer.get_quantize_value(output)
             #print(q_activation_txt.shape)
 
-            #########保存下量化好的激活，供下一层的使用
             a_para = q_activation_txt
             #############输入特征图重排序
             if self.reorder == True:

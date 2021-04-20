@@ -317,43 +317,43 @@ class BNFold_DorefaConv2d(DorefaConv2d):
         if self.quantizer_output == True:  # 输出量化参数txt文档
 
             # 创建的quantizer_output输出文件夹
-            if not os.path.isdir('./quantier_output'):
-                os.makedirs('./quantier_output')
+            if not os.path.isdir('./quantizer_output'):
+                os.makedirs('./quantizer_output')
 
-            if not os.path.isdir('./quantier_output/q_weight_out'):
-                os.makedirs('./quantier_output/q_weight_out')
-            if not os.path.isdir('./quantier_output/w_scale_out'):
-                os.makedirs('./quantier_output/w_scale_out')
-            if not os.path.isdir('./quantier_output/q_weight_max'):
-                os.makedirs('./quantier_output/q_weight_max')
-            if not os.path.isdir('./quantier_output/max_weight_count'):
-                os.makedirs('./quantier_output/max_weight_count')
+            if not os.path.isdir('./quantizer_output/q_weight_out'):
+                os.makedirs('./quantizer_output/q_weight_out')
+            if not os.path.isdir('./quantizer_output/w_scale_out'):
+                os.makedirs('./quantizer_output/w_scale_out')
+            if not os.path.isdir('./quantizer_output/q_weight_max'):
+                os.makedirs('./quantizer_output/q_weight_max')
+            if not os.path.isdir('./quantizer_output/max_weight_count'):
+                os.makedirs('./quantizer_output/max_weight_count')
             #######################输出当前层的权重量化因子
             weight_scale = self.weight_quantizer.get_scale()
-            np.savetxt(('./quantier_output/w_scale_out/scale %f.txt' % time.time()), weight_scale, delimiter='\n')
+            np.savetxt(('./quantizer_output/w_scale_out/scale %f.txt' % time.time()), weight_scale, delimiter='\n')
             #######################输出当前层的量化权重
             q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
             q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
             q_weight_max = [np.max(q_weight_txt)]
             # q_weight_max = np.argmax(q_weight_txt)
             max_weight_count = [np.sum(abs(q_weight_txt) >= 255)]  # 统计该层溢出的数目
-            np.savetxt(('./quantier_output/max_weight_count/max_weight_count %f.txt' % time.time()), max_weight_count)
-            np.savetxt(('./quantier_output/q_weight_max/max_weight %f.txt' % time.time()), q_weight_max)
-            np.savetxt(('./quantier_output/q_weight_out/weight %f.txt' % time.time()), q_weight_txt, delimiter='\n')
+            np.savetxt(('./quantizer_output/max_weight_count/max_weight_count %f.txt' % time.time()), max_weight_count)
+            np.savetxt(('./quantizer_output/q_weight_max/max_weight %f.txt' % time.time()), q_weight_max)
+            np.savetxt(('./quantizer_output/q_weight_out/weight %f.txt' % time.time()), q_weight_txt, delimiter='\n')
             # io.savemat('save.mat',{'q_weight_txt':q_weight_txt})
 
             #######################创建输出偏置txt的文件夹
-            if not os.path.isdir('./quantier_output/q_bias_out'):
-                os.makedirs('./quantier_output/q_bias_out')
-            if not os.path.isdir('./quantier_output/b_scale_out'):
-                os.makedirs('./quantier_output/b_scale_out')
+            if not os.path.isdir('./quantizer_output/q_bias_out'):
+                os.makedirs('./quantizer_output/q_bias_out')
+            if not os.path.isdir('./quantizer_output/b_scale_out'):
+                os.makedirs('./quantizer_output/b_scale_out')
             #######################输出当前层偏置的量化因子
             bias_scale = self.bias_quantizer.get_scale()
-            np.savetxt(('./quantier_output/b_scale_out/scale %f.txt' % time.time()), bias_scale, delimiter='\n')
+            np.savetxt(('./quantizer_output/b_scale_out/scale %f.txt' % time.time()), bias_scale, delimiter='\n')
             #######################输出当前层的量化偏置
             q_bias_txt = self.bias_quantizer.get_quantize_value(bias)
             q_bias_txt = np.array(q_bias_txt.cpu()).reshape(1, -1)
-            np.savetxt(('./quantier_output/q_bias_out/bias %f.txt' % time.time()), q_bias_txt, delimiter='\n')
+            np.savetxt(('./quantizer_output/q_bias_out/bias %f.txt' % time.time()), q_bias_txt, delimiter='\n')
 
         # 量化卷积
         if self.training:  # 训练态
@@ -396,27 +396,27 @@ class BNFold_DorefaConv2d(DorefaConv2d):
 
         if self.quantizer_output == True:
 
-            if not os.path.isdir('./quantier_output/q_activation_out'):
-                os.makedirs('./quantier_output/q_activation_out')
-            if not os.path.isdir('./quantier_output/a_scale_out'):
-                os.makedirs('./quantier_output/a_scale_out')
-            if not os.path.isdir('./quantier_output/q_activation_max'):
-                os.makedirs('./quantier_output/q_activation_max')
-            if not os.path.isdir('./quantier_output/max_activation_count'):
-                os.makedirs('./quantier_output/max_activation_count')
+            if not os.path.isdir('./quantizer_output/q_activation_out'):
+                os.makedirs('./quantizer_output/q_activation_out')
+            if not os.path.isdir('./quantizer_output/a_scale_out'):
+                os.makedirs('./quantizer_output/a_scale_out')
+            if not os.path.isdir('./quantizer_output/q_activation_max'):
+                os.makedirs('./quantizer_output/q_activation_max')
+            if not os.path.isdir('./quantizer_output/max_activation_count'):
+                os.makedirs('./quantizer_output/max_activation_count')
             ##################输出当前激活的量化因子
             activation_scale = self.activation_quantizer.get_scale()
-            np.savetxt(('./quantier_output/a_scale_out/scale %f.txt' % time.time()), activation_scale, delimiter='\n')
+            np.savetxt(('./quantizer_output/a_scale_out/scale %f.txt' % time.time()), activation_scale, delimiter='\n')
             ##################输出当前层的量化激活
             q_activation_txt = self.activation_quantizer.get_quantize_value(output)
             q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
             q_activation_max = [np.max(q_activation_txt)]  # 统计该层的最大值(即查看是否有溢出)
             max_activation_count = [np.sum(abs(q_activation_txt) >= 255)]  # 统计该层溢出的数目
             # q_weight_max = np.argmax(q_weight_txt)
-            np.savetxt(('./quantier_output/max_activation_count/max_activation_count %f.txt' % time.time()),
+            np.savetxt(('./quantizer_output/max_activation_count/max_activation_count %f.txt' % time.time()),
                        max_activation_count)
-            np.savetxt(('./quantier_output/q_activation_max/max_activation %f.txt' % time.time()), q_activation_max)
-            np.savetxt(('./quantier_output/q_activation_out/activation %f.txt' % time.time()), q_activation_txt,
+            np.savetxt(('./quantizer_output/q_activation_max/max_activation %f.txt' % time.time()), q_activation_max)
+            np.savetxt(('./quantizer_output/q_activation_out/activation %f.txt' % time.time()), q_activation_txt,
                        delimiter='\n')
 
         output = self.activation_quantizer(output)

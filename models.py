@@ -126,7 +126,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,reord
                                                                                    w_bits=w_bit,
                                                                                    bn=bn,
                                                                                    activate=mdef['activation'],
-                                                                                   quantizer_output=quantizer_output))
+                                                                                   quantizer_output=quantizer_output,
+                                                                                   reorder=reorder, TM=TM, TN=TN))
                 else:
                     modules.add_module('Conv2d', PTQuantizedConv2d(in_channels=output_filters[-1],
                                                                    out_channels=filters,
@@ -206,7 +207,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,reord
                                                                                   w_bits=w_bit,
                                                                                   bn=bn,
                                                                                   activate=mdef['activation'],
-                                                                                  quantizer_output=quantizer_output))
+                                                                                  quantizer_output=quantizer_output,
+                                                                                  reorder=reorder,TM=TM,TN=TN))
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,
@@ -331,7 +333,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,reord
                                                                                         w_bits=w_bit,
                                                                                         bn=bn,
                                                                                         activate=mdef['activation'],
-                                                                                        quantizer_output=quantizer_output))
+                                                                                        quantizer_output=quantizer_output,
+                                                                                        reorder=reorder,TM=TM,TN=TN))
                 else:
                     modules.add_module('DepthWise2d', PTQuantizedConv2d(in_channels=output_filters[-1],
                                                                         out_channels=filters,
@@ -410,7 +413,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,reord
                                                                                        w_bits=w_bit,
                                                                                        bn=bn,
                                                                                        activate=mdef['activation'],
-                                                                                       quantizer_output=quantizer_output))
+                                                                                       quantizer_output=quantizer_output,
+                                                                                       reorder=reorder,TM=TM,TN=TN))
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
                                                             out_channels=filters,

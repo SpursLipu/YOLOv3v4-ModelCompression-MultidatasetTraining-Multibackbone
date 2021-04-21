@@ -1,6 +1,5 @@
 import argparse
 
-import torch.distributed as dist
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
@@ -417,6 +416,19 @@ def train(hyp):
                 scaler.scale(loss).backward()
             else:
                 loss.backward()
+            if opt.SWIFT:
+                if hasattr(model, 'module'):
+                    for i, (mdef, module) in enumerate(zip(model.module.module_defs[:], model.module.module_list[:])):
+                        if mdef['type'] == 'convolutional':
+                            if mdef['activation'] != 'linear':
+                                conv_layer_weight = module[0].weight
+                                conv_layer_weight.grad[conv_layer_weight == 0] = 0
+                else:
+                    for i, (mdef, module) in enumerate(zip(model.module_defs[:], model.module_list[:])):
+                        if mdef['type'] == 'convolutional':
+                            if mdef['activation'] != 'linear':
+                                conv_layer_weight = module[0].weight
+                                conv_layer_weight.grad[conv_layer_weight == 0] = 0
             # 对要剪枝层的γ参数稀疏化
             if hasattr(model, 'module'):
                 if opt.prune != -1:
@@ -495,7 +507,8 @@ def train(hyp):
                                       a_bit=opt.a_bit,
                                       w_bit=opt.w_bit,
                                       FPGA=opt.FPGA,
-                                      rank=opt.local_rank)
+                                      rank=opt.local_rank,
+                                      plot=False)
 
         # Write
         if opt.local_rank in [-1, 0]:
@@ -609,8 +622,9 @@ if __name__ == '__main__':
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
-    parser.add_argument('--FPGA', action='store_true', help='FPGA')
+    parser.add_argument('--FPGA', '-FPGA', dest='FPGA', action='store_true', help='FPGA')
     parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
+    parser.add_argument('--SWIFT', '-SWIFT', dest='SWIFT', action='store_true', help='ues for SWITF pruning')
 
     # DDP get local-rank
     parser.add_argument('--rank', default=0, help='rank of current process')

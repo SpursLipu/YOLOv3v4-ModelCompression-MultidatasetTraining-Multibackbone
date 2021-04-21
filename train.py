@@ -110,7 +110,7 @@ def train(hyp):
     # Initialize model
     steps = math.ceil(len(open(train_path).readlines()) / batch_size) * epochs
     model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
-                    FPGA=opt.FPGA, steps=steps).to(device)
+                    FPGA=opt.FPGA, steps=steps, is_gray_scale=opt.gray_scale).to(device)
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
 
@@ -212,13 +212,17 @@ def train(hyp):
                                   hyp=hyp,  # augmentation hyperparameters
                                   rect=opt.rect,  # rectangular training
                                   cache_images=opt.cache_images,
-                                  single_cls=opt.single_cls)
+                                  single_cls=opt.single_cls,
+                                  rank=opt.local_rank,
+                                  is_gray_scale=True if opt.gray_scale else False)
 
     testset = LoadImagesAndLabels(test_path, imgsz_test, batch_size,
                                   hyp=hyp,
                                   rect=True,
                                   cache_images=opt.cache_images,
-                                  single_cls=opt.single_cls)
+                                  single_cls=opt.single_cls,
+                                  rank=opt.local_rank,
+                                  is_gray_scale=True if opt.gray_scale else False)
 
     # 获得要剪枝的层
     if hasattr(model, 'module'):
@@ -265,7 +269,9 @@ def train(hyp):
                                                                  hyp=hyp,
                                                                  rect=True,
                                                                  cache_images=opt.cache_images,
-                                                                 single_cls=opt.single_cls),
+                                                                 single_cls=opt.single_cls,
+                                                                 rank=opt.local_rank,
+                                                                 is_gray_scale=True if opt.gray_scale else False),
                                              batch_size=batch_size,
                                              num_workers=nw,
                                              pin_memory=True,
@@ -604,6 +610,7 @@ if __name__ == '__main__':
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
+    parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
 
     # DDP get local-rank
     parser.add_argument('--rank', default=0, help='rank of current process')

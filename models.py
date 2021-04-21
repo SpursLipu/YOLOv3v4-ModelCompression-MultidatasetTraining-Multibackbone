@@ -12,12 +12,16 @@ ONNX_EXPORT = False
 
 
 # YOLO
-def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,reorder,TM,TN,a_bit=8, w_bit=8, FPGA=False, steps=0):
+def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,reorder,TM,TN,a_bit=8, w_bit=8, FPGA=False, steps=0, is_gray_scale=False):
     # Constructs module list of layer blocks from module configuration in module_defs
 
     img_size = [img_size] * 2 if isinstance(img_size, int) else img_size  # expand if necessary
     _ = module_defs.pop(0)  # cfg training hyperparams (unused)
-    output_filters = [3]  # input channels
+    if is_gray_scale:
+        output_filters = [1]  # input channels
+    else:
+        output_filters = [3] 
+    
     module_list = nn.ModuleList()
     routs = []  # list of layers which rout to deeper layers
     yolo_index = -1
@@ -623,7 +627,7 @@ class Darknet(nn.Module):
     # YOLOv3 object detection model
 
     def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, FPGA=False,
-                 quantizer_output=False, reorder=False,TM=32,TN=32,steps=0):
+                 quantizer_output=False, reorder=False,TM=32,TN=32,steps=0, is_gray_scale=False):
         super(Darknet, self).__init__()
 
         if isinstance(cfg, str):
@@ -643,7 +647,7 @@ class Darknet(nn.Module):
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
                                                       quantizer_output=self.quantizer_output,reorder=self.reorder,
                                                       TM=self.TM,TN=self.TN, a_bit=self.a_bit,
-                                                      w_bit=self.w_bit, FPGA=self.FPGA, steps=steps)
+                                                      w_bit=self.w_bit, FPGA=self.FPGA, steps=steps, is_gray_scale=is_gray_scale)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 

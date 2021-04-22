@@ -25,7 +25,8 @@ def test(cfg,
          w_bit=8,
          FPGA=False,
          rank=None,
-         plot=True):
+         plot=True,
+         is_gray_scale=False):
     # Initialize/load model and set device
     if model is None:
         device = torch_utils.select_device(opt.device, batch_size=batch_size)
@@ -67,7 +68,7 @@ def test(cfg,
 
     # Dataloader
     if dataloader is None:
-        dataset = LoadImagesAndLabels(path, imgsz, batch_size, rect=True, single_cls=single_cls)
+        dataset = LoadImagesAndLabels(path, imgsz, batch_size, rect=True, single_cls=single_cls, is_gray_scale=is_gray_scale)
         batch_size = min(batch_size, len(dataset))
         dataloader = DataLoader(dataset,
                                 batch_size=batch_size,
@@ -174,9 +175,9 @@ def test(cfg,
         # Plot images
         if batch_i < 1 and plot:
             f = 'test_batch%g_gt.jpg' % batch_i  # filename
-            plot_images(imgs, targets, paths=paths, names=names, fname=f)  # ground truth
+            plot_images(imgs, targets, paths=paths, names=names, fname=f, is_gray_scale=is_gray_scale)  # ground truth
             f = 'test_batch%g_pred.jpg' % batch_i
-            plot_images(imgs, output_to_target(output, width, height), paths=paths, names=names, fname=f)  # predictions
+            plot_images(imgs, output_to_target(output, width, height), paths=paths, names=names, fname=f, is_gray_scale=is_gray_scale)  # predictions
 
     # Compute statistics
     stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy

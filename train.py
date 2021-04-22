@@ -459,7 +459,7 @@ def train(hyp):
                 if not os.path.isdir('train_sample/'):
                     os.makedirs('train_sample/')
                 f = 'train_sample/train_batch%g.jpg' % epoch  # filename
-                res = plot_images(images=imgs, targets=targets, paths=paths, fname=f)
+                res = plot_images(images=imgs, targets=targets, paths=paths, fname=f, is_gray_scale=opt.gray_scale)
                 if tb_writer:
                     tb_writer.add_image(f, res, dataformats='HWC', global_step=epoch)
                     # tb_writer.add_graph(model, imgs)  # add model to tensorboard

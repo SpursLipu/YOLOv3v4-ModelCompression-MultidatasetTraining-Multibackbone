@@ -657,7 +657,7 @@ if __name__ == '__main__':
     if not opt.evolve:  # Train normally
         if opt.local_rank in [-1, 0]:
             print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
-        tb_writer = SummaryWriter(comment=opt.name)
+            tb_writer = SummaryWriter(comment=opt.name)
         train(hyp)  # train normally
 
     else:  # Evolve hyperparameters (optional)

@@ -38,7 +38,7 @@ def test(cfg,
 
         # Initialize model
         model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit,
-                        FPGA=FPGA)
+                        FPGA=FPGA, is_gray_scale=opt.gray_scale)
 
         # Load weights
         attempt_download(weights)
@@ -68,7 +68,8 @@ def test(cfg,
 
     # Dataloader
     if dataloader is None:
-        dataset = LoadImagesAndLabels(path, imgsz, batch_size, rect=True, single_cls=single_cls, is_gray_scale=is_gray_scale)
+        dataset = LoadImagesAndLabels(path, imgsz, batch_size, rect=True, single_cls=single_cls,
+                                      is_gray_scale=is_gray_scale)
         batch_size = min(batch_size, len(dataset))
         dataloader = DataLoader(dataset,
                                 batch_size=batch_size,
@@ -177,7 +178,8 @@ def test(cfg,
             f = 'test_batch%g_gt.jpg' % batch_i  # filename
             plot_images(imgs, targets, paths=paths, names=names, fname=f, is_gray_scale=is_gray_scale)  # ground truth
             f = 'test_batch%g_pred.jpg' % batch_i
-            plot_images(imgs, output_to_target(output, width, height), paths=paths, names=names, fname=f, is_gray_scale=is_gray_scale)  # predictions
+            plot_images(imgs, output_to_target(output, width, height), paths=paths, names=names, fname=f,
+                        is_gray_scale=is_gray_scale)  # predictions
 
     # Compute statistics
     stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
@@ -261,6 +263,7 @@ if __name__ == '__main__':
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
+    parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
 
     opt = parser.parse_args()
     opt.save_json = opt.save_json or any([x in opt.data for x in ['coco.data', 'coco2014.data', 'coco2017.data']])
@@ -285,7 +288,8 @@ if __name__ == '__main__':
              a_bit=opt.a_bit,
              w_bit=opt.w_bit,
              FPGA=opt.FPGA,
-             rank=-1)
+             rank=-1,
+             is_gray_scale=opt.gray_scale)
 
     elif opt.task == 'benchmark':  # mAPs at 256-640 at conf 0.5 and 0.7
         y = []

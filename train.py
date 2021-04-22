@@ -215,7 +215,7 @@ def train(hyp):
                                   rank=opt.local_rank,
                                   is_gray_scale=True if opt.gray_scale else False)
 
-    testset = LoadImagesAndLabels(test_path, imgsz_test, batch_size // 4,
+    testset = LoadImagesAndLabels(test_path, imgsz_test, batch_size,
                                   hyp=hyp,
                                   rect=True,
                                   cache_images=opt.cache_images,
@@ -264,14 +264,14 @@ def train(hyp):
                                              sampler=train_sampler if (opt.local_rank != -1) else None
                                              )
     # Testloader
-    testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(test_path, imgsz_test, batch_size // 4,
+    testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(test_path, imgsz_test, batch_size,
                                                                  hyp=hyp,
                                                                  rect=True,
                                                                  cache_images=opt.cache_images,
                                                                  single_cls=opt.single_cls,
                                                                  rank=opt.local_rank,
                                                                  is_gray_scale=True if opt.gray_scale else False),
-                                             batch_size=batch_size // 4,
+                                             batch_size=batch_size,
                                              num_workers=nw,
                                              pin_memory=True,
                                              collate_fn=dataset.collate_fn)
@@ -496,7 +496,7 @@ def train(hyp):
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
             results, maps = test.test(cfg,
                                       data,
-                                      batch_size=batch_size // 4,
+                                      batch_size=batch_size,
                                       imgsz=imgsz_test,
                                       model=ema.ema if opt.ema else model,
                                       save_json=final_epoch and is_coco,

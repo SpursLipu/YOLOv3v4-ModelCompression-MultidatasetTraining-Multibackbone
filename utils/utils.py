@@ -712,7 +712,7 @@ def Failure_Case_Loss_FM(masks, imgs, targets):
             # mask_target = mask_target + mask_object
         # masks_target.append(mask_target.unsqueeze(0))
     # masks_target = torch.cat(masks_target, dim=0)
-    F_loss = abs(PBI-PBO)/imgs.shape[0]
+    F_loss = abs(PBI - PBO) / imgs.shape[0]
     # return criterion(masks*imgs, masks_target*imgs)#, PBI, PBO
 
     fence_imgs = F.log_softmax((masks * imgs).view(imgs.size(0), -1), dim=-1)
@@ -720,6 +720,7 @@ def Failure_Case_Loss_FM(masks, imgs, targets):
     D_loss = criterion(fence_imgs, original_imgs)
 
     return F_loss + D_loss
+
 
 def build_targets(p, targets, model):
     # targets = [image, class, x, y, w, h]
@@ -1179,7 +1180,8 @@ def plot_wh_methods():  # from utils.utils import *; plot_wh_methods()
     fig.savefig('comparison.png', dpi=200)
 
 
-def plot_images(images, targets, paths=None, fname='images.jpg', names=None, max_size=640, max_subplots=16, is_gray_scale=False):
+def plot_images(images, targets, paths=None, fname='images.jpg', names=None, max_size=640, max_subplots=16,
+                is_gray_scale=False):
     tl = 3  # line thickness
     tf = max(tl - 1, 1)  # font thickness
 
@@ -1199,7 +1201,7 @@ def plot_images(images, targets, paths=None, fname='images.jpg', names=None, max
 
     # Check if we should resize
     scale_factor = max_size / max(h, w)
-    if scale_factor < 1 and not is_gray_scale:
+    if scale_factor < 1:
         h = math.ceil(scale_factor * h)
         w = math.ceil(scale_factor * w)
 
@@ -1220,8 +1222,9 @@ def plot_images(images, targets, paths=None, fname='images.jpg', names=None, max
         block_y = int(h * (i % ns))
 
         img = img.transpose(1, 2, 0)
-        if scale_factor < 1 and not is_gray_scale:
+        if scale_factor < 1:
             img = cv2.resize(img, (w, h))
+            img = np.expand_dims(img, axis=-1)
 
         mosaic[block_y:block_y + h, block_x:block_x + w, :] = img
         if len(targets) > 0:

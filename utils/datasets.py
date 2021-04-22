@@ -282,9 +282,6 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         # Define labels
         self.label_files = [x.replace('images', 'labels').replace(os.path.splitext(x)[-1], '.txt')
                             for x in self.img_files]
-        if self.is_gray_scale:
-            self.rect = True
-
 
         # Rectangular Training  https://github.com/ultralytics/yolov3/issues/232
         if self.rect:
@@ -417,9 +414,9 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             index = self.indices[index]
 
         hyp = self.hyp
-        if self.mosaic and not self.is_gray_scale:
+        if self.mosaic:
             # Load mosaic
-            img, labels = load_mosaic(self, index)
+            img, labels = load_mosaic(self, index, self.is_gray_scale)
             shapes = None
 
         else:
@@ -510,7 +507,8 @@ def load_image(self, index, is_gray_scale=False):
     if img is None:  # not cached
         path = self.img_files[index]
         if is_gray_scale:
-            img = cv2.imread(path, flags=cv2.IMREAD_GRAYSCALE) # gray scale
+            img = cv2.imread(path, flags=cv2.IMREAD_GRAYSCALE)  # gray scale
+            img = np.expand_dims(img, axis=-1)
         else:
             img = cv2.imread(path)  # BGR
         assert img is not None, 'Image Not Found ' + path
@@ -519,6 +517,8 @@ def load_image(self, index, is_gray_scale=False):
         if r < 1 or (self.augment and r != 1):  # always resize down, only resize up if training with augmentation
             interp = cv2.INTER_AREA if r < 1 and not self.augment else cv2.INTER_LINEAR
             img = cv2.resize(img, (int(w0 * r), int(h0 * r)), interpolation=interp)
+            if is_gray_scale:
+                img = np.expand_dims(img, axis=-1)
         return img, (h0, w0), img.shape[:2]  # img, hw_original, hw_resized
     else:
         return self.imgs[index], self.img_hw0[index], self.img_hw[index]  # img, hw_original, hw_resized
@@ -750,6 +750,7 @@ def cutout(image, labels):
 
     return labels
 
+
 # class FenceMask(torch.nn.Module):
 #     def __init__(self, img_size, mean, probability=0.8):
 #         super(FenceMask, self).__init__()
@@ -826,10 +827,10 @@ class FenceMask(torch.nn.Module):
         for j in range(self.group_size):
             masks = []
             for k in range(batch_size):
-                x = random.randint(self.img_size/32, self.img_size/16)
-                y = random.randint(self.img_size/32, self.img_size/16)
-                l1 = random.randint(self.img_size/16, self.img_size/8)
-                l2 = random.randint(self.img_size/16, self.img_size/8)
+                x = random.randint(self.img_size / 32, self.img_size / 16)
+                y = random.randint(self.img_size / 32, self.img_size / 16)
+                l1 = random.randint(self.img_size / 16, self.img_size / 8)
+                l2 = random.randint(self.img_size / 16, self.img_size / 8)
                 # mask_1代表横着的条纹，mask_2代表竖着的条纹
                 mask_1 = np.ones(shape=(self.img_size, self.img_size, 3))
                 mask_2 = np.ones(shape=(self.img_size, self.img_size, 3))
@@ -858,8 +859,8 @@ class FenceMask(torch.nn.Module):
                 masks.append(mask)
             masks = torch.cat(masks, dim=0).int()
             mask_white = (0.5 * torch.rand((batch_size, 3, img_size, img_size)) + 0.5) * masks
-            mask_black = (0.5 * torch.rand((batch_size, 3, img_size, img_size))) * (1-masks)
-            masks = mask_black+mask_white
+            mask_black = (0.5 * torch.rand((batch_size, 3, img_size, img_size))) * (1 - masks)
+            masks = mask_black + mask_white
             group_masks.append(masks.unsqueeze(0))
         group_masks = torch.cat(group_masks, dim=0)
         self.group_masks = torch.nn.Parameter(group_masks, requires_grad=True)
@@ -885,10 +886,11 @@ class FenceMask(torch.nn.Module):
         #     cv2.imshow('image', image)
         #     cv2.waitKey(500)
 
-        return x*masks, masks
+        return x * masks, masks
 
     def set_prob(self, epoch, max_epoch):
         self.prob = self.st_prob * min(1, epoch / max_epoch)
+
 
 class Grid(object):
     def __init__(self, d1, d2, rotate=1, ratio=0.5, mode=0, prob=1.):

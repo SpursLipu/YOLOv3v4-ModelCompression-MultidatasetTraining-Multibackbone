@@ -4,6 +4,7 @@ from utils.prune_utils import *
 from utils.datasets import *
 import os
 import test
+import argparse
 
 
 def obtain_avg_forward_time(input, model, repeat=200):
@@ -92,8 +93,6 @@ def rand_prune_and_eval(model, min_rate, max_rate):
             compact_module_defs[idx]['filters'] = str(num)
         compact_model = Darknet([model.hyperparams.copy()] + compact_module_defs).to(device)
         current_parameters = obtain_num_parameters(compact_model)
-        remain_ratio = 0.6  # 0.2
-        delta = 0.05  # 0.03
         # print(current_parameters/origin_nparameters, end='；')
         if current_parameters / origin_nparameters > remain_ratio + delta or current_parameters / origin_nparameters < remain_ratio - delta:
             # print('missing')
@@ -112,7 +111,7 @@ def rand_prune_and_eval(model, min_rate, max_rate):
             for batch_i, (imgs, targets, paths, shapes) in enumerate(tqdm(dataloader)):
                 imgs = imgs.cuda().float() / 255.0
                 compact_model(imgs)
-                if batch_i > 1000:
+                if batch_i > steps:
                     break
         del model_copy
         torch.cuda.empty_cache()
@@ -121,11 +120,25 @@ def rand_prune_and_eval(model, min_rate, max_rate):
 
 
 if __name__ == '__main__':
-    class opt():
-        cfg = "cfg/yolov3/yolov3.cfg"
-        data = "data/coco2017.data"
-        weights = 'weights/pretrain_weights/yolov3.weights'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--cfg', type=str, default='cfg/yolov3/yolov3.cfg', help='cfg file path')
+    parser.add_argument('--data', type=str, default='data/coco2017.data', help='*.data file path')
+    parser.add_argument('--weights', type=str, default='weights/pretrain_weights/yolov3.weights',
+                        help='sparse model weights')
+    parser.add_argument('--percent', type=float, default=0.5, help='global channel prune percent')
+    parser.add_argument('--delta', type=float, default=0.05, help='delta')
+    parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
+    parser.add_argument('--batch-size', type=int, default=16, help='batch-size')
+    parser.add_argument('--number', type=int, default=200, help='number of subnetwork')
+    opt = parser.parse_args()
+    print(opt)
 
+    t0 = time.time()
+    remain_ratio = 1 - opt.percent
+    number = opt.number
+    img_size = opt.img_size
+    batch_size = opt.batch_size
+    delta = opt.delta
 
     hyp = {'giou': 3.54,  # giou loss gain
            'cls': 37.4,  # cls loss gain
@@ -160,11 +173,9 @@ if __name__ == '__main__':
     valid_path = data_config["valid"]
     train_path = data_config["train"]
     class_names = load_classes(data_config["names"])
+    steps = math.ceil((len(open(train_path).readlines()) / batch_size) * 0.1)
 
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
-
-    img_size = 416
-    batch_size = 16
 
     dataset = LoadImagesAndLabels(train_path,
                                   img_size,
@@ -206,10 +217,9 @@ if __name__ == '__main__':
 
     print("-------------------------------------------------------")
 
-    percent = 1
     max_mAP = 0
-    for i in range(1000):
-        compact_module_defs, current_parameters, compact_model = rand_prune_and_eval(model, 0, percent)
+    for i in range(number):
+        compact_module_defs, current_parameters, compact_model = rand_prune_and_eval(model, 0, 1)
         with torch.no_grad():
             # 防止随机生成的较差的模型撑爆显存，增大nmsconf阈值
             mAP = test.test(opt.cfg,
@@ -264,9 +274,10 @@ if __name__ == '__main__':
     print(AsciiTable(metric_table).table)
 
     # 生成剪枝后的cfg文件并保存模型
-    pruned_cfg_name = 'cfg/rand-slim_0-' + str(percent) + '_1000/' + 'rand-slim_0-' + str(percent) + '_1000.cfg'
+    pruned_cfg_name = 'cfg/rand-slim_' + str(remain_ratio) + '_' + str(number) + '/' + 'rand-slim_' + str(
+        remain_ratio) + '_' + str(number) + '.cfg'
     # 创建存储目录
-    dir_name = 'cfg/rand-slim_0-' + str(percent) + '_1000/'
+    dir_name = 'cfg/rand-slim_' + str(remain_ratio) + '_' + str(number) + '/'
     if not os.path.isdir(dir_name):
         os.makedirs(dir_name)
 
@@ -294,7 +305,8 @@ if __name__ == '__main__':
     weights_dir_name = dir_name.replace('cfg', 'weights')
     if not os.path.isdir(weights_dir_name):
         os.makedirs(weights_dir_name)
-    compact_model_name = weights_dir_name + 'rand-slim_0-' + str(percent) + '_1000.weights'
+    compact_model_name = weights_dir_name + 'rand-slim_' + str(remain_ratio) + '_' + str(number) + '.weights'
 
     save_weights(compact_model_winnner, path=compact_model_name)
     print(f'Compact model has been saved: {compact_model_name}')
+    print('%g sub networks completed in %.3f hours.\n' % (number, (time.time() - t0) / 3600))

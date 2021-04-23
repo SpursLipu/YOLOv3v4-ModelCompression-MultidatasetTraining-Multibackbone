@@ -152,9 +152,12 @@ def obtain_quantiles(bn_weights, num_quantile=5):
     return quantiles
 
 
-def get_input_mask(module_defs, idx, CBLidx2mask):
+def get_input_mask(module_defs, idx, CBLidx2mask, is_gray_scale=False):
     if idx == 0:
-        return np.ones(3)
+        if not is_gray_scale:
+            return np.ones(3)
+        else:
+            return np.ones(1)
 
     if module_defs[idx - 1]['type'] == 'convolutional':
         return CBLidx2mask[idx - 1]
@@ -206,7 +209,7 @@ def get_input_mask(module_defs, idx, CBLidx2mask):
             raise Exception
 
 
-def init_weights_from_loose_model(compact_model, loose_model, CBL_idx, Other_idx, CBLidx2mask):
+def init_weights_from_loose_model(compact_model, loose_model, CBL_idx, Other_idx, CBLidx2mask, is_gray_scale=False):
     for idx in CBL_idx:
         compact_CBL = compact_model.module_list[idx]
         loose_CBL = loose_model.module_list[idx]
@@ -218,7 +221,7 @@ def init_weights_from_loose_model(compact_model, loose_model, CBL_idx, Other_idx
         compact_bn.running_mean.data = loose_bn.running_mean.data[out_channel_idx].clone()
         compact_bn.running_var.data = loose_bn.running_var.data[out_channel_idx].clone()
 
-        input_mask = get_input_mask(loose_model.module_defs, idx, CBLidx2mask)
+        input_mask = get_input_mask(loose_model.module_defs, idx, CBLidx2mask, is_gray_scale=is_gray_scale)
         in_channel_idx = np.argwhere(input_mask)[:, 0].tolist()
         compact_conv, loose_conv = compact_CBL[0], loose_CBL[0]
         tmp = loose_conv.weight.data[:, in_channel_idx, :, :].clone()
@@ -333,7 +336,7 @@ def prune_model_keep_size(model, prune_idx, CBL_idx, CBLidx2mask):
 
 
 def obtain_bn_mask(bn_module, thre):
-    thre = thre.cuda()
+    thre = thre.to(bn_module.weight.device)
     mask = bn_module.weight.data.abs().ge(thre).float()
 
     return mask

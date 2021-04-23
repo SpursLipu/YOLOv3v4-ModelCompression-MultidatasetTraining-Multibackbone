@@ -42,7 +42,7 @@ def exif_size(img):
 
 
 class LoadImages:  # for inference
-    def __init__(self, path, img_size=416):
+    def __init__(self, path, img_size=416, is_gray_scale=False):
         path = str(Path(path))  # os-agnostic
         files = []
         if os.path.isdir(path):
@@ -59,6 +59,7 @@ class LoadImages:  # for inference
         self.nF = nI + nV  # number of files
         self.video_flag = [False] * nI + [True] * nV
         self.mode = 'images'
+        self.is_gray_scale = is_gray_scale
         if any(videos):
             self.new_video(videos[0])  # new video
         else:
@@ -94,15 +95,19 @@ class LoadImages:  # for inference
         else:
             # Read image
             self.count += 1
-            img0 = cv2.imread(path)  # BGR
+            if self.is_gray_scale:
+                img0 = cv2.imread(path, flags=cv2.IMREAD_GRAYSCALE)  # gray scale
+                img0 = np.expand_dims(img0, axis=-1)
+            else:
+                img0 = cv2.imread(path)  # BGR
             assert img0 is not None, 'Image Not Found ' + path
             print('image %g/%g %s: ' % (self.count, self.nF, path), end='')
 
         # Padded resize
-        img = letterbox(img0, new_shape=self.img_size)[0]
+        img = letterbox(img0, new_shape=self.img_size, is_gray_scale=self.is_gray_scale)[0]
 
         # Convert
-        img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
+        img = img[:, :, ::-1].transpose(2, 0, 1).copy()  # BGR to RGB, to 3x416x416
         img = np.ascontiguousarray(img)
 
         # cv2.imwrite(path + '.letterbox.jpg', 255 * img.transpose((1, 2, 0))[:, :, ::-1])  # save letterbox image
@@ -601,7 +606,8 @@ def load_mosaic(self, index, is_gray_scale=False):
     return img4, labels4
 
 
-def letterbox(img, new_shape=(416, 416), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True):
+def letterbox(img, new_shape=(416, 416), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True,
+              is_gray_scale=False):
     # Resize image to a 32-pixel-multiple rectangle https://github.com/ultralytics/yolov3/issues/232
     shape = img.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
@@ -628,9 +634,13 @@ def letterbox(img, new_shape=(416, 416), color=(114, 114, 114), auto=True, scale
 
     if shape[::-1] != new_unpad:  # resize
         img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
+        if is_gray_scale:
+            img = np.expand_dims(img, axis=-1)
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
     img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+    if is_gray_scale:
+        img = np.expand_dims(img, axis=-1)
     return img, ratio, (dw, dh)
 
 

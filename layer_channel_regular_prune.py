@@ -181,13 +181,14 @@ if __name__ == '__main__':
     parser.add_argument('--layer_keep', type=float, default=0.01, help='channel keep percent per layer')
     parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
     parser.add_argument('--batch-size', type=int, default=16, help='batch-size')
+    parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
     opt = parser.parse_args()
     print(opt)
 
     assert opt.cfg.find("mobilenet") == -1, "Mobilenet doesn't support layer pruning!"
     img_size = opt.img_size
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = Darknet(opt.cfg, (img_size, img_size)).to(device)
+    model = Darknet(opt.cfg, (img_size, img_size), is_gray_scale=opt.gray_scale).to(device)
 
     if opt.weights.endswith(".pt"):
         model.load_state_dict(torch.load(opt.weights, map_location=device)['model'])
@@ -196,7 +197,7 @@ if __name__ == '__main__':
     print('\nloaded weights from ', opt.weights)
 
     eval_model = lambda model: test(model=model, cfg=opt.cfg, data=opt.data, batch_size=opt.batch_size, imgsz=img_size,
-                                    rank=-1)
+                                    rank=-1, is_gray_scale=True if opt.gray_scale else False)
     obtain_num_parameters = lambda model: sum([param.nelement() for param in model.parameters()])
 
     print("\nlet's test the original model first:")
@@ -253,10 +254,11 @@ if __name__ == '__main__':
     # for item_def in compact_module_defs:
     #     print(item_def)
 
-    compact_model1 = Darknet([model.hyperparams.copy()] + compact_module_defs).to(device)
+    compact_model1 = Darknet([model.hyperparams.copy()] + compact_module_defs, is_gray_scale=opt.gray_scale).to(device)
     compact_nparameters1 = obtain_num_parameters(compact_model1)
 
-    init_weights_from_loose_model(compact_model1, pruned_model, CBL_idx, Conv_idx, CBLidx2mask)
+    init_weights_from_loose_model(compact_model1, pruned_model, CBL_idx, Conv_idx, CBLidx2mask,
+                                  is_gray_scale=opt.gray_scale)
 
     print('testing the channel pruned model...')
     with torch.no_grad():
@@ -320,18 +322,25 @@ if __name__ == '__main__':
                 module_def['layers'] = from_layers
 
     compact_module_defs = [compact_module_defs[i] for i in index_remain]
-    compact_model2 = Darknet([compact_model1.hyperparams.copy()] + compact_module_defs, (img_size, img_size)).to(device)
+    compact_model2 = Darknet([compact_model1.hyperparams.copy()] + compact_module_defs, (img_size, img_size),
+                             is_gray_scale=opt.gray_scale).to(device)
 
     compact_nparameters2 = obtain_num_parameters(compact_model2)
 
+    # init_weights_from_loose_model(compact_model2, compact_model1, CBL_idx, Conv_idx, CBLidx2mask,
+    #                               is_gray_scale=opt.gray_scale)
+
     print('testing the final model')
+    torch.cuda.empty_cache()
     with torch.no_grad():
         compact_model_metric2 = eval_model(compact_model2)
 
     ################################################################
     # 剪枝完毕，测试速度
-
-    random_input = torch.rand((1, 3, img_size, img_size)).to(device)
+    if opt.gray_scale:
+        random_input = torch.rand((1, 1, img_size, img_size)).to(device)
+    else:
+        random_input = torch.rand((1, 3, img_size, img_size)).to(device)
 
     print('testing inference time...')
     pruned_forward_time, output = obtain_avg_forward_time(random_input, model)

@@ -14,7 +14,7 @@ def convert():
     device = torch_utils.select_device(opt.device)
 
     # Initialize model
-    model = Darknet(opt.cfg, img_size)
+    model = Darknet(opt.cfg, img_size, is_gray_scale=opt.gray_scale)
 
     # Load weights
     attempt_download(weights)
@@ -36,6 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=str, default='output', help='output folder')  # output folder
     parser.add_argument('--img_size', type=int, default=416, help='inference size (pixels)')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
+    parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
     opt = parser.parse_args()
     print(opt)
 

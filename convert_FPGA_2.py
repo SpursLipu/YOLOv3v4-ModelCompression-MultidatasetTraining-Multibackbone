@@ -15,7 +15,7 @@ def convert():
 
     # Initialize model
     model = Darknet(opt.cfg, img_size, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
-                    FPGA=opt.FPGA)
+                    FPGA=opt.FPGA, is_gray_scale=opt.gray_scale)
 
     # Load weights
     attempt_download(weights)
@@ -92,7 +92,7 @@ def convert():
                                 first = False
                             else:
                                 reorder_para = np.append(reorder_para, temp.cpu().data.numpy())
-                        if shape_input == 3:
+                        if shape_input == 3 or (opt.gray_scale and shape_input == 1):
                             temp = para[j * opt.TM:(j + 1) * opt.TM, num_TN * opt.TN:num_TN * opt.TN + remainder_TN, :,
                                    :]
                             temp = temp.view(temp.shape[0], temp.shape[1], temp.shape[2] * temp.shape[3])
@@ -116,12 +116,18 @@ def convert():
                                 reorder_para = np.append(reorder_para, temp.cpu().data.numpy())
 
                     para_flatten = reorder_para
+                    if shape_input == 3 or (opt.gray_scale and shape_input == 1):
+                        if para_flatten.size == para.shape[0] * 32 * para.shape[2] * para.shape[3]:
+                            print("convert correctly!")
+                        else:
+                            print("convert mismatchingly!")
+                    else:
+                        if para_flatten.size == para.shape[0] * para.shape[1] * para.shape[2] * para.shape[3]:
+                            print("convert correctly!")
+                        else:
+                            print("convert mismatchingly!")
                 else:
                     para_flatten = para.cpu().data.numpy().flatten()  # 展开
-                if para_flatten.size == para.shape[0] * para.shape[1] * para.shape[2] * para.shape[3]:
-                    print("convert correctly!")
-                else:
-                    print("convert mismatchingly!")
                 # 存储weights
                 for i in para_flatten:
                     if opt.w_bit == 16:
@@ -161,6 +167,7 @@ if __name__ == '__main__':
     parser.add_argument('--reorder', action='store_true', help='reorder')
     parser.add_argument('--TN', type=int, default=32, help='TN')
     parser.add_argument('--TM', type=int, default=32, help='TN')
+    parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
     opt = parser.parse_args()
     print(opt)
 

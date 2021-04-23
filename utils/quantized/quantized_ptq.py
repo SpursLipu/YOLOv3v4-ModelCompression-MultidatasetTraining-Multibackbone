@@ -430,15 +430,15 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
                             reorder_w_para = np.append(reorder_w_para, temp.cpu().data.numpy())
                 else:
                     for j in range(num_TM):
-                        if shape_input == 3:  # 第一层
+                        if shape_input == 3 or shape_input == 1:  # 第一层
                             print('The first layer~~~~~~~~~~~~')
                             temp = w_para[j * self.TM:(j + 1) * self.TM,
                                    num_TN * self.TN:num_TN * self.TN + remainder_TN, :,
                                    :]
                             temp = temp.view(temp.shape[0], temp.shape[1], temp.shape[2] * temp.shape[3])
-                            '''fill = torch.zeros(self.TM, self.TN, temp.shape[2]).to(temp.device)
-                            fill[:, 0:remainder_TN, :] = temp'''
-                            temp = temp.permute(2, 0, 1).contiguous().view(-1)
+                            fill = torch.zeros(self.TM, self.TN, temp.shape[2]).to(temp.device)
+                            fill[:, 0:remainder_TN, :] = temp
+                            temp = fill.permute(2, 0, 1).contiguous().view(-1)
                             if first:  # 创建数组存储
                                 reorder_w_para = temp.clone().cpu().data.numpy()
                                 first = False

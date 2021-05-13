@@ -470,12 +470,12 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             np.savetxt(('./quantizer_output/w_scale_out/%f.txt' % time.time()), weight_scale, delimiter='\n')
             #######################输出当前层的量化权重
             q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
-            #print(q_weight_txt.shape)
+            # print(q_weight_txt.shape)
             #############权重重排序
 
-            w_para = q_weight_txt#重排序参数
-            if  self.reorder == True:
-                #print("use weights reorder!")
+            w_para = q_weight_txt  # 重排序参数
+            if self.reorder == True:
+                # print("use weights reorder!")
                 shape_output = w_para.shape[0]
                 shape_input = w_para.shape[1]
                 num_TN = int(shape_input / self.TN)
@@ -485,7 +485,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 first = True
                 reorder_w_para = None
                 if self.activate == 'linear':
-                    #print('layer-linear reorder!')
+                    # print('layer-linear reorder!')
                     for k in range(num_TN):
                         temp = w_para[0:remainder_TM, k * self.TN:(k + 1) * self.TN, :, :]
                         temp = temp.view(temp.shape[0], temp.shape[1], temp.shape[2] * temp.shape[3])
@@ -497,15 +497,16 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                             reorder_w_para = np.append(reorder_w_para, temp.cpu().data.numpy())
                 else:
                     for j in range(num_TM):
-                        if shape_input == 1 or shape_input == 3:#第一层
+                        if shape_input == 1 or shape_input == 3:  # 第一层
                             print('The first layer~~~~~~~~~~~~')
-                            temp = w_para[j * self.TM:(j + 1) * self.TM, num_TN * self.TN:num_TN * self.TN + remainder_TN, :,
+                            temp = w_para[j * self.TM:(j + 1) * self.TM,
+                                   num_TN * self.TN:num_TN * self.TN + remainder_TN, :,
                                    :]
                             temp = temp.view(temp.shape[0], temp.shape[1], temp.shape[2] * temp.shape[3])
                             fill = torch.zeros(self.TM, self.TN, temp.shape[2]).to(temp.device)
                             fill[:, 0:remainder_TN, :] = temp
                             temp = fill.permute(2, 0, 1).contiguous().view(-1)
-                            if first:#创建数组存储
+                            if first:  # 创建数组存储
                                 reorder_w_para = temp.clone().cpu().data.numpy()
                                 first = False
                             else:
@@ -515,7 +516,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                                 temp = w_para[j * self.TM:(j + 1) * self.TM, k * self.TN:(k + 1) * self.TN, :, :]
                                 # #合并成论文图10(a)的TM*TN*(K2)的张量格式
                                 temp = temp.view(temp.shape[0], temp.shape[1], temp.shape[2] * temp.shape[3])
-                                #转换为图10(b)的重排序格式
+                                # 转换为图10(b)的重排序格式
                                 temp = temp.permute(2, 0, 1).contiguous().view(-1)
                                 if first:
                                     reorder_w_para = temp.clone().cpu().data.numpy()
@@ -524,7 +525,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                                     reorder_w_para = np.append(reorder_w_para, temp.cpu().data.numpy())
 
                 w_para_flatten = reorder_w_para
-                #print(reorder_w_para.size)
+                # print(reorder_w_para.size)
                 #####验证重排序结果的正确性
                 '''if w_para_flatten.size == w_para.shape[0] * w_para.shape[1] * w_para.shape[2] * w_para.shape[3]:
                     print("weights convert correctly!")
@@ -533,11 +534,12 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
                 q_weight_reorder = w_para_flatten
                 q_weight_reorder = np.array(q_weight_reorder).reshape(1, -1)
-                np.savetxt(('./quantizer_output/q_weight_reorder/%f.txt' % time.time()), q_weight_reorder, delimiter='\n')
+                np.savetxt(('./quantizer_output/q_weight_reorder/%f.txt' % time.time()), q_weight_reorder,
+                           delimiter='\n')
             ################权重重排序结束
 
             q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
-            #print(q_weight_txt.size)
+            # print(q_weight_txt.size)
             q_weight_max = [np.max(q_weight_txt)]
             # q_weight_max = np.argmax(q_weight_txt)
             max_weight_count = [np.sum(abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
@@ -561,13 +563,12 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
             #############偏置重排序
             if self.reorder == True:
-                b_para = np.zeros(2048,dtype=int)
+                b_para = np.zeros(2048, dtype=int)
                 b_para[0:q_bias_txt.size] = q_bias_txt
-                #print(b_para.shape)
-                #b_para = np.array(b_para.cpu()).reshape(1, -1)
+                # print(b_para.shape)
+                # b_para = np.array(b_para.cpu()).reshape(1, -1)
                 np.savetxt(('./quantizer_output/q_bias_reorder/%f.txt' % time.time()), b_para, delimiter='\n')
             ################偏置重排序结束
-
 
         # 量化卷积
         if self.training:  # 训练态
@@ -624,7 +625,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             np.savetxt(('./quantizer_output/a_scale_out/%f.txt' % time.time()), activation_scale, delimiter='\n')
             ##################输出当前层的量化激活
             q_activation_txt = self.activation_quantizer.get_quantize_value(output)
-            #print(q_activation_txt.shape)
+            # print(q_activation_txt.shape)
 
             a_para = q_activation_txt
             #############输入特征图重排序
@@ -637,8 +638,8 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 first = True
                 reorder_a_para = None
                 if self.activate == 'linear':
-                    #print('layer-linear reorder!')
-                    temp = a_para[:,0:remainder_TN, :, :]
+                    # print('layer-linear reorder!')
+                    temp = a_para[:, 0:remainder_TN, :, :]
                     temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
                     temp = temp.permute(2, 1, 0).contiguous().view(-1)
                     if first:
@@ -648,7 +649,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                         reorder_a_para = np.append(reorder_a_para, temp.cpu().data.numpy())
                 else:
                     for k in range(num_TN):
-                        temp = a_para[:, k * self.TN:(k + 1) * self.TN,:,:]
+                        temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
                         temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
                         temp = temp.permute(2, 1, 0).contiguous().view(-1)
                         if first:
@@ -762,3 +763,35 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             bias = self.bias
             weight = self.weight
         return weight, bias
+
+
+class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
+    def __init__(self, layers, weight=False):
+        super(QuantizedShortcut, self).__init__()
+        self.layers = layers  # layer indices
+        self.weight = weight  # apply weights boolean
+        self.n = len(layers) + 1  # number of layers
+        if weight:
+            self.w = nn.Parameter(torch.zeros(self.n), requires_grad=True)  # layer weights
+
+    def forward(self, x, outputs):
+        # Weights
+        if self.weight:
+            w = torch.sigmoid(self.w) * (2 / self.n)  # sigmoid weights (0-1)
+            x = x * w[0]
+
+        # Fusion
+        nx = x.shape[1]  # input channels
+        for i in range(self.n - 1):
+            a = outputs[self.layers[i]] * w[i + 1] if self.weight else outputs[self.layers[i]]  # feature to add
+            na = a.shape[1]  # feature channels
+
+            # Adjust channels
+            if nx == na:  # same shape
+                x = x + a
+            elif nx > na:  # slice input
+                x[:, :na] = x[:, :na] + a  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
+            else:  # slice feature
+                x = x + a[:, :nx]
+
+        return x

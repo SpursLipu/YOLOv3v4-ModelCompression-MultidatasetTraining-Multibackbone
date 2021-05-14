@@ -25,8 +25,8 @@ def PTQ(cfg,
     print('PTQ only support for one gpu!')
     print('')  # skip a line
     # Initialize model
-    model = Darknet(cfg)
-    q_model = Darknet(cfg, quantized=5, a_bit=a_bit, w_bit=w_bit, FPGA=FPGA)
+    model = Darknet(cfg, is_gray_scale=opt.gray_scale)
+    q_model = Darknet(cfg, quantized=5, a_bit=a_bit, w_bit=w_bit, FPGA=FPGA, is_gray_scale=opt.gray_scale)
 
     # Load weights
     attempt_download(weights)
@@ -47,7 +47,8 @@ def PTQ(cfg,
     c_path = c_data['valid']  # path to test images
 
     # Dataloader
-    c_dataset = LoadImagesAndLabels(c_path, imgsz, batch_size, rect=True, single_cls=single_cls)
+    c_dataset = LoadImagesAndLabels(c_path, imgsz, batch_size, rect=True, single_cls=single_cls,
+                                    is_gray_scale=True if opt.gray_scale else False)
     c_batch_size = min(batch_size, len(c_dataset))
     c_dataloader = DataLoader(c_dataset,
                               batch_size=c_batch_size,
@@ -55,7 +56,8 @@ def PTQ(cfg,
                               pin_memory=True,
                               collate_fn=c_dataset.collate_fn)
 
-    t_dataset = LoadImagesAndLabels(t_path, imgsz, batch_size, rect=True, single_cls=single_cls)
+    t_dataset = LoadImagesAndLabels(t_path, imgsz, batch_size, rect=True, single_cls=single_cls,
+                                    is_gray_scale=True if opt.gray_scale else False)
     t_batch_size = min(batch_size, len(t_dataset))
     t_dataloader = DataLoader(t_dataset,
                               batch_size=t_batch_size,
@@ -127,6 +129,7 @@ if __name__ == '__main__':
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
+    parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
 
     opt = parser.parse_args()
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file

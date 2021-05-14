@@ -24,7 +24,7 @@ def test(cfg,
          a_bit=8,
          w_bit=8,
          FPGA=False,
-         rank=None,
+         rank=-1,
          plot=True,
          is_gray_scale=False):
     # Initialize/load model and set device

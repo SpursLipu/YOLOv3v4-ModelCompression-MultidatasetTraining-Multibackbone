@@ -148,7 +148,7 @@ if __name__ == '__main__':
     parser.add_argument('--classes', nargs='+', type=int, help='filter by class')
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
-    parser.add_argument('--quantized', type=int, default=0,
+    parser.add_argument('--quantized', type=int, default=-1,
                         help='0:quantization way one Ternarized weight and 8bit activation')
     parser.add_argument('--a-bit', type=int, default=8,
                         help='a-bit')

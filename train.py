@@ -616,7 +616,7 @@ if __name__ == '__main__':
     parser.add_argument('--s', type=float, default=0.001, help='scale sparse rate')
     parser.add_argument('--prune', type=int, default=-1,
                         help='0:nomal prune or regular prune 1:shortcut prune 2:layer prune')
-    parser.add_argument('--quantized', type=int, default=0,
+    parser.add_argument('--quantized', type=int, default=-1,
                         help='0:quantization way one Ternarized weight and 8bit activation')
     parser.add_argument('--a-bit', type=int, default=8,
                         help='a-bit')

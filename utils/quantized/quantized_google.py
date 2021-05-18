@@ -766,13 +766,40 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
 
 class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
-    def __init__(self, layers, weight=False):
+    def __init__(self, layers, weight=False, bits=8, FPGA=False):
         super(QuantizedShortcut, self).__init__()
         self.layers = layers  # layer indices
         self.weight = weight  # apply weights boolean
         self.n = len(layers) + 1  # number of layers
+        self.bits = bits
+        self.FPGA = FPGA
+        self.range_tracker_x = AveragedRangeTracker(q_level='L', out_channels=-1)
+        self.range_tracker_a = AveragedRangeTracker(q_level='L', out_channels=-1)
+        self.range_tracker_sum = AveragedRangeTracker(q_level='L', out_channels=-1)
+        self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
         if weight:
             self.w = nn.Parameter(torch.zeros(self.n), requires_grad=True)  # layer weights
+
+    # 量化
+    def quantize(self, input):
+        output = input / self.scale
+        return output
+
+    def round(self, input):
+        output = Round.apply(input)
+        return output
+
+    # 截断
+    def clamp(self, input):
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+        output = torch.clamp(input, min_val, max_val)
+        return output
+
+    # 反量化
+    def dequantize(self, input):
+        output = (input) * self.scale
+        return output
 
     def forward(self, x, outputs):
         # Weights
@@ -785,6 +812,47 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
         for i in range(self.n - 1):
             a = outputs[self.layers[i]] * w[i + 1] if self.weight else outputs[self.layers[i]]  # feature to add
             na = a.shape[1]  # feature channels
+            if self.training == True:
+                # 得到输入两个feature和一个输出的scale
+                self.range_tracker_a(x)
+                self.range_tracker_x(a)
+                if nx == na:  # same shape
+                    self.range_tracker_sum(x + a)
+                elif nx > na:  # slice input
+                    self.range_tracker_sum(x[:, :na] + a)  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
+                else:  # slice feature
+                    self.range_tracker_sum(x + a[:, :nx])
+                float_max_val = max(self.range_tracker_sum.max_val, self.range_tracker_x.max_val,
+                                    self.range_tracker_a.max_val)
+                float_min_val = min(self.range_tracker_sum.min_val, self.range_tracker_x.min_val,
+                                    self.range_tracker_a.min_val)
+                quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
+                quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+                quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
+                if self.FPGA == False:
+                    float_range = torch.max(torch.abs(float_min_val),
+                                            torch.abs(float_max_val))  # 量化前范围
+                else:
+                    float_max = torch.max(torch.abs(float_min_val),
+                                          torch.abs(float_max_val))  # 量化前范围
+                    floor_float_range = 2 ** float_max.log2().floor()
+                    ceil_float_range = 2 ** float_max.log2().ceil()
+                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                        float_range = ceil_float_range
+                    else:
+                        float_range = floor_float_range
+                self.scale = float_range / quantized_range  # 量化比例因子
+            # 量化x
+            x = self.quantize(x)  # 量化
+            x = self.round(x)
+            x = self.clamp(x)  # 截断
+            x = self.dequantize(x)  # 反量化
+
+            # 量化a
+            a = self.quantize(a)  # 量化
+            a = self.round(a)
+            a = self.clamp(a)  # 截断
+            a = self.dequantize(a)  # 反量化
 
             # Adjust channels
             if nx == na:  # same shape
@@ -793,5 +861,75 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                 x[:, :na] = x[:, :na] + a  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
             else:  # slice feature
                 x = x + a[:, :nx]
-
+            # 量化和
+            x = self.quantize(x)  # 量化
+            x = self.round(x)
+            x = self.clamp(x)  # 截断
+            x = self.dequantize(x)  # 反量化
         return x
+
+
+class QuantizedFeatureConcat(nn.Module):
+    def __init__(self, layers, groups, bits=8, FPGA=False):
+        super(QuantizedFeatureConcat, self).__init__()
+        self.layers = layers  # layer indices
+        self.groups = groups
+        self.multiple = len(layers) > 1  # multiple layers flag
+        self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
+        self.bits = bits
+        self.FPGA = FPGA
+
+    # 量化
+    def quantize(self, input):
+        output = input / self.scale
+        return output
+
+    def round(self, input):
+        output = Round.apply(input)
+        return output
+
+    # 截断
+    def clamp(self, input):
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+        output = torch.clamp(input, min_val, max_val)
+        return output
+
+    # 反量化
+    def dequantize(self, input):
+        output = (input) * self.scale
+        return output
+
+    def forward(self, x, outputs):
+        if self.multiple:
+            if self.training == True:
+                float_max_list = []
+                quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
+                quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+                quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
+                for i in self.layers:
+                    float_max_list.append(torch.max(outputs[i]))
+                    float_max_list.append(torch.abs(torch.min(outputs[i])))
+                if self.FPGA == False:
+                    float_range = max(float_max_list)  # 量化前范围
+                else:
+                    float_max = max(float_max_list)  # 量化前范围
+                    floor_float_range = 2 ** float_max.log2().floor()
+                    ceil_float_range = 2 ** float_max.log2().ceil()
+                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                        float_range = ceil_float_range
+                    else:
+                        float_range = floor_float_range
+                self.scale = float_range / quantized_range  # 量化比例因子
+            # 量化
+            for i in self.layers:
+                outputs[i] = self.quantize(outputs[i])  # 量化
+                outputs[i] = self.round(outputs[i])
+                outputs[i] = self.clamp(outputs[i])  # 截断
+                outputs[i] = self.dequantize(outputs[i])  # 反量化
+            return torch.cat([outputs[i] for i in self.layers], 1)
+        else:
+            if self.groups:
+                return x[:, (x.shape[1] // 2):]
+            else:
+                return outputs[self.layers[0]]

@@ -342,7 +342,17 @@ def obtain_bn_mask(bn_module, thre):
     return mask
 
 
-def merge_mask(model, CBLidx2mask, CBLidx2filters):
+def get_nearest_multiple(num, base):
+    down = num % base
+    up = base - down
+    if down >= up:
+        near_multi_base = num + up
+    else:
+        near_multi_base = num - down
+    return near_multi_base
+
+
+def merge_mask(model, CBLidx2mask, CBLidx2filters, base=1):
     for i in range(len(model.module_defs) - 1, -1, -1):
         mtype = model.module_defs[i]['type']
         if mtype == 'shortcut':
@@ -351,7 +361,7 @@ def merge_mask(model, CBLidx2mask, CBLidx2filters):
 
             Merge_masks = []
             layer_i = i
-            while mtype == 'shortcut':
+            while mtype == 'shortcut':  # 对shortcut的上一层和from层读取：如果为卷积层且BN=1，则对应层的CBLidx2mask扩展维度后添加到Merge_masks中
                 model.module_defs[layer_i]['is_access'] = True
 
                 if model.module_defs[layer_i - 1]['type'] == 'convolutional':
@@ -367,21 +377,37 @@ def merge_mask(model, CBLidx2mask, CBLidx2filters):
                     if bn:
                         Merge_masks.append(CBLidx2mask[layer_i].unsqueeze(0))
 
-            if len(Merge_masks) > 1:
-                Merge_masks = torch.cat(Merge_masks, 0)
-                merge_mask = (torch.sum(Merge_masks, dim=0) > 0).float()
+            if len(Merge_masks) > 1:  # 若有多个shortcut层
+                Merge_masks = torch.cat(Merge_masks, 0)  # 按列排列,是2维张量
+                if base == 1:
+                    merge_mask = (torch.sum(Merge_masks, dim=0) > 0).float()  # 按列求和，是1维张量
+                else:
+                    sum_mask = (torch.sum(Merge_masks, dim=0)).float()
+                    merge_num = int(torch.sum(torch.sum(Merge_masks, dim=0) > 0).item())
+                    merge_num_multi = get_nearest_multiple(merge_num, base)
+                    _, y = torch.topk(sum_mask, merge_num_multi)
+                    merge_mask = torch.zeros(sum_mask.size(), dtype=torch.float32)
+                    merge_mask[y] = 1
+
             else:
-                merge_mask = Merge_masks[0].float()
+                if base == 1:
+                    merge_mask = Merge_masks[0].float()
+                else:
+                    merge_num = int(torch.sum(Merge_masks, dim=0)).item()
+                    merge_num_multi = get_nearest_multiple(merge_num, base)
+                    _, y = torch.topk(Merge_masks[0], merge_num_multi)
+                    merge_mask = torch.zeros(Merge_masks[0].size(), dtype=torch.float32)
+                    merge_mask[y] = 1
 
             layer_i = i
             mtype = 'shortcut'
-            while mtype == 'shortcut':
+            while mtype == 'shortcut':  # 对shortcut的上一层和from层读取：如果为卷积层且BN=1，则对应层的CBLidx2mask和CBLidx2filters分别使用merge_mask和merge_mask的所有元素之和
 
                 if model.module_defs[layer_i - 1]['type'] == 'convolutional':
                     bn = int(model.module_defs[layer_i - 1]['batch_normalize'])
                     if bn:
                         CBLidx2mask[layer_i - 1] = merge_mask
-                        CBLidx2filters[layer_i - 1] = int(torch.sum(merge_mask).item())
+                        CBLidx2filters[layer_i - 1] = int(torch.sum(merge_mask).item())  # 全部求和并且得到元素值
 
                 layer_i = int(model.module_defs[layer_i]['from'][0]) + layer_i
                 mtype = model.module_defs[layer_i]['type']

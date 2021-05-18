@@ -911,9 +911,9 @@ class QuantizedFeatureConcat(nn.Module):
                     float_max_list.append(torch.max(outputs[i]))
                     float_max_list.append(torch.abs(torch.min(outputs[i])))
                 if self.FPGA == False:
-                    float_range = max(float_max_list)  # 量化前范围
+                    float_range = max(float_max_list).unsqueeze(0)  # 量化前范围
                 else:
-                    float_max = max(float_max_list)  # 量化前范围
+                    float_max = max(float_max_list).unsqueeze(0)  # 量化前范围
                     floor_float_range = 2 ** float_max.log2().floor()
                     ceil_float_range = 2 ** float_max.log2().ceil()
                     if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):

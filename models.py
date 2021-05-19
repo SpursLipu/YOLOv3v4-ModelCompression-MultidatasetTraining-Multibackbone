@@ -12,7 +12,7 @@ ONNX_EXPORT = False
 
 
 # YOLO
-def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, reorder, TM, TN, a_bit=8, w_bit=8,
+def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer_idx, reorder, TM, TN, a_bit=8, w_bit=8,
                    FPGA=False, steps=0, is_gray_scale=False):
     # Constructs module list of layer blocks from module configuration in module_defs
 
@@ -51,7 +51,9 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, reor
                                                                                  activate=mdef['activation'],
                                                                                  steps=steps,
                                                                                  quantizer_output=quantizer_output,
-                                                                                 reorder=reorder, TM=TM, TN=TN))
+                                                                                 reorder=reorder, TM=TM, TN=TN,
+                                                                                 name="{:04d}".format(i) + "_" +mdef['type'][:4],
+                                                                                 layer_idx=layer_idx))
                 else:
                     modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
                                                                  out_channels=filters,
@@ -132,7 +134,9 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, reor
                                                                                    bn=bn,
                                                                                    activate=mdef['activation'],
                                                                                    quantizer_output=quantizer_output,
-                                                                                   reorder=reorder, TM=TM, TN=TN))
+                                                                                   reorder=reorder, TM=TM, TN=TN,
+                                                                                   name="{:04d}".format(i) + "_" +mdef['type'][:4],
+                                                                                   layer_idx=layer_idx))
                 else:
                     modules.add_module('Conv2d', PTQuantizedConv2d(in_channels=output_filters[-1],
                                                                    out_channels=filters,
@@ -213,7 +217,9 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, reor
                                                                                   bn=bn,
                                                                                   activate=mdef['activation'],
                                                                                   quantizer_output=quantizer_output,
-                                                                                  reorder=reorder, TM=TM, TN=TN))
+                                                                                  reorder=reorder, TM=TM, TN=TN,
+                                                                                  name="{:04d}".format(i)+"_"+mdef['type'][:4],
+                                                                                  layer_idx = layer_idx))
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,
@@ -259,7 +265,9 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, reor
                                                                        activate=mdef['activation'],
                                                                        steps=steps,
                                                                        quantizer_output=quantizer_output,
-                                                                       reorder=reorder, TM=TM, TN=TN))
+                                                                       reorder=reorder, TM=TM, TN=TN,
+                                                                       name="{:04d}".format(i) + "_" +mdef['type'][:4],
+                                                                       layer_idx=layer_idx))
                 else:
                     modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
                                                                       out_channels=filters,
@@ -339,7 +347,9 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, reor
                                                                                         bn=bn,
                                                                                         activate=mdef['activation'],
                                                                                         quantizer_output=quantizer_output,
-                                                                                        reorder=reorder, TM=TM, TN=TN))
+                                                                                        reorder=reorder, TM=TM, TN=TN,
+                                                                                        name="{:04d}".format(i) + "_" +mdef['type'][:4],
+                                                                                        layer_idx=layer_idx))
                 else:
                     modules.add_module('DepthWise2d', PTQuantizedConv2d(in_channels=output_filters[-1],
                                                                         out_channels=filters,
@@ -419,7 +429,9 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, reor
                                                                                        bn=bn,
                                                                                        activate=mdef['activation'],
                                                                                        quantizer_output=quantizer_output,
-                                                                                       reorder=reorder, TM=TM, TN=TN))
+                                                                                       reorder=reorder, TM=TM, TN=TN,
+                                                                                       name="{:04d}".format(i) + "_" +mdef['type'][:4],
+                                                                                       layer_idx=layer_idx))
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
                                                             out_channels=filters,
@@ -640,7 +652,7 @@ class Darknet(nn.Module):
     # YOLOv3 object detection model
 
     def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, FPGA=False,
-                 quantizer_output=False, reorder=False, TM=32, TN=32, steps=0, is_gray_scale=False):
+                 quantizer_output=False, layer_idx = -1,reorder=False, TM=32, TN=32, steps=0, is_gray_scale=False):
         super(Darknet, self).__init__()
 
         if isinstance(cfg, str):
@@ -652,6 +664,7 @@ class Darknet(nn.Module):
         self.w_bit = w_bit
         self.FPGA = FPGA
         self.quantizer_output = quantizer_output  ####输出设置超参数
+        self.layer_idx = layer_idx
         self.reorder = reorder
         self.TM = TM
         self.TN = TN
@@ -659,8 +672,8 @@ class Darknet(nn.Module):
         self.hyperparams = copy.deepcopy(self.module_defs[0])
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
                                                       quantizer_output=self.quantizer_output, reorder=self.reorder,
-                                                      TM=self.TM, TN=self.TN, a_bit=self.a_bit,
-                                                      w_bit=self.w_bit, FPGA=self.FPGA, steps=steps,
+                                                      TM=self.TM, TN=self.TN, layer_idx = self.layer_idx,
+                                                      a_bit=self.a_bit,w_bit=self.w_bit, FPGA=self.FPGA, steps=steps,
                                                       is_gray_scale=is_gray_scale)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)

@@ -18,15 +18,14 @@ def PTQ(cfg,
         single_cls=False,
         augment=False,
         a_bit=8,
-        w_bit=8,
-        FPGA=False):
+        w_bit=8, ):
     # Initialize/load model and set device
     device = torch_utils.select_device(opt.device, batch_size=batch_size)
     print('PTQ only support for one gpu!')
     print('')  # skip a line
     # Initialize model
     model = Darknet(cfg, is_gray_scale=opt.gray_scale)
-    q_model = Darknet(cfg, quantized=5, a_bit=a_bit, w_bit=w_bit, FPGA=FPGA, is_gray_scale=opt.gray_scale)
+    q_model = Darknet(cfg, quantized=5, a_bit=a_bit, w_bit=w_bit, FPGA=True, is_gray_scale=opt.gray_scale)
 
     # Load weights
     attempt_download(weights)
@@ -35,7 +34,7 @@ def PTQ(cfg,
         q_model.load_state_dict(torch.load(weights, map_location=device)['model'])
     else:  # darknet format
         load_darknet_weights(model, weights)
-        load_darknet_weights(q_model, weights, FPGA=FPGA)
+        load_darknet_weights(q_model, weights, FPGA=True)
 
     model.to(device)
     q_model.to(device)
@@ -95,7 +94,6 @@ def PTQ(cfg,
               quantized=4,
               a_bit=opt.a_bit,
               w_bit=opt.w_bit,
-              FPGA=opt.FPGA,
               rank=-1)
     # Save model
 
@@ -128,7 +126,6 @@ if __name__ == '__main__':
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
-    parser.add_argument('--FPGA', action='store_true', help='FPGA')
     parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
 
     opt = parser.parse_args()
@@ -147,5 +144,4 @@ if __name__ == '__main__':
         opt.single_cls,
         opt.augment,
         a_bit=opt.a_bit,
-        w_bit=opt.w_bit,
-        FPGA=opt.FPGA)
+        w_bit=opt.w_bit)

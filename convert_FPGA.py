@@ -8,7 +8,7 @@ from utils.utils import *
 
 def convert():
     img_size = (320, 192) if ONNX_EXPORT else opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
-    weights= opt.weights
+    weights = opt.weights
 
     # Initialize
     device = torch_utils.select_device(device='cpu' if ONNX_EXPORT else opt.device)
@@ -32,7 +32,8 @@ def convert():
             w_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_w_scale.bin', 'wb')
             a_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_a_scale.bin', 'wb')
             b_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_b_scale.bin', 'wb')
-            a = struct.pack('<i', 0)
+            s_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_s_scale.bin', 'wb')
+            a = struct.pack('<i', 14)
             a_scale.write(a)
         for _, (mdef, module) in enumerate(zip(model.module_defs, model.module_list)):
             print(mdef)
@@ -148,10 +149,15 @@ def convert():
                         else:
                             a = struct.pack('<f', i)
                         b_file.write(a)
+            if mdef['type'] == 'shortcut':
+                shortcut_scale = -math.log(module.scale.cpu().data.numpy()[0], 2)
+                a = struct.pack('<i', int(shortcut_scale))
+                s_scale.write(a)
         if opt.quantized == 1:
             w_scale.close()
             a_scale.close()
             b_scale.close()
+            s_scale.close()
         w_file.close()
         b_file.close()
     # Eval mode

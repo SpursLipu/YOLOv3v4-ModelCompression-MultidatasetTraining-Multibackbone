@@ -147,7 +147,7 @@ def convert():
                                 a = struct.pack('B', int(i))
                         else:
                             a = struct.pack('<f', i)
-                    b_file.write(a)
+                        b_file.write(a)
         if opt.quantized == 1:
             w_scale.close()
             a_scale.close()

@@ -30,6 +30,7 @@ def convert():
         w_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_w_scale.bin', 'wb')
         a_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_a_scale.bin', 'wb')
         b_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_b_scale.bin', 'wb')
+        s_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_s_scale.bin', 'wb')
         for _, (mdef, module) in enumerate(zip(model.module_defs, model.module_list)):
             print(mdef)
             if mdef['type'] == 'convolutional':
@@ -137,10 +138,14 @@ def convert():
                     else:
                         a = struct.pack('<f', i)
                     w_file.write(a)
-
+            if mdef['type'] == 'shortcut':
+                shortcut_scale = -math.log(module.scale.cpu().data.numpy()[0], 2)
+                a = struct.pack('<i', int(shortcut_scale))
+                s_scale.write(a)
         w_scale.close()
         a_scale.close()
         b_scale.close()
+        s_scale.close()
         w_file.close()
     # Eval mode
     model.to(device).eval()

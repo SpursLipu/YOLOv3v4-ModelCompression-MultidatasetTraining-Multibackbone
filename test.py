@@ -25,7 +25,7 @@ def test(cfg,
          w_bit=8,
          FPGA=False,
          rank=-1,
-         plot=True,
+         plot=False,
          is_gray_scale=False):
     # Initialize/load model and set device
     if model is None:
@@ -88,6 +88,8 @@ def test(cfg,
     jdict, stats, ap, ap_class = [], [], [], []
     for batch_i, (imgs, targets, paths, shapes) in enumerate(pbar):
         imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
+        if quantized != -1 and a_bit <= 8:
+            imgs = imgs * 2 - 1
         targets = targets.to(device)
         nb, _, height, width = imgs.shape  # batch size, channels, height, width
         whwh = torch.Tensor([width, height, width, height]).to(device)

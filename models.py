@@ -4,7 +4,7 @@ from utils.quantized.quantized_google import *
 from utils.quantized.quantized_dorefa import *
 from utils.quantized.quantized_ptq import *
 from utils.quantized.quantized_ptq_cos import *
-from utils.quantized.quantized_pact import *
+from utils.quantized.quantized_TPSQ import *
 from utils.layers import *
 import copy
 
@@ -164,7 +164,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                         modules.add_module('activation', Mish())
             elif quantized == 4:
                 if FPGA:
-                    modules.add_module('Conv2d', Pact_BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                    modules.add_module('Conv2d', TPSQ_BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
                                                                                       out_channels=filters,
                                                                                       kernel_size=kernel_size,
                                                                                       stride=int(mdef['stride']),
@@ -179,7 +179,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                                                                                       steps=steps,
                                                                                       quantizer_output=quantizer_output))
                 else:
-                    modules.add_module('Conv2d', Pact_QuantizedConv2d(in_channels=output_filters[-1],
+                    modules.add_module('Conv2d', TPSQ_QuantizedConv2d(in_channels=output_filters[-1],
                                                                       out_channels=filters,
                                                                       kernel_size=kernel_size,
                                                                       stride=int(mdef['stride']),
@@ -378,7 +378,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
             if quantized == 4:
                 if FPGA:
                     modules.add_module('DepthWise2d',
-                                       Pact_BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
+                                       TPSQ_BNFold_QuantizedConv2d_For_FPGA(in_channels=output_filters[-1],
                                                                             out_channels=filters,
                                                                             kernel_size=kernel_size,
                                                                             stride=int(mdef['stride']),
@@ -392,7 +392,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                                                                             steps=steps,
                                                                             quantizer_output=quantizer_output))
                 else:
-                    modules.add_module('DepthWise2d', Pact_QuantizedConv2d(in_channels=output_filters[-1],
+                    modules.add_module('DepthWise2d', TPSQ_QuantizedConv2d(in_channels=output_filters[-1],
                                                                            out_channels=filters,
                                                                            kernel_size=kernel_size,
                                                                            stride=int(mdef['stride']),

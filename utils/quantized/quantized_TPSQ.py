@@ -267,7 +267,7 @@ class SymmetricQuantizer(Bias_Quantizer):
 
 
 # ********************* 量化卷积（同时量化A/W，并做卷积） *********************
-class Pact_QuantizedConv2d(nn.Conv2d):
+class TPSQ_QuantizedConv2d(nn.Conv2d):
     def __init__(
             self,
             in_channels,
@@ -325,7 +325,7 @@ def reshape_to_bias(input):
 
 
 # ********************* bn融合_量化卷积（bn融合后，同时量化A/W，并做卷积） *********************
-class Pact_BNFold_QuantizedConv2d_For_FPGA(Pact_QuantizedConv2d):
+class TPSQ_BNFold_QuantizedConv2d_For_FPGA(TPSQ_QuantizedConv2d):
     def __init__(
             self,
             in_channels,

@@ -25,19 +25,6 @@ class Round(Function):
         return grad_input
 
 
-class Ceil(Function):
-
-    @staticmethod
-    def forward(self, input):
-        output = torch.ceil(input)
-        return output
-
-    @staticmethod
-    def backward(self, grad_output):
-        grad_input = grad_output.clone()
-        return grad_input
-
-
 class Search_Pow2(Function):
 
     @staticmethod
@@ -103,10 +90,6 @@ class Quantizer(nn.Module):
         output = Round.apply(input)
         return output
 
-    def ceil(self, input):
-        output = Ceil.apply(input)
-        return output
-
     # 反量化
     def dequantize(self, input):
         quantized_range = torch.tensor((1 << (self.bits - 1)))
@@ -125,11 +108,7 @@ class Quantizer(nn.Module):
         else:
             output = self.clamp(input)  # 截断
             output = self.quantize(output)  # 量化
-            if self.FPGA:
-                # output = self.ceil(output)
-                output = self.round(output)
-            else:
-                output = self.round(output)
+            output = self.round(output)
             output = self.dequantize(output)  # 反量化
 
         return output

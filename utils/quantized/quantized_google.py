@@ -471,7 +471,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             if self.layer_idx == -1:
 
                 #######################输出当前层的权重量化因子
-                weight_scale = self.weight_quantizer.get_scale()
+                weight_scale = - self.weight_quantizer.get_scale()
                 np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s' % self.name), weight_scale, delimiter='\n')
                 #######################输出当前层的量化权重
                 q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
@@ -558,7 +558,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 if not os.path.isdir('./quantizer_output/b_scale_out'):
                     os.makedirs('./quantizer_output/b_scale_out')
                 #######################输出当前层偏置的量化因子
-                bias_scale = self.bias_quantizer.get_scale()
+                bias_scale = - self.bias_quantizer.get_scale()
                 np.savetxt(('./quantizer_output/b_scale_out/b_scale_%s.txt' % self.name), bias_scale, delimiter='\n')
                 #######################输出当前层的量化偏置
                 q_bias_txt = self.bias_quantizer.get_quantize_value(bias)
@@ -572,10 +572,17 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                     # print(b_para.shape)
                     # b_para = np.array(b_para.cpu()).reshape(1, -1)
                     np.savetxt(('./quantizer_output/q_bias_reorder/q_b_reorder_%s.txt' % self.name), b_para, delimiter='\n')
+                    ######权重和偏置的重排序数据的二进制文件保存
+                    bias_weight_reorder = np.append(b_para, q_weight_reorder)
+                    wb_flat = bias_weight_reorder.astype(np.int8)
+                    writer = open('./quantizer_output/q_weight_reorder/%s_bias_weight_q_bin' % self.name, "wb")
+                    writer.write(wb_flat)
+                    writer.close()
                 ################偏置重排序结束
+
             elif int(self.name[1:4]) == self.layer_idx:
                 #######################输出当前层的权重量化因子
-                weight_scale = self.weight_quantizer.get_scale()
+                weight_scale = - self.weight_quantizer.get_scale()
                 np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s' % self.name), weight_scale, delimiter='\n')
                 #######################输出当前层的量化权重
                 q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
@@ -663,7 +670,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 if not os.path.isdir('./quantizer_output/b_scale_out'):
                     os.makedirs('./quantizer_output/b_scale_out')
                 #######################输出当前层偏置的量化因子
-                bias_scale = self.bias_quantizer.get_scale()
+                bias_scale = - self.bias_quantizer.get_scale()
                 np.savetxt(('./quantizer_output/b_scale_out/b_scale_%s.txt' % self.name), bias_scale, delimiter='\n')
                 #######################输出当前层的量化偏置
                 q_bias_txt = self.bias_quantizer.get_quantize_value(bias)
@@ -678,6 +685,12 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                     # b_para = np.array(b_para.cpu()).reshape(1, -1)
                     np.savetxt(('./quantizer_output/q_bias_reorder/q_b_reorder_%s.txt' % self.name), b_para,
                                delimiter='\n')
+                    ######权重和偏置的重排序数据的二进制文件保存
+                    bias_weight_reorder = np.append(b_para, q_weight_reorder)
+                    wb_flat = bias_weight_reorder.astype(np.int8)
+                    writer = open('./quantizer_output/q_weight_reorder/%s_bias_weight_q_bin' % self.name, "wb")
+                    writer.write(wb_flat)
+                    writer.close()
                 ################偏置重排序结束
 
         # 量化卷积
@@ -733,7 +746,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
             if self.layer_idx == -1:
                 ##################输出当前激活的量化因子
-                activation_scale = self.activation_quantizer.get_scale()
+                activation_scale = - self.activation_quantizer.get_scale()
                 np.savetxt(('./quantizer_output/a_scale_out/a_scale_%s.txt' % self.name), activation_scale,
                            delimiter='\n')
                 ##################输出当前层的量化激活
@@ -781,6 +794,11 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                     q_activation_reorder = np.array(q_activation_reorder).reshape(1, -1)
                     np.savetxt(('./quantizer_output/q_activation_reorder/a_reorder_%s.txt' % self.name),
                                q_activation_reorder, delimiter='\n')
+                    ###保存重排序的二进制文件
+                    activation_flat = q_activation_reorder.astype(np.int8)
+                    writer = open('./quantizer_output/q_activation_reorder/%s_activation_q_bin'% self.name,"wb")
+                    writer.write(activation_flat)
+                    writer.close()
                 ##########特征图重排序结束
 
                 q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
@@ -793,15 +811,11 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 np.savetxt(('./quantizer_output/q_activation_out/q_activation_%s.txt' % self.name), q_activation_txt,
                            delimiter='\n')
 
-                # flow_percent = self.validation(w_para=w_para, bias_para=bias_para, weight_scale=weight_scale,
-                #                                bias_scale=bias_scale, a_para=a_para, activation_scale=activation_scale,
-                #                                input=input)
-                # print(flow_percent)
 
             elif int(self.name[1:4]) == self.layer_idx:
 
                 ##################输出当前激活的量化因子
-                activation_scale = self.activation_quantizer.get_scale()
+                activation_scale = - self.activation_quantizer.get_scale()
                 np.savetxt(('./quantizer_output/a_scale_out/a_scale_%s.txt' % self.name), activation_scale,
                            delimiter='\n')
                 ##################输出当前层的量化激活
@@ -849,6 +863,11 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                     q_activation_reorder = np.array(q_activation_reorder).reshape(1, -1)
                     np.savetxt(('./quantizer_output/q_activation_reorder/a_reorder_%s.txt' % self.name),
                                q_activation_reorder, delimiter='\n')
+                    ###保存重排序的二进制文件
+                    activation_flat = q_activation_reorder.astype(np.int8)
+                    writer = open('./quantizer_output/q_activation_reorder/%s_activation_q_bin'% self.name,"wb")
+                    writer.write(activation_flat)
+                    writer.close()
                 ##########特征图重排序结束
 
                 q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
@@ -861,10 +880,6 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 np.savetxt(('./quantizer_output/q_activation_out/q_activation_%s.txt' % self.name), q_activation_txt,
                            delimiter='\n')
 
-                # flow_percent = self.validation(w_para=w_para, bias_para=bias_para, weight_scale=weight_scale,
-                #                                bias_scale=bias_scale, a_para=a_para, activation_scale=activation_scale,
-                #                                input=input)
-                # print(flow_percent)
 
         output = self.activation_quantizer(output)
         return output

@@ -175,12 +175,9 @@ if __name__ == '__main__':
     parser.add_argument('--conf-thres', type=float, default=0.6, help='object confidence threshold')
     parser.add_argument('--nms-thres', type=float, default=0.8, help='iou threshold for non-maximum suppression')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
-    parser.add_argument('--quantized', type=int, default=-1,
-                        help='0:quantization way one Ternarized weight and 8bit activation')
-    parser.add_argument('--a-bit', type=int, default=8,
-                        help='a-bit')
-    parser.add_argument('--w-bit', type=int, default=8,
-                        help='w-bit')
+    parser.add_argument('--quantized', type=int, default=-1, help='quantization way')
+    parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
+    parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
     parser.add_argument('--reorder', action='store_true', help='reorder')
     parser.add_argument('--TN', type=int, default=8, help='TN')

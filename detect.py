@@ -17,8 +17,10 @@ def detect(save_img=False):
     os.makedirs(out)  # make new output folder
 
     # Initialize model
-    model = Darknet(opt.cfg, imgsz, quantized=opt.quantized, quantizer_output=opt.quantizer_output,layer_idx = opt.layer_idx,
-                    reorder=opt.reorder,TN=opt.TN, TM=opt.TM, a_bit=opt.a_bit, w_bit=opt.w_bit, FPGA=opt.FPGA, is_gray_scale=opt.gray_scale)
+    model = Darknet(opt.cfg, imgsz, quantized=opt.quantized, quantizer_output=opt.quantizer_output,
+                    layer_idx=opt.layer_idx,
+                    reorder=opt.reorder, TN=opt.TN, TM=opt.TM, a_bit=opt.a_bit, w_bit=opt.w_bit, FPGA=opt.FPGA,
+                    is_gray_scale=opt.gray_scale)
 
     # Load weights
     attempt_download(weights)
@@ -148,12 +150,9 @@ if __name__ == '__main__':
     parser.add_argument('--classes', nargs='+', type=int, help='filter by class')
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
-    parser.add_argument('--quantized', type=int, default=0,
-                        help='0:quantization way one Ternarized weight and 8bit activation')
-    parser.add_argument('--a-bit', type=int, default=8,
-                        help='a-bit')
-    parser.add_argument('--w-bit', type=int, default=8,
-                        help='w-bit')
+    parser.add_argument('--quantized', type=int, default=0, help='quantization way')
+    parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
+    parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
     parser.add_argument('--quantizer_output', type=bool, default=False, help='output')
     parser.add_argument('--layer_idx', type=int, default=-1, help='output')

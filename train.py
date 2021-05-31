@@ -509,7 +509,7 @@ def train(hyp):
                                       w_bit=opt.w_bit,
                                       FPGA=opt.FPGA,
                                       rank=opt.local_rank,
-                                      plot=False)
+                                      plot=True)
             torch.cuda.empty_cache()
         # Write
         if opt.local_rank in [-1, 0]:

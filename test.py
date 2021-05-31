@@ -25,7 +25,7 @@ def test(cfg,
          w_bit=8,
          FPGA=False,
          rank=-1,
-         plot=False,
+         plot=True,
          is_gray_scale=False):
     # Initialize/load model and set device
     if model is None:

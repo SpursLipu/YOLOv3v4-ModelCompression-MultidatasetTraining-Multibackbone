@@ -1123,9 +1123,9 @@ def output_to_target(output, width, height):
     [batch_id, class_id, x, y, w, h, conf]
 
     """
-
-    if isinstance(output, torch.Tensor):
-        output = output.cpu().numpy()
+    for i in range(len(output)):
+        if isinstance(output[i], torch.Tensor):
+            output[i] = output[i].cpu().numpy()
 
     targets = []
     for i, o in enumerate(output):
@@ -1242,7 +1242,7 @@ def plot_images(images, targets, paths=None, fname='images.jpg', names=None, max
                 cls = int(classes[j])
                 color = color_lut[cls % len(color_lut)]
                 cls = names[cls] if names else cls
-                if gt or conf[j] > 0.3:  # 0.3 conf thresh
+                if gt or conf[j] > 0.1:  # 0.3 conf thresh
                     label = '%s' % cls if gt else '%s %.1f' % (cls, conf[j])
                     plot_one_box(box, mosaic, label=label, color=color, line_thickness=tl)
 

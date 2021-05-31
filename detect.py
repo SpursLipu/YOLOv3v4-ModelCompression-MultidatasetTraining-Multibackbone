@@ -52,12 +52,14 @@ def detect(save_img=False):
 
     # Run inference
     t0 = time.time()
-    img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
+    # img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
     # _ = model(img.float()) if device.type != 'cpu' else None  # run once
     for path, img, im0s, vid_cap in dataset:
         img = torch.from_numpy(img).to(device)
         img = img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        if opt.quantized != -1 and opt.a_bit <= 8 and opt.FPGA:
+            img = img * 2 - 1
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
 
@@ -159,7 +161,7 @@ if __name__ == '__main__':
     parser.add_argument('--reorder', type=bool, default=False, help='reorder')
     parser.add_argument('--TN', type=int, default=32, help='TN')
     parser.add_argument('--TM', type=int, default=32, help='TM')
-    parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
+    parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')
     opt = parser.parse_args()
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
     opt.names = list(glob.iglob('./**/' + opt.names, recursive=True))[0]  # find file

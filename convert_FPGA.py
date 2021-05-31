@@ -182,7 +182,7 @@ if __name__ == '__main__':
     parser.add_argument('--reorder', action='store_true', help='reorder')
     parser.add_argument('--TN', type=int, default=8, help='TN')
     parser.add_argument('--TM', type=int, default=64, help='TN')
-    parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
+    parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')
     opt = parser.parse_args()
     print(opt)
 

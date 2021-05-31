@@ -114,7 +114,7 @@ if __name__ == '__main__':
     parser.add_argument('--layer_keep', type=float, default=0.01, help='channel keep percent per layer')
     parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
     parser.add_argument('--batch-size', type=int, default=16, help='batch-size')
-    parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
+    parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')
     opt = parser.parse_args()
     print(opt)
 

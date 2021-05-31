@@ -621,7 +621,7 @@ if __name__ == '__main__':
     parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', '-FPGA', dest='FPGA', action='store_true', help='FPGA')
-    parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
+    parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')
     parser.add_argument('--SWIFT', '-SWIFT', dest='SWIFT', action='store_true', help='ues for SWITF pruning')
 
     # DDP get local-rank

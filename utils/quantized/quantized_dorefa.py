@@ -15,7 +15,8 @@ class Round(Function):
 
     @staticmethod
     def forward(self, input):
-        output = torch.round(input)
+        sign = torch.sign(input)
+        output = sign * torch.floor(torch.abs(input) + 0.5)
         return output
 
     @staticmethod

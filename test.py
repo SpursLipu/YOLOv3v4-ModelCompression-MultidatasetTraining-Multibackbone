@@ -87,9 +87,11 @@ def test(cfg,
     loss = torch.zeros(3, device=device)
     jdict, stats, ap, ap_class = [], [], [], []
     for batch_i, (imgs, targets, paths, shapes) in enumerate(pbar):
-        imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
         if quantized != -1 and a_bit <= 8 and FPGA:
+            imgs = imgs.to(device).float() / 256.0
             imgs = imgs * 2 - 1
+        else:
+            imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
         targets = targets.to(device)
         nb, _, height, width = imgs.shape  # batch size, channels, height, width
         whwh = torch.Tensor([width, height, width, height]).to(device)
@@ -258,9 +260,9 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
     parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
-    parser.add_argument('--quantized', type=int, default=-1,help='quantization way')
-    parser.add_argument('--a-bit', type=int, default=8,help='a-bit')
-    parser.add_argument('--w-bit', type=int, default=8,help='w-bit')
+    parser.add_argument('--quantized', type=int, default=-1, help='quantization way')
+    parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
+    parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
     parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')
 

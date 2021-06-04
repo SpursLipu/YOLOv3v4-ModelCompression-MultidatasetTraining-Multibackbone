@@ -33,7 +33,10 @@ def convert():
             a_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_a_scale.bin', 'wb')
             b_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_b_scale.bin', 'wb')
             s_scale = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_s_scale.bin', 'wb')
-            a = struct.pack('<i', 14)
+            if opt.w_bit == 16:
+                a = struct.pack('<i', 14)
+            if opt.w_bit == 8:
+                a = struct.pack('<i', 7)
             a_scale.write(a)
         for _, (mdef, module) in enumerate(zip(model.module_defs, model.module_list)):
             print(mdef)

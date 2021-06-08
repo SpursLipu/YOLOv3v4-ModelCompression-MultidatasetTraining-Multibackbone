@@ -310,7 +310,8 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
             activate='leaky',
             quantizer_output=False,
             reorder=False, TM=32, TN=32,
-            name = '',layer_idx = -1
+            name='', layer_idx=-1,
+            maxabsscaler=False
     ):
         super().__init__(
             in_channels=in_channels,
@@ -339,7 +340,7 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
         self.TN = TN
         self.name = name
         self.layer_idx = layer_idx
-
+        self.maxabsscaler = maxabsscaler
         # 实例化量化器（A-layer级，W-channel级）
         if q_type == 0:
             self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L',
@@ -415,7 +416,7 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
 
                 w_para = q_weight_txt  # 重排序参数
                 if self.reorder == True:
-                    #print("use weights reorder!")
+                    # print("use weights reorder!")
                     shape_output = w_para.shape[0]
                     shape_input = w_para.shape[1]
                     num_TN = int(shape_input / self.TN)
@@ -484,7 +485,8 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
                 max_weight_count = [np.sum(abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
                 np.savetxt(('./quantizer_output/max_weight_count/max_w_count_%s.txt' % self.name), max_weight_count)
                 np.savetxt(('./quantizer_output/q_weight_max/max_w_%s.txt' % self.name), q_weight_max)
-                np.savetxt(('./quantizer_output/q_weight_out/q_weight_%s.txt' % self.name), q_weight_txt, delimiter='\n')
+                np.savetxt(('./quantizer_output/q_weight_out/q_weight_%s.txt' % self.name), q_weight_txt,
+                           delimiter='\n')
                 # io.savemat('save.mat',{'q_weight_txt':q_weight_txt})
 
                 #######################创建输出偏置txt的文件夹
@@ -506,11 +508,12 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
                     b_para[0:q_bias_txt.size] = q_bias_txt
                     # print(b_para.shape)
                     # b_para = np.array(b_para.cpu()).reshape(1, -1)
-                    np.savetxt(('./quantizer_output/q_bias_reorder/q_b_reorder_%s.txt' % self.name), b_para, delimiter='\n')
+                    np.savetxt(('./quantizer_output/q_bias_reorder/q_b_reorder_%s.txt' % self.name), b_para,
+                               delimiter='\n')
                     ######权重和偏置的重排序数据的二进制文件保存
-                    bias_weight_reorder = np.append(b_para,q_weight_reorder)
+                    bias_weight_reorder = np.append(b_para, q_weight_reorder)
                     wb_flat = bias_weight_reorder.astype(np.int8)
-                    writer = open('./quantizer_output/q_weight_reorder/%s_bias_weight_q_bin'% self.name, "wb")
+                    writer = open('./quantizer_output/q_weight_reorder/%s_bias_weight_q_bin' % self.name, "wb")
                     writer.write(wb_flat)
                     writer.close()
                 ################偏置重排序结束
@@ -621,9 +624,9 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
                     np.savetxt(('./quantizer_output/q_bias_reorder/q_b_reorder_%s.txt' % self.name), b_para,
                                delimiter='\n')
                     ######权重和偏置的重排序数据的二进制文件保存
-                    bias_weight_reorder = np.append(b_para,q_weight_reorder)
+                    bias_weight_reorder = np.append(b_para, q_weight_reorder)
                     wb_flat = bias_weight_reorder.astype(np.int8)
-                    writer = open('./quantizer_output/q_weight_reorder/%s_bias_weight_q_bin'% self.name, "wb")
+                    writer = open('./quantizer_output/q_weight_reorder/%s_bias_weight_q_bin' % self.name, "wb")
                     writer.write(wb_flat)
                     writer.close()
                 ################偏置重排序结束
@@ -639,7 +642,7 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
             groups=self.groups
         )
         if self.activate == 'leaky':
-            output = F.leaky_relu(output, 0.125, inplace=True)
+            output = F.leaky_relu(output, 0.125 if not self.maxabsscaler else 0.25, inplace=True)
         elif self.activate == 'relu6':
             output = F.relu6(output, inplace=True)
         elif self.activate == 'h_swish':
@@ -719,7 +722,7 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
                                q_activation_reorder, delimiter='\n')
                     ###保存重排序的二进制文件
                     activation_flat = q_activation_reorder.astype(np.int8)
-                    writer = open('./quantizer_output/q_activation_reorder/%s_activation_q_bin'% self.name,"wb")
+                    writer = open('./quantizer_output/q_activation_reorder/%s_activation_q_bin' % self.name, "wb")
                     writer.write(activation_flat)
                     writer.close()
                 ##########特征图重排序结束
@@ -787,7 +790,7 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
                                q_activation_reorder, delimiter='\n')
                     ###保存重排序的二进制文件
                     activation_flat = q_activation_reorder.astype(np.int8)
-                    writer = open('./quantizer_output/q_activation_reorder/%s_activation_q_bin'% self.name,"wb")
+                    writer = open('./quantizer_output/q_activation_reorder/%s_activation_q_bin' % self.name, "wb")
                     writer.write(activation_flat)
                     writer.close()
                 ##########特征图重排序结束
@@ -801,7 +804,6 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
                 np.savetxt(('./quantizer_output/q_activation_max/q_a_max_%s.txt' % self.name), q_activation_max)
                 np.savetxt(('./quantizer_output/q_activation_out/q_activation_%s.txt' % self.name), q_activation_txt,
                            delimiter='\n')
-
 
         output = self.activation_quantizer(output)
         return output

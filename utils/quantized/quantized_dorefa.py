@@ -204,6 +204,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
             activate='leaky',
             steps=0,
             quantizer_output=False,
+            maxabsscaler=False
     ):
         super().__init__(
             in_channels=in_channels,
@@ -229,7 +230,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
         self.register_buffer('first_bn', torch.zeros(1))
         self.register_buffer('step', torch.zeros(1))
         self.quantizer_output = quantizer_output
-
+        self.maxabsscaler = maxabsscaler
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
 
@@ -380,7 +381,7 @@ class BNFold_DorefaConv2d(DorefaConv2d):
                 groups=self.groups
             )
         if self.activate == 'leaky':
-            output = F.leaky_relu(output, 0.125, inplace=True)
+            output = F.leaky_relu(output, 0.125 if not self.maxabsscaler else 0.25, inplace=True)
         elif self.activate == 'relu6':
             output = F.relu6(output, inplace=True)
         elif self.activate == 'h_swish':

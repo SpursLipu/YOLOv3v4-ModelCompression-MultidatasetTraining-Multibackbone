@@ -316,7 +316,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             steps=0,
             quantizer_output=False,
             reorder=False, TM=32, TN=32,
-            name='', layer_idx=-1
+            name='', layer_idx=-1, maxabsscaler=False
     ):
         super().__init__(
             in_channels=in_channels,
@@ -347,7 +347,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         self.TN = TN
         self.name = name
         self.layer_idx = layer_idx
-
+        self.maxabsscaler = maxabsscaler
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
 
@@ -719,7 +719,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 groups=self.groups
             )
         if self.activate == 'leaky':
-            output = F.leaky_relu(output, 0.125, inplace=True)
+            output = F.leaky_relu(output, 0.125 if not self.maxabsscaler else 0.25, inplace=True)
         elif self.activate == 'relu6':
             output = F.relu6(output, inplace=True)
         elif self.activate == 'h_swish':

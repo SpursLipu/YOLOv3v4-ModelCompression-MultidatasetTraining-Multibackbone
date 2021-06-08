@@ -12,8 +12,9 @@ ONNX_EXPORT = False
 
 
 # YOLO
-def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer_idx, reorder, TM, TN, a_bit=8, w_bit=8,
-                   FPGA=False, steps=0, is_gray_scale=False):
+def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, layer_idx, reorder, TM, TN, a_bit=8,
+                   w_bit=8,
+                   FPGA=False, steps=0, is_gray_scale=False, maxabsscaler=False):
     # Constructs module list of layer blocks from module configuration in module_defs
 
     img_size = [img_size] * 2 if isinstance(img_size, int) else img_size  # expand if necessary
@@ -52,7 +53,9 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                                                                                  steps=steps,
                                                                                  quantizer_output=quantizer_output,
                                                                                  reorder=reorder, TM=TM, TN=TN,
-                                                                                 name="{:04d}".format(i) + "_" +mdef['type'][:4],
+                                                                                 name="{:04d}".format(i) + "_" + mdef[
+                                                                                                                     'type'][
+                                                                                                                 :4],
                                                                                  layer_idx=layer_idx))
                 else:
                     modules.add_module('Conv2d', QuantizedConv2d(in_channels=output_filters[-1],
@@ -68,7 +71,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                         modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
                     if mdef['activation'] == 'leaky':
-                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        modules.add_module('activation', nn.LeakyReLU(0.1 if not maxabsscaler else 0.25, inplace=True))
                         # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                         # modules.add_module('activation', Swish())
                     if mdef['activation'] == 'relu6':
@@ -108,7 +111,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                         modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
                     if mdef['activation'] == 'leaky':
-                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        modules.add_module('activation', nn.LeakyReLU(0.1 if not maxabsscaler else 0.25, inplace=True))
                         # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                         # modules.add_module('activation', Swish())
                     if mdef['activation'] == 'relu6':
@@ -135,7 +138,9 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                                                                                    activate=mdef['activation'],
                                                                                    quantizer_output=quantizer_output,
                                                                                    reorder=reorder, TM=TM, TN=TN,
-                                                                                   name="{:04d}".format(i) + "_" +mdef['type'][:4],
+                                                                                   name="{:04d}".format(i) + "_" + mdef[
+                                                                                                                       'type'][
+                                                                                                                   :4],
                                                                                    layer_idx=layer_idx))
                 else:
                     modules.add_module('Conv2d', PTQuantizedConv2d(in_channels=output_filters[-1],
@@ -151,7 +156,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                         modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
                     if mdef['activation'] == 'leaky':
-                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        modules.add_module('activation', nn.LeakyReLU(0.1 if not maxabsscaler else 0.25, inplace=True))
                         # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                         # modules.add_module('activation', Swish())
                     if mdef['activation'] == 'relu6':
@@ -192,7 +197,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                         modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
                     if mdef['activation'] == 'leaky':
-                        modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                        modules.add_module('activation', nn.LeakyReLU(0.1 if not maxabsscaler else 0.25, inplace=True))
                         # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                         # modules.add_module('activation', Swish())
                     if mdef['activation'] == 'relu6':
@@ -218,8 +223,10 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                                                                                   activate=mdef['activation'],
                                                                                   quantizer_output=quantizer_output,
                                                                                   reorder=reorder, TM=TM, TN=TN,
-                                                                                  name="{:04d}".format(i)+"_"+mdef['type'][:4],
-                                                                                  layer_idx = layer_idx))
+                                                                                  name="{:04d}".format(i) + "_" + mdef[
+                                                                                                                      'type'][
+                                                                                                                  :4],
+                                                                                  layer_idx=layer_idx))
             else:
                 modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
                                                        out_channels=filters,
@@ -232,7 +239,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                     modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
                 if mdef['activation'] == 'leaky':
-                    modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                    modules.add_module('activation', nn.LeakyReLU(0.1 if not maxabsscaler else 0.25, inplace=True))
                     # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
                     # modules.add_module('activation', Swish())
                 if mdef['activation'] == 'relu6':
@@ -266,7 +273,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                                                                        steps=steps,
                                                                        quantizer_output=quantizer_output,
                                                                        reorder=reorder, TM=TM, TN=TN,
-                                                                       name="{:04d}".format(i) + "_" +mdef['type'][:4],
+                                                                       name="{:04d}".format(i) + "_" + mdef['type'][:4],
                                                                        layer_idx=layer_idx))
                 else:
                     modules.add_module('DepthWise2d', QuantizedConv2d(in_channels=output_filters[-1],
@@ -348,7 +355,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                                                                                         activate=mdef['activation'],
                                                                                         quantizer_output=quantizer_output,
                                                                                         reorder=reorder, TM=TM, TN=TN,
-                                                                                        name="{:04d}".format(i) + "_" +mdef['type'][:4],
+                                                                                        name="{:04d}".format(i) + "_" +
+                                                                                             mdef['type'][:4],
                                                                                         layer_idx=layer_idx))
                 else:
                     modules.add_module('DepthWise2d', PTQuantizedConv2d(in_channels=output_filters[-1],
@@ -430,7 +438,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output,layer
                                                                                        activate=mdef['activation'],
                                                                                        quantizer_output=quantizer_output,
                                                                                        reorder=reorder, TM=TM, TN=TN,
-                                                                                       name="{:04d}".format(i) + "_" +mdef['type'][:4],
+                                                                                       name="{:04d}".format(i) + "_" +
+                                                                                            mdef['type'][:4],
                                                                                        layer_idx=layer_idx))
             else:
                 modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
@@ -652,7 +661,8 @@ class Darknet(nn.Module):
     # YOLOv3 object detection model
 
     def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, FPGA=False,
-                 quantizer_output=False, layer_idx = -1,reorder=False, TM=32, TN=32, steps=0, is_gray_scale=False):
+                 quantizer_output=False, layer_idx=-1, reorder=False, TM=32, TN=32, steps=0, is_gray_scale=False,
+                 maxabsscaler=False):
         super(Darknet, self).__init__()
 
         if isinstance(cfg, str):
@@ -672,9 +682,9 @@ class Darknet(nn.Module):
         self.hyperparams = copy.deepcopy(self.module_defs[0])
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg, quantized=self.quantized,
                                                       quantizer_output=self.quantizer_output, reorder=self.reorder,
-                                                      TM=self.TM, TN=self.TN, layer_idx = self.layer_idx,
-                                                      a_bit=self.a_bit,w_bit=self.w_bit, FPGA=self.FPGA, steps=steps,
-                                                      is_gray_scale=is_gray_scale)
+                                                      TM=self.TM, TN=self.TN, layer_idx=self.layer_idx,
+                                                      a_bit=self.a_bit, w_bit=self.w_bit, FPGA=self.FPGA, steps=steps,
+                                                      is_gray_scale=is_gray_scale, maxabsscaler=maxabsscaler)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 

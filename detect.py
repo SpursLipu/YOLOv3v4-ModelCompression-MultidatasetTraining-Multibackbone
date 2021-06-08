@@ -20,7 +20,7 @@ def detect(save_img=False):
     model = Darknet(opt.cfg, imgsz, quantized=opt.quantized, quantizer_output=opt.quantizer_output,
                     layer_idx=opt.layer_idx,
                     reorder=opt.reorder, TN=opt.TN, TM=opt.TM, a_bit=opt.a_bit, w_bit=opt.w_bit, FPGA=opt.FPGA,
-                    is_gray_scale=opt.gray_scale)
+                    is_gray_scale=opt.gray_scale, maxabsscaler=opt.maxabsscaler)
 
     # Load weights
     attempt_download(weights)
@@ -57,7 +57,7 @@ def detect(save_img=False):
     for path, img, im0s, vid_cap in dataset:
         img = torch.from_numpy(img).to(device)
         img = img.float()  # uint8 to fp16/32
-        if opt.quantized != -1 and opt.a_bit <= 8 and opt.FPGA:
+        if opt.maxabsscaler:
             img /= 256
             img = img * 2 - 1
         else:
@@ -164,6 +164,7 @@ if __name__ == '__main__':
     parser.add_argument('--TN', type=int, default=32, help='TN')
     parser.add_argument('--TM', type=int, default=32, help='TM')
     parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')
+    parser.add_argument('--maxabsscaler', '-mas', action='store_true', help='Standarize input to (-1,1)')
     opt = parser.parse_args()
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
     opt.names = list(glob.iglob('./**/' + opt.names, recursive=True))[0]  # find file

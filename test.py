@@ -26,7 +26,8 @@ def test(cfg,
          FPGA=False,
          rank=-1,
          plot=True,
-         is_gray_scale=False):
+         is_gray_scale=False,
+         maxabsscaler=False):
     # Initialize/load model and set device
     if model is None:
         device = torch_utils.select_device(opt.device, batch_size=batch_size)
@@ -38,7 +39,7 @@ def test(cfg,
 
         # Initialize model
         model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit,
-                        FPGA=FPGA, is_gray_scale=opt.gray_scale)
+                        FPGA=FPGA, is_gray_scale=is_gray_scale, maxabsscaler=maxabsscaler)
 
         # Load weights
         attempt_download(weights)
@@ -87,7 +88,7 @@ def test(cfg,
     loss = torch.zeros(3, device=device)
     jdict, stats, ap, ap_class = [], [], [], []
     for batch_i, (imgs, targets, paths, shapes) in enumerate(pbar):
-        if quantized != -1 and a_bit <= 8 and FPGA:
+        if maxabsscaler:
             imgs = imgs.to(device).float() / 256.0
             imgs = imgs * 2 - 1
         else:
@@ -265,6 +266,7 @@ if __name__ == '__main__':
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
     parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')
+    parser.add_argument('--maxabsscaler', '-mas', action='store_true', help='Standarize input to (-1,1)')
 
     opt = parser.parse_args()
     opt.save_json = opt.save_json or any([x in opt.data for x in ['coco.data', 'coco2014.data', 'coco2017.data']])
@@ -290,7 +292,8 @@ if __name__ == '__main__':
              w_bit=opt.w_bit,
              FPGA=opt.FPGA,
              rank=-1,
-             is_gray_scale=opt.gray_scale)
+             is_gray_scale=opt.gray_scale,
+             maxabsscaler=opt.maxabsscaler)
 
     elif opt.task == 'benchmark':  # mAPs at 256-640 at conf 0.5 and 0.7
         y = []

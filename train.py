@@ -109,7 +109,7 @@ def train(hyp):
     # Initialize model
     steps = math.ceil(len(open(train_path).readlines()) / batch_size) * epochs
     model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
-                    FPGA=opt.FPGA, steps=steps, is_gray_scale=opt.gray_scale).to(device)
+                    FPGA=opt.FPGA, steps=steps, is_gray_scale=opt.gray_scale, maxabsscaler=opt.maxabsscaler).to(device)
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
 
@@ -327,7 +327,7 @@ def train(hyp):
         pbar = tqdm(enumerate(dataloader), total=nb)  # progress bar
         for i, (imgs, targets, paths, _) in pbar:  # batch -------------------------------------------------------------
             ni = i + nb * epoch  # number integrated batches (since train start)
-            if opt.quantized != -1 and opt.a_bit <= 8 and opt.FPGA:
+            if opt.maxabsscaler:
                 imgs = imgs.to(device).float() / 256.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
                 imgs = imgs * 2 - 1
             else:
@@ -419,19 +419,6 @@ def train(hyp):
                 scaler.scale(loss).backward()
             else:
                 loss.backward()
-            if opt.SWIFT:
-                if hasattr(model, 'module'):
-                    for i, (mdef, module) in enumerate(zip(model.module.module_defs[:], model.module.module_list[:])):
-                        if mdef['type'] == 'convolutional':
-                            if mdef['activation'] != 'linear':
-                                conv_layer_weight = module[0].weight
-                                conv_layer_weight.grad[conv_layer_weight == 0] = 0
-                else:
-                    for i, (mdef, module) in enumerate(zip(model.module_defs[:], model.module_list[:])):
-                        if mdef['type'] == 'convolutional':
-                            if mdef['activation'] != 'linear':
-                                conv_layer_weight = module[0].weight
-                                conv_layer_weight.grad[conv_layer_weight == 0] = 0
             # 对要剪枝层的γ参数稀疏化
             if hasattr(model, 'module'):
                 if opt.prune != -1:
@@ -511,7 +498,8 @@ def train(hyp):
                                       w_bit=opt.w_bit,
                                       FPGA=opt.FPGA,
                                       rank=opt.local_rank,
-                                      plot=True)
+                                      plot=True,
+                                      maxabsscaler=opt.maxabsscaler)
             torch.cuda.empty_cache()
         # Write
         if opt.local_rank in [-1, 0]:
@@ -624,8 +612,7 @@ if __name__ == '__main__':
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', '-FPGA', dest='FPGA', action='store_true', help='FPGA')
     parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')
-    parser.add_argument('--SWIFT', '-SWIFT', dest='SWIFT', action='store_true', help='ues for SWITF pruning')
-
+    parser.add_argument('--maxabsscaler', '-mas', action='store_true', help='Standarize input to (-1,1)')
     # DDP get local-rank
     parser.add_argument('--rank', default=0, help='rank of current process')
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')

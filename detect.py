@@ -62,6 +62,12 @@ def detect(save_img=False):
             img = img * 2 - 1
         else:
             img /= 256.0  # 0 - 255 to 0.0 - 1.0
+        if opt.quantized != -1:
+            if opt.a_bit == 16:
+                img = img * (2 ** 14)
+                sign = torch.sign(img)
+                img = sign * torch.floor(torch.abs(img) + 0.5)
+                img = img / (2 ** 14)
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
 

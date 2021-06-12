@@ -61,7 +61,7 @@ def detect(save_img=False):
             img /= 256
             img = img * 2 - 1
         else:
-            img /= 255.0  # 0 - 255 to 0.0 - 1.0
+            img /= 256.0  # 0 - 255 to 0.0 - 1.0
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
 

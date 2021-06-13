@@ -93,8 +93,8 @@ def test(cfg,
             imgs = imgs * 2 - 1
         else:
             imgs = imgs.to(device).float() / 256.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
-        if opt.quantized != -1:
-            if opt.a_bit == 16:
+        if quantized != -1:
+            if a_bit == 16:
                 imgs = imgs * (2 ** 14)
                 sign = torch.sign(imgs)
                 imgs = sign * torch.floor(torch.abs(imgs) + 0.5)

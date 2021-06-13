@@ -164,7 +164,7 @@ class Quantizer(nn.Module):
     ################获得量化因子所对应的移位数
     def get_scale(self):
         #############移位修正
-        move_scale = math.log2(self.scale)
+        move_scale = math.log(self.scale.cpu().data.numpy()[0], 2)
         move_scale = np.array(move_scale).reshape(1, -1)
         return move_scale
 
@@ -341,6 +341,8 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         self.register_buffer('batch_var', torch.zeros(out_channels))
         self.register_buffer('first_bn', torch.zeros(1))
         self.register_buffer('step', torch.zeros(1))
+        self.register_buffer('last_activation_scale', torch.zeros(1))
+        self.register_buffer('bias_scale', torch.zeros(1))
         self.quantizer_output = quantizer_output
         self.reorder = reorder
         self.TM = TM
@@ -361,9 +363,6 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             self.weight_quantizer = SymmetricQuantizer(bits=w_bits,
                                                        range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
                                                        out_channels=-1, FPGA=True)
-            self.bias_quantizer = SymmetricQuantizer(bits=w_bits,
-                                                     range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                     out_channels=-1, FPGA=True)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
                                                             range_tracker=AveragedRangeTracker(q_level='L',
@@ -372,9 +371,6 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits,
                                                         range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
                                                         out_channels=-1, FPGA=True, sign=False)
-            self.bias_quantizer = AsymmetricQuantizer(bits=w_bits,
-                                                      range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                      out_channels=-1, FPGA=True, sign=False)
 
     def forward(self, input):
         # 训练态
@@ -449,7 +445,14 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 weight = self.weight
         # 量化A和bn融合后的W
         q_weight = self.weight_quantizer(weight)
-        q_bias = self.bias_quantizer(bias)
+        if self.training:
+            self.bias_scale = self.last_activation_scale * self.weight_quantizer.scale
+        q_bias = bias / self.bias_scale
+        q_bias = Round.apply(q_bias)
+        min_val = torch.tensor(-(1 << (self.a_bits - 1)))
+        max_val = torch.tensor((1 << (self.a_bits - 1)) - 1)
+        q_bias = torch.clamp(q_bias, min_val, max_val)
+        q_bias = q_bias * self.bias_scale
 
         if self.quantizer_output == True:  # 输出量化参数txt文档
 
@@ -475,7 +478,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
                 #######################输出当前层的权重量化因子
                 weight_scale = - self.weight_quantizer.get_scale()
-                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s' % self.name), weight_scale, delimiter='\n')
+                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s.txt' % self.name), weight_scale, delimiter='\n')
                 #######################输出当前层的量化权重
                 q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
 
@@ -562,10 +565,12 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 if not os.path.isdir('./quantizer_output/b_scale_out'):
                     os.makedirs('./quantizer_output/b_scale_out')
                 #######################输出当前层偏置的量化因子
-                bias_scale = - self.bias_quantizer.get_scale()
+                move_scale = math.log(self.bias_scale.cpu().data.numpy()[0], 2)
+                move_scale = np.array(move_scale).reshape(1, -1)
+                bias_scale = - move_scale
                 np.savetxt(('./quantizer_output/b_scale_out/b_scale_%s.txt' % self.name), bias_scale, delimiter='\n')
                 #######################输出当前层的量化偏置
-                q_bias_txt = self.bias_quantizer.get_quantize_value(bias)
+                q_bias_txt = q_bias / self.bias_scale
                 q_bias_txt = np.array(q_bias_txt.cpu()).reshape(1, -1)
                 np.savetxt(('./quantizer_output/q_bias_out/q_bias_%s.txt' % self.name), q_bias_txt, delimiter='\n')
 
@@ -588,7 +593,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             elif int(self.name[1:4]) == self.layer_idx:
                 #######################输出当前层的权重量化因子
                 weight_scale = - self.weight_quantizer.get_scale()
-                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s' % self.name), weight_scale, delimiter='\n')
+                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s.txt' % self.name), weight_scale, delimiter='\n')
                 #######################输出当前层的量化权重
                 q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
 
@@ -675,10 +680,12 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 if not os.path.isdir('./quantizer_output/b_scale_out'):
                     os.makedirs('./quantizer_output/b_scale_out')
                 #######################输出当前层偏置的量化因子
-                bias_scale = - self.bias_quantizer.get_scale()
+                move_scale = math.log(self.bias_scale.cpu().data.numpy()[0], 2)
+                move_scale = np.array(move_scale).reshape(1, -1)
+                bias_scale = - move_scale
                 np.savetxt(('./quantizer_output/b_scale_out/b_scale_%s.txt' % self.name), bias_scale, delimiter='\n')
                 #######################输出当前层的量化偏置
-                q_bias_txt = self.bias_quantizer.get_quantize_value(bias)
+                q_bias_txt = q_bias / self.bias_scale
                 q_bias_txt = np.array(q_bias_txt.cpu()).reshape(1, -1)
                 np.savetxt(('./quantizer_output/q_bias_out/q_bias_%s.txt' % self.name), q_bias_txt, delimiter='\n')
 
@@ -904,6 +911,17 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             bias = self.bias
             weight = self.weight
         return weight, bias
+
+    def set_last_activation_scale(self, last_activation_scale):
+        self.last_activation_scale = last_activation_scale
+
+    def get_bias_quantize_value(self, bias):
+        q_bias = bias / self.bias_scale
+        q_bias = Round.apply(q_bias)
+        min_val = torch.tensor(-(1 << (self.a_bits - 1)))
+        max_val = torch.tensor((1 << (self.a_bits - 1)) - 1)
+        q_bias = torch.clamp(q_bias, min_val, max_val)
+        return q_bias
 
 
 class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070

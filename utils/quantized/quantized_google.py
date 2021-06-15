@@ -347,6 +347,8 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         self.TN = TN
         self.name = name
         self.layer_idx = layer_idx
+        self.w_bits = w_bits
+        self.a_bits = a_bits
         self.maxabsscaler = maxabsscaler
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
@@ -1059,10 +1061,8 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                     q_x_shortcut = self.round(q_x_shortcut)
                     q_x_shortcut = self.clamp(q_x_shortcut)  # 截断
 
-                    Q_shortcut = np.array(q_x_shortcut.cpu()).reshape(1, -1)
-                    np.savetxt(('./quantizer_output/q_activation_out/Q_shortcut_%s.txt' % self.name), Q_shortcut,delimiter='\n')
                     if self.reorder == True:
-                        a_para = Q_shortcut
+                        a_para = q_x_shortcut
                         # 重排序参数
                         # print("use activation reorder!")
                         shape_input = a_para.shape[1]
@@ -1091,6 +1091,9 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                         writer.write(activation_flat)
                         writer.close()
                     ##########shortcut重排序结束
+
+                    Q_shortcut = np.array(q_x_shortcut.cpu()).reshape(1, -1)
+                    np.savetxt(('./quantizer_output/q_activation_out/Q_shortcut_%s.txt' % self.name), Q_shortcut,delimiter='\n')
 
                 elif int(self.name[1:4]) == self.layer_idx:
 
@@ -1124,12 +1127,8 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                     q_x_shortcut = self.round(q_x_shortcut)
                     q_x_shortcut = self.clamp(q_x_shortcut)  # 截断
 
-                    Q_shortcut = np.array(q_x_shortcut.cpu()).reshape(1, -1)
-                    np.savetxt(('./quantizer_output/q_activation_out/Q_shortcut_%s.txt' % self.name), Q_shortcut,
-                               delimiter='\n')
-
                     if self.reorder == True:
-                        a_para = Q_shortcut
+                        a_para = q_x_shortcut
                         # 重排序参数
                         # print("use activation reorder!")
                         shape_input = a_para.shape[1]
@@ -1158,6 +1157,9 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                         writer.write(activation_flat)
                         writer.close()
                     ##########shortcut重排序结束
+                    Q_shortcut = np.array(q_x_shortcut.cpu()).reshape(1, -1)
+                    np.savetxt(('./quantizer_output/q_activation_out/Q_shortcut_%s.txt' % self.name), Q_shortcut,
+                               delimiter='\n')
 
             # 量化x
             x = self.quantize(x)  # 量化

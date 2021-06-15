@@ -331,7 +331,13 @@ def train(hyp):
                 imgs = imgs.to(device).float() / 256.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
                 imgs = imgs * 2 - 1
             else:
-                imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
+                imgs = imgs.to(device).float() / 256.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
+            if opt.quantized != -1:
+                if opt.a_bit == 16:
+                    img = img * (2 ** 14)
+                    sign = torch.sign(img)
+                    img = sign * torch.floor(torch.abs(img) + 0.5)
+                    img = img / (2 ** 14)
             # Burn-in
             if ni <= n_burn:
                 xi = [0, n_burn]  # x interp

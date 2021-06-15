@@ -92,7 +92,13 @@ def test(cfg,
             imgs = imgs.to(device).float() / 256.0
             imgs = imgs * 2 - 1
         else:
-            imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
+            imgs = imgs.to(device).float() / 256.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
+        if quantized != -1:
+            if a_bit == 16:
+                img = img * (2 ** 14)
+                sign = torch.sign(img)
+                img = sign * torch.floor(torch.abs(img) + 0.5)
+                img = img / (2 ** 14)
         targets = targets.to(device)
         nb, _, height, width = imgs.shape  # batch size, channels, height, width
         whwh = torch.Tensor([width, height, width, height]).to(device)

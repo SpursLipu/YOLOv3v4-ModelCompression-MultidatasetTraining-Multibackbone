@@ -42,7 +42,7 @@ def exif_size(img):
 
 
 class LoadImages:  # for inference
-    def __init__(self, path, img_size=416, is_gray_scale=False):
+    def __init__(self, path, img_size=416, is_gray_scale=False, rect=False):
         path = str(Path(path))  # os-agnostic
         files = []
         if os.path.isdir(path):
@@ -60,6 +60,7 @@ class LoadImages:  # for inference
         self.video_flag = [False] * nI + [True] * nV
         self.mode = 'images'
         self.is_gray_scale = is_gray_scale
+        self.rect = rect
         if any(videos):
             self.new_video(videos[0])  # new video
         else:
@@ -104,8 +105,10 @@ class LoadImages:  # for inference
             print('image %g/%g %s: ' % (self.count, self.nF, path), end='')
 
         # Padded resize
-        img = letterbox(img0, new_shape=self.img_size, is_gray_scale=self.is_gray_scale)[0]
-
+        if self.rect:
+            img = letterbox(img0, new_shape=self.img_size, is_gray_scale=self.is_gray_scale)[0]
+        else:
+            img = letterbox(img0, new_shape=self.img_size, auto=False, is_gray_scale=self.is_gray_scale)[0]
         # Convert
         img = img[:, :, ::-1].transpose(2, 0, 1).copy()  # BGR to RGB, to 3x416x416
         img = np.ascontiguousarray(img)

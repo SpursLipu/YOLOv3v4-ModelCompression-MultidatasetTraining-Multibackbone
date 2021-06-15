@@ -341,6 +341,8 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
         self.name = name
         self.layer_idx = layer_idx
         self.maxabsscaler = maxabsscaler
+        self.a_bits = a_bits
+        self.w_bits = w_bits
         # 实例化量化器（A-layer级，W-channel级）
         if q_type == 0:
             self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L',
@@ -482,7 +484,7 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
                 q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
                 q_weight_max = [np.max(q_weight_txt)]
                 # q_weight_max = np.argmax(q_weight_txt)
-                max_weight_count = [np.sum(abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
+                max_weight_count = [np.sum(abs(q_weight_txt) >= (1 << (self.w_bits - 1)) - 1)]  # 统计该层溢出的数目
                 np.savetxt(('./quantizer_output/max_weight_count/max_w_count_%s.txt' % self.name), max_weight_count)
                 np.savetxt(('./quantizer_output/q_weight_max/max_w_%s.txt' % self.name), q_weight_max)
                 np.savetxt(('./quantizer_output/q_weight_out/q_weight_%s.txt' % self.name), q_weight_txt,
@@ -595,7 +597,7 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
                 q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
                 q_weight_max = [np.max(q_weight_txt)]
                 # q_weight_max = np.argmax(q_weight_txt)
-                max_weight_count = [np.sum(abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
+                max_weight_count = [np.sum(abs(q_weight_txt) >= (1 << (self.w_bits - 1)) - 1)]  # 统计该层溢出的数目
                 np.savetxt(('./quantizer_output/max_weight_count/max_w_count_%s.txt' % self.name), max_weight_count)
                 np.savetxt(('./quantizer_output/q_weight_max/max_w_%s.txt' % self.name), q_weight_max)
                 np.savetxt(('./quantizer_output/q_weight_out/q_weight_%s.txt' % self.name), q_weight_txt,
@@ -729,7 +731,7 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
 
                 q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
                 q_activation_max = [np.max(q_activation_txt)]  # 统计该层的最大值(即查看是否有溢出)
-                max_activation_count = [np.sum(abs(q_activation_txt) >= 127)]  # 统计该层溢出的数目
+                max_activation_count = [np.sum(abs(q_activation_txt) >= (1 << (self.w_bits - 1)) - 1)]  # 统计该层溢出的数目
                 # q_weight_max = np.argmax(q_weight_txt)
                 np.savetxt(('./quantizer_output/max_activation_count/max_a_count_%s.txt' % self.name),
                            max_activation_count)
@@ -797,7 +799,7 @@ class BNFold_PTQuantizedConv2d_For_FPGA(PTQuantizedConv2d):
 
                 q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
                 q_activation_max = [np.max(q_activation_txt)]  # 统计该层的最大值(即查看是否有溢出)
-                max_activation_count = [np.sum(abs(q_activation_txt) >= 127)]  # 统计该层溢出的数目
+                max_activation_count = [np.sum(abs(q_activation_txt) >= (1 << (self.w_bits - 1)) - 1)]  # 统计该层溢出的数目
                 # q_weight_max = np.argmax(q_weight_txt)
                 np.savetxt(('./quantizer_output/max_activation_count/max_a_count_%s.txt' % self.name),
                            max_activation_count)

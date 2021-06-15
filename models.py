@@ -520,9 +520,17 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
                     modules = FeatureConcat(layers=layers, groups=False)
             else:
                 if 'groups' in mdef:
-                    modules = QuantizedFeatureConcat(layers=layers, groups=True, bits=a_bit, FPGA=FPGA)
+                    modules = QuantizedFeatureConcat(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,quantizer_output=quantizer_output,
+                                                                                       reorder=reorder, TM=TM, TN=TN,
+                                                                                       name="{:04d}".format(i) + "_" +
+                                                                                            mdef['type'][:4],
+                                                                                       layer_idx=layer_idx,)
                 else:
-                    modules = QuantizedFeatureConcat(layers=layers, groups=False, bits=a_bit, FPGA=FPGA)
+                    modules = QuantizedFeatureConcat(layers=layers, groups=False, bits=a_bit, FPGA=FPGA,quantizer_output=quantizer_output,
+                                                                                       reorder=reorder, TM=TM, TN=TN,
+                                                                                       name="{:04d}".format(i) + "_" +
+                                                                                            mdef['type'][:4],
+                                                                                       layer_idx=layer_idx,)
 
 
         elif mdef['type'] == 'shortcut':  # nn.Sequential() placeholder for 'shortcut' layer
@@ -532,7 +540,12 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
             if quantized == -1 or quantized == 2:
                 modules = Shortcut(layers=layers, weight='weights_type' in mdef)
             else:
-                modules = QuantizedShortcut(layers=layers, weight='weights_type' in mdef, bits=a_bit, FPGA=FPGA)
+                modules = QuantizedShortcut(layers=layers, weight='weights_type' in mdef, bits=a_bit, FPGA=FPGA,
+                                            quantizer_output=quantizer_output,
+                                            reorder=reorder, TM=TM, TN=TN,
+                                            name="{:04d}".format(i) + "_" +
+                                                 mdef['type'][:4],
+                                            layer_idx=layer_idx,)
 
 
 

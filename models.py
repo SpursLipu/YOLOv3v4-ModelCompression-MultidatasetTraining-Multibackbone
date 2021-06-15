@@ -749,9 +749,7 @@ class Darknet(nn.Module):
                            torch_utils.scale_img(x.flip(3), s[0]),  # flip-lr and scale
                            torch_utils.scale_img(x, s[1]),  # scale
                            ), 0)
-        if self.quantized != -1 and self.FPGA:
-            if x.shape[1] == 3 or x.shape[1] == 1:
-                last_activation_scale = torch.tensor(2 ** (-14)).unsqueeze(0).to(x.device)
+
         for i, module in enumerate(self.module_list):
             name = module.__class__.__name__
             if name in ['Shortcut', 'FeatureConcat', 'QuantizedShortcut', 'QuantizedFeatureConcat']:  # sum, concat
@@ -763,18 +761,15 @@ class Darknet(nn.Module):
             elif name == 'YOLOLayer':
                 yolo_out.append(module(x, out))
             else:  # run module directly, i.e. mtype = 'convolutional', 'upsample', 'maxpool', 'batchnorm2d' etc.
-                if self.quantized != -1 and self.FPGA and hasattr(module, 'Conv2d'):
-                    module.Conv2d.set_last_activation_scale(last_activation_scale)
-                    x = module(x)
-                    last_activation_scale = module.Conv2d.activation_quantizer.scale
-                else:
-                    x = module(x)
+                x = module(x)
                 if name == "Sequential" and self.module_list[i + 1].__class__.__name__ != 'YOLOLayer':
                     feature_out.append(x)
+
             out.append(x if self.routs[i] else [])
             if verbose:
                 print('%g/%g %s -' % (i, len(self.module_list), name), list(x.shape), str)
                 str = ''
+
         if self.training:  # train
             return yolo_out, feature_out
         elif ONNX_EXPORT:  # export

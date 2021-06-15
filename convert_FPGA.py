@@ -23,7 +23,7 @@ def convert():
         model.load_state_dict(torch.load(weights, map_location=device)['model'])
     else:  # darknet format
         _ = load_darknet_weights(model, weights, FPGA=opt.FPGA)
-    if opt.quantized == -1:
+    if opt.quantized == 0:
         save_weights(model, path='weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '-best.weights')
     else:
         w_file = open('weights/' + opt.cfg.split('/')[-1].replace('.cfg', '') + '_weights.bin', 'wb')
@@ -128,9 +128,9 @@ def convert():
                 # 处理bias
                 if bias != None:
                     # 生成量化后的参数
-                    para = conv_layer.get_bias_quantize_value(bias)
+                    para = conv_layer.bias_quantizer.get_quantize_value(bias)
                     if opt.quantized == 1:
-                        bias_scale = -math.log(conv_layer.bias_scale.cpu().data.numpy()[0], 2)
+                        bias_scale = -math.log(conv_layer.bias_quantizer.scale.cpu().data.numpy()[0], 2)
                         a = struct.pack('<i', int(bias_scale))
                         b_scale.write(a)
                     # print(para.shape)

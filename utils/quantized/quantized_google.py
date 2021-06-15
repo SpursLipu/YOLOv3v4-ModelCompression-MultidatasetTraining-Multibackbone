@@ -348,8 +348,6 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         self.name = name
         self.layer_idx = layer_idx
         self.maxabsscaler = maxabsscaler
-        self.a_bits = a_bits
-        self.w_bits = w_bits
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
 
@@ -549,7 +547,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
                 q_weight_max = [np.max(q_weight_txt)]
                 # q_weight_max = np.argmax(q_weight_txt)
-                max_weight_count = [np.sum(abs(q_weight_txt) >= (1 << (self.w_bits - 1)) - 1)]  # 统计该层溢出的数目
+                max_weight_count = [np.sum(abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
                 np.savetxt(('./quantizer_output/max_weight_count/max_w_count_%s.txt' % self.name), max_weight_count)
                 np.savetxt(('./quantizer_output/q_weight_max/max_w_%s.txt' % self.name), q_weight_max)
                 np.savetxt(('./quantizer_output/q_weight_out/q_weight_%s.txt' % self.name), q_weight_txt,
@@ -662,7 +660,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                 q_weight_txt = np.array(q_weight_txt.cpu()).reshape(1, -1)
                 q_weight_max = [np.max(q_weight_txt)]
                 # q_weight_max = np.argmax(q_weight_txt)
-                max_weight_count = [np.sum(abs(q_weight_txt) >= (1 << (self.w_bits - 1)) - 1)]  # 统计该层溢出的数目
+                max_weight_count = [np.sum(abs(q_weight_txt) >= 127)]  # 统计该层溢出的数目
                 np.savetxt(('./quantizer_output/max_weight_count/max_w_count_%s.txt' % self.name), max_weight_count)
                 np.savetxt(('./quantizer_output/q_weight_max/max_w_%s.txt' % self.name), q_weight_max)
                 np.savetxt(('./quantizer_output/q_weight_out/q_weight_%s.txt' % self.name), q_weight_txt,
@@ -808,7 +806,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
                 q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
                 q_activation_max = [np.max(q_activation_txt)]  # 统计该层的最大值(即查看是否有溢出)
-                max_activation_count = [np.sum(abs(q_activation_txt) >= (1 << (self.a_bits - 1)) - 1)]  # 统计该层溢出的数目
+                max_activation_count = [np.sum(abs(q_activation_txt) >= 127)]  # 统计该层溢出的数目
                 # q_weight_max = np.argmax(q_weight_txt)
                 np.savetxt(('./quantizer_output/max_activation_count/max_a_count_%s.txt' % self.name),
                            max_activation_count)
@@ -877,7 +875,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
                 q_activation_txt = np.array(q_activation_txt.cpu()).reshape(1, -1)
                 q_activation_max = [np.max(q_activation_txt)]  # 统计该层的最大值(即查看是否有溢出)
-                max_activation_count = [np.sum(abs(q_activation_txt) >= (1 << (self.a_bits - 1)) - 1)]  # 统计该层溢出的数目
+                max_activation_count = [np.sum(abs(q_activation_txt) >= 127)]  # 统计该层溢出的数目
                 # q_weight_max = np.argmax(q_weight_txt)
                 np.savetxt(('./quantizer_output/max_activation_count/max_a_count_%s.txt' % self.name),
                            max_activation_count)
@@ -1011,7 +1009,8 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
 
 
 class QuantizedFeatureConcat(nn.Module):
-    def __init__(self, layers, groups, bits=8, FPGA=False):
+    def __init__(self, layers, groups, bits=8, FPGA=False,
+                 quantizer_output=False,reorder=False, TM=32, TN=32,name='', layer_idx=-1,):
         super(QuantizedFeatureConcat, self).__init__()
         self.layers = layers  # layer indices
         self.groups = groups
@@ -1019,6 +1018,13 @@ class QuantizedFeatureConcat(nn.Module):
         self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
         self.bits = bits
         self.FPGA = FPGA
+
+        self.quantizer_output = quantizer_output
+        self.reorder = reorder
+        self.TM = TM
+        self.TN = TN
+        self.name = name
+        self.layer_idx = layer_idx
 
     # 量化
     def quantize(self, input):
@@ -1040,6 +1046,22 @@ class QuantizedFeatureConcat(nn.Module):
     def dequantize(self, input):
         output = (input) * self.scale
         return output
+
+    def get_concat_quantize(self, input):
+        for i in self.layers:
+            outputs[i] = self.quantize(outputs[i])  # 量化
+            outputs[i] = self.round(outputs[i])
+            outputs[i] = self.clamp(outputs[i])  # 截断
+        return torch.cat([outputs[i] for i in self.layers], 1)
+
+
+    ################获得量化因子所对应的移位数
+    def get_concat_scale(self):
+        #############移位修正
+        move_scale = math.log2(self.scale)
+        move_scale = np.array(move_scale).reshape(1, -1)
+        return move_scale
+
 
     def forward(self, x, outputs):
         if self.multiple:
@@ -1063,6 +1085,8 @@ class QuantizedFeatureConcat(nn.Module):
                         float_range = floor_float_range
                 self.scale = float_range / quantized_range  # 量化比例因子
             # 量化
+            if quantizer_output == True:
+                
             for i in self.layers:
                 outputs[i] = self.quantize(outputs[i])  # 量化
                 outputs[i] = self.round(outputs[i])

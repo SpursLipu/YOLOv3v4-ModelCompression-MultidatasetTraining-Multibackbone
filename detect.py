@@ -1,4 +1,5 @@
 import argparse
+import subprocess
 
 from models import *  # set ONNX_EXPORT in models.py
 from utils.datasets import *
@@ -6,6 +7,9 @@ from utils.utils import *
 
 
 def detect(save_img=False):
+    if opt.quantizer_output == True:
+        tmp_dir = 'quantizer_output'
+        subprocess.Popen("rm -rf %s" % tmp_dir, shell=True)
     imgsz = (320, 192) if ONNX_EXPORT else opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
     out, source, weights, view_img, save_txt = opt.output, opt.source, opt.weights, opt.view_img, opt.save_txt
     webcam = source == '0' or source.startswith('rtsp') or source.startswith('http') or source.endswith('.txt')

@@ -1029,6 +1029,16 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                 self.scale = float_range / quantized_range  # 量化比例因子
 
             if self.quantizer_output == True:
+                if not os.path.isdir('./quantizer_output/q_activation_out'):
+                    os.makedirs('./quantizer_output/q_activation_out')
+                if not os.path.isdir('./quantizer_output/a_scale_out'):
+                    os.makedirs('./quantizer_output/a_scale_out')
+                if not os.path.isdir('./quantizer_output/q_activation_max'):
+                    os.makedirs('./quantizer_output/q_activation_max')
+                if not os.path.isdir('./quantizer_output/max_activation_count'):
+                    os.makedirs('./quantizer_output/max_activation_count')
+                if not os.path.isdir('./quantizer_output/q_activation_reorder'):
+                    os.makedirs('./quantizer_output/q_activation_reorder')
 
                 if self.layer_idx == -1:
 

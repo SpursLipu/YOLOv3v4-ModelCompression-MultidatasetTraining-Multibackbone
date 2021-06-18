@@ -771,7 +771,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                         print('layer-linear reorder!')
                         temp = a_para[:, 0:remainder_TN, :, :]
                         temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                        temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                        temp = temp.permute(1, 2, 0).contiguous().view(-1)
                         if first:
                             reorder_a_para = temp.clone().cpu().data.numpy()
                             first = False
@@ -781,7 +781,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                         for k in range(num_TN):
                             temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
                             temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                            temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
                             if first:
                                 reorder_a_para = temp.clone().cpu().data.numpy()
                                 first = False
@@ -840,7 +840,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                         print('layer-linear reorder!')
                         temp = a_para[:, 0:remainder_TN, :, :]
                         temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                        temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                        temp = temp.permute(1, 2, 0).contiguous().view(-1)
                         if first:
                             reorder_a_para = temp.clone().cpu().data.numpy()
                             first = False
@@ -850,7 +850,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                         for k in range(num_TN):
                             temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
                             temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                            temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
                             if first:
                                 reorder_a_para = temp.clone().cpu().data.numpy()
                                 first = False
@@ -1067,9 +1067,9 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                     else:  # slice feature
                         q_x_shortcut = q_x_shortcut + q_a_shortcut[:, :nx]
                     # 量化和
-                    q_x_shortcut = self.quantize(q_x_shortcut)  # 量化
-                    q_x_shortcut = self.round(q_x_shortcut)
-                    q_x_shortcut = self.clamp(q_x_shortcut)  # 截断
+                    # q_x_shortcut = self.quantize(q_x_shortcut)  # 量化
+                    # q_x_shortcut = self.round(q_x_shortcut)
+                    # q_x_shortcut = self.clamp(q_x_shortcut)  # 截断
 
                     if self.reorder == True:
                         a_para = q_x_shortcut
@@ -1083,7 +1083,7 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                         for k in range(num_TN):
                             temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
                             temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                            temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
                             if first:
                                 reorder_a_para = temp.clone().cpu().data.numpy()
                                 first = False
@@ -1133,9 +1133,9 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                     else:  # slice feature
                         q_x_shortcut = q_x_shortcut + q_a_shortcut[:, :nx]
                     # 量化和
-                    q_x_shortcut = self.quantize(q_x_shortcut)  # 量化
-                    q_x_shortcut = self.round(q_x_shortcut)
-                    q_x_shortcut = self.clamp(q_x_shortcut)  # 截断
+                    # q_x_shortcut = self.quantize(q_x_shortcut)  # 量化
+                    # q_x_shortcut = self.round(q_x_shortcut)
+                    # q_x_shortcut = self.clamp(q_x_shortcut)  # 截断
 
                     if self.reorder == True:
                         a_para = q_x_shortcut
@@ -1149,7 +1149,7 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                         for k in range(num_TN):
                             temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
                             temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                            temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
                             if first:
                                 reorder_a_para = temp.clone().cpu().data.numpy()
                                 first = False
@@ -1311,7 +1311,7 @@ class QuantizedFeatureConcat(nn.Module):
                         for k in range(num_TN):
                             temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
                             temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                            temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
                             if first:
                                 reorder_a_para = temp.clone().cpu().data.numpy()
                                 first = False
@@ -1359,7 +1359,7 @@ class QuantizedFeatureConcat(nn.Module):
                         for k in range(num_TN):
                             temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
                             temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                            temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
                             if first:
                                 reorder_a_para = temp.clone().cpu().data.numpy()
                                 first = False

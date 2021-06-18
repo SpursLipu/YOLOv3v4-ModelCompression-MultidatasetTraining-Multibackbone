@@ -1028,6 +1028,7 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                         float_range = floor_float_range
                 self.scale = float_range / quantized_range  # 量化比例因子
 
+            # 量化因子数据输出
             if self.quantizer_output == True:
                 if not os.path.isdir('./quantizer_output/q_activation_out'):
                     os.makedirs('./quantizer_output/q_activation_out')
@@ -1049,27 +1050,55 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                     np.savetxt(('./quantizer_output/a_scale_out/shortcut_scale_%s.txt' % self.name), shortcut_scale,
                                delimiter='\n')
 
-                    # 量化x
-                    q_x_shortcut = self.quantize(q_x_shortcut)  # 量化
-                    q_x_shortcut = self.round(q_x_shortcut)
-                    q_x_shortcut = self.clamp(q_x_shortcut)  # 截断
+                elif int(self.name[1:4]) == self.layer_idx:
 
-                    # 量化a
-                    q_a_shortcut = self.quantize(q_a_shortcut)  # 量化
-                    q_a_shortcut = self.round(q_a_shortcut)
-                    q_a_shortcut = self.clamp(q_a_shortcut)  # 截断
+                    q_a_shortcut = a
+                    q_x_shortcut = x
 
-                    # Adjust channels
-                    if nx == na:  # same shape
-                        q_x_shortcut = q_x_shortcut + q_a_shortcut
-                    elif nx > na:  # slice input
-                        q_x_shortcut[:, :na] = q_x_shortcut[:, :na] + q_a_shortcut  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
-                    else:  # slice feature
-                        q_x_shortcut = q_x_shortcut + q_a_shortcut[:, :nx]
-                    # 量化和
-                    # q_x_shortcut = self.quantize(q_x_shortcut)  # 量化
-                    # q_x_shortcut = self.round(q_x_shortcut)
-                    # q_x_shortcut = self.clamp(q_x_shortcut)  # 截断
+                    shortcut_scale = - self.get_shortcut_value(q_x_shortcut, q_a_shortcut, nx, na)
+                    np.savetxt(('./quantizer_output/a_scale_out/shortcut_scale_%s.txt' % self.name), shortcut_scale,
+                               delimiter='\n')
+
+            # 量化x
+            x = self.quantize(x)  # 量化
+            x = self.round(x)
+            x = self.clamp(x)  # 截断
+            x = self.dequantize(x)  # 反量化
+
+            # 量化a
+            a = self.quantize(a)  # 量化
+            a = self.round(a)
+            a = self.clamp(a)  # 截断
+            a = self.dequantize(a)  # 反量化
+
+            # Adjust channels
+            if nx == na:  # same shape
+                x = x + a
+            elif nx > na:  # slice input
+                x[:, :na] = x[:, :na] + a  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
+            else:  # slice feature
+                x = x + a[:, :nx]
+            # 量化和
+            x = self.quantize(x)  # 量化
+            x = self.round(x)
+            x = self.clamp(x)  # 截断
+
+            # 特征图量化数据输出
+            if self.quantizer_output == True:
+                if not os.path.isdir('./quantizer_output/q_activation_out'):
+                    os.makedirs('./quantizer_output/q_activation_out')
+                if not os.path.isdir('./quantizer_output/a_scale_out'):
+                    os.makedirs('./quantizer_output/a_scale_out')
+                if not os.path.isdir('./quantizer_output/q_activation_max'):
+                    os.makedirs('./quantizer_output/q_activation_max')
+                if not os.path.isdir('./quantizer_output/max_activation_count'):
+                    os.makedirs('./quantizer_output/max_activation_count')
+                if not os.path.isdir('./quantizer_output/q_activation_reorder'):
+                    os.makedirs('./quantizer_output/q_activation_reorder')
+
+                if self.layer_idx == -1:
+
+                    q_x_shortcut = x
 
                     if self.reorder == True:
                         a_para = q_x_shortcut
@@ -1107,35 +1136,7 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
 
                 elif int(self.name[1:4]) == self.layer_idx:
 
-                    q_a_shortcut = a
                     q_x_shortcut = x
-
-                    shortcut_scale = - self.get_shortcut_value(q_x_shortcut, q_a_shortcut, nx, na)
-                    np.savetxt(('./quantizer_output/a_scale_out/shortcut_scale_%s.txt' % self.name), shortcut_scale,
-                               delimiter='\n')
-
-                    # 量化x
-                    q_x_shortcut = self.quantize(q_x_shortcut)  # 量化
-                    q_x_shortcut = self.round(q_x_shortcut)
-                    q_x_shortcut = self.clamp(q_x_shortcut)  # 截断
-
-                    # 量化a
-                    q_a_shortcut = self.quantize(q_a_shortcut)  # 量化
-                    q_a_shortcut = self.round(q_a_shortcut)
-                    q_a_shortcut = self.clamp(q_a_shortcut)  # 截断
-
-                    # Adjust channels
-                    if nx == na:  # same shape
-                        q_x_shortcut = q_x_shortcut + q_a_shortcut
-                    elif nx > na:  # slice input
-                        q_x_shortcut[:, :na] = q_x_shortcut[:,
-                                               :na] + q_a_shortcut  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
-                    else:  # slice feature
-                        q_x_shortcut = q_x_shortcut + q_a_shortcut[:, :nx]
-                    # 量化和
-                    # q_x_shortcut = self.quantize(q_x_shortcut)  # 量化
-                    # q_x_shortcut = self.round(q_x_shortcut)
-                    # q_x_shortcut = self.clamp(q_x_shortcut)  # 截断
 
                     if self.reorder == True:
                         a_para = q_x_shortcut
@@ -1171,29 +1172,6 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                     np.savetxt(('./quantizer_output/q_activation_out/Q_shortcut_%s.txt' % self.name), Q_shortcut,
                                delimiter='\n')
 
-            # 量化x
-            x = self.quantize(x)  # 量化
-            x = self.round(x)
-            x = self.clamp(x)  # 截断
-            x = self.dequantize(x)  # 反量化
-
-            # 量化a
-            a = self.quantize(a)  # 量化
-            a = self.round(a)
-            a = self.clamp(a)  # 截断
-            a = self.dequantize(a)  # 反量化
-
-            # Adjust channels
-            if nx == na:  # same shape
-                x = x + a
-            elif nx > na:  # slice input
-                x[:, :na] = x[:, :na] + a  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
-            else:  # slice feature
-                x = x + a[:, :nx]
-            # 量化和
-            x = self.quantize(x)  # 量化
-            x = self.round(x)
-            x = self.clamp(x)  # 截断
             x = self.dequantize(x)  # 反量化
         return x
 
@@ -1305,7 +1283,6 @@ class QuantizedFeatureConcat(nn.Module):
                         # print("use activation reorder!")
                         shape_input = a_para.shape[1]
                         num_TN = int(shape_input / self.TN)
-                        remainder_TN = shape_input % self.TN
                         first = True
                         reorder_a_para = None
                         for k in range(num_TN):
@@ -1353,7 +1330,6 @@ class QuantizedFeatureConcat(nn.Module):
                         # print("use activation reorder!")
                         shape_input = a_para.shape[1]
                         num_TN = int(shape_input / self.TN)
-                        remainder_TN = shape_input % self.TN
                         first = True
                         reorder_a_para = None
                         for k in range(num_TN):

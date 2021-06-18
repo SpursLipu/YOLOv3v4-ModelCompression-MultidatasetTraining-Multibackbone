@@ -511,7 +511,7 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                         print('layer-linear reorder!')
                         temp = a_para[:, 0:remainder_TN, :, :]
                         temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                        temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                        temp = temp.permute(1, 2, 0).contiguous().view(-1)
                         if first:
                             reorder_a_para = temp.clone().cpu().data.numpy()
                             first = False
@@ -521,7 +521,7 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                         for k in range(num_TN):
                             temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
                             temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                            temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
                             if first:
                                 reorder_a_para = temp.clone().cpu().data.numpy()
                                 first = False
@@ -579,17 +579,17 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                         print('layer-linear reorder!')
                         temp = a_para[:, 0:remainder_TN, :, :]
                         temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                        temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                        temp = temp.permute(1, 2, 0).contiguous().view(-1)
                         if first:
                             reorder_a_para = temp.clone().cpu().data.numpy()
                             first = False
                         else:
-                            reorder_a_para = np.append(reorder_a_para, temp.cpu().data.numpy())
+                                                           reorder_a_para = np.append(reorder_a_para, temp.cpu().data.numpy())
                     else:
                         for k in range(num_TN):
                             temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
                             temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
-                            temp = temp.permute(2, 1, 0).contiguous().view(-1)
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
                             if first:
                                 reorder_a_para = temp.clone().cpu().data.numpy()
                                 first = False

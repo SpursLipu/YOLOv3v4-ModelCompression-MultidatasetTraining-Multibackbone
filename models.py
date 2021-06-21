@@ -520,35 +520,19 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
                     modules = FeatureConcat(layers=layers, groups=False)
             else:
                 if 'groups' in mdef:
-                    if shortcut_way == 1:
-                        modules = QuantizedFeatureConcat_min(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
-                                                             quantizer_output=quantizer_output,
-                                                             reorder=reorder, TM=TM, TN=TN,
-                                                             name="{:04d}".format(i) + "_" +
-                                                                  mdef['type'][:4],
-                                                             layer_idx=layer_idx, )
-                    elif shortcut_way == 2:
-                        modules = QuantizedFeatureConcat_max(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
-                                                             quantizer_output=quantizer_output,
-                                                             reorder=reorder, TM=TM, TN=TN,
-                                                             name="{:04d}".format(i) + "_" +
-                                                                  mdef['type'][:4],
-                                                             layer_idx=layer_idx, )
+                    modules = QuantizedFeatureConcat(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
+                                                     quantizer_output=quantizer_output,
+                                                     reorder=reorder, TM=TM, TN=TN,
+                                                     name="{:04d}".format(i) + "_" +
+                                                          mdef['type'][:4],
+                                                     layer_idx=layer_idx, )
                 else:
-                    if shortcut_way == 1:
-                        modules = QuantizedFeatureConcat_min(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
-                                                             quantizer_output=quantizer_output,
-                                                             reorder=reorder, TM=TM, TN=TN,
-                                                             name="{:04d}".format(i) + "_" +
-                                                                  mdef['type'][:4],
-                                                             layer_idx=layer_idx, )
-                    elif shortcut_way == 2:
-                        modules = QuantizedFeatureConcat_max(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
-                                                             quantizer_output=quantizer_output,
-                                                             reorder=reorder, TM=TM, TN=TN,
-                                                             name="{:04d}".format(i) + "_" +
-                                                                  mdef['type'][:4],
-                                                             layer_idx=layer_idx, )
+                    modules = QuantizedFeatureConcat(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
+                                                     quantizer_output=quantizer_output,
+                                                     reorder=reorder, TM=TM, TN=TN,
+                                                     name="{:04d}".format(i) + "_" +
+                                                          mdef['type'][:4],
+                                                     layer_idx=layer_idx, )
 
 
         elif mdef['type'] == 'shortcut':  # nn.Sequential() placeholder for 'shortcut' layer

@@ -906,10 +906,10 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         return weight, bias
 
 
-class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
+class QuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
     def __init__(self, layers, weight=False, bits=8, FPGA=False,
-                 quantizer_output=False,reorder=False, TM=32, TN=32,name='', layer_idx=-1,):
-        super(QuantizedShortcut, self).__init__()
+                 quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
+        super(QuantizedShortcut_max, self).__init__()
         self.layers = layers  # layer indices
         self.weight = weight  # apply weights boolean
         self.n = len(layers) + 1  # number of layers
@@ -951,7 +951,7 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
         output = (input) * self.scale
         return output
 
-    def get_shortcut_value(self,x,a,nx,na):
+    def get_shortcut_value(self, x, a, nx, na):
         # 得到输入两个feature和一个输出的scale
         self.range_tracker_a(x)
         self.range_tracker_x(a)
@@ -1046,7 +1046,7 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                     q_a_shortcut = a
                     q_x_shortcut = x
 
-                    shortcut_scale = - self.get_shortcut_value(q_x_shortcut,q_a_shortcut,nx,na)
+                    shortcut_scale = - self.get_shortcut_value(q_x_shortcut, q_a_shortcut, nx, na)
                     np.savetxt(('./quantizer_output/a_scale_out/shortcut_scale_%s.txt' % self.name), shortcut_scale,
                                delimiter='\n')
 
@@ -1132,7 +1132,8 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
                     ##########shortcut重排序结束
 
                     Q_shortcut = np.array(q_x_shortcut.cpu()).reshape(1, -1)
-                    np.savetxt(('./quantizer_output/q_activation_out/Q_shortcut_%s.txt' % self.name), Q_shortcut,delimiter='\n')
+                    np.savetxt(('./quantizer_output/q_activation_out/Q_shortcut_%s.txt' % self.name), Q_shortcut,
+                               delimiter='\n')
 
                 elif int(self.name[1:4]) == self.layer_idx:
 
@@ -1176,10 +1177,284 @@ class QuantizedShortcut(nn.Module):  # weighted sum of 2 or more layers https://
         return x
 
 
-class QuantizedFeatureConcat(nn.Module):
+class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
+    def __init__(self, layers, weight=False, bits=8, FPGA=False,
+                 quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
+        super(QuantizedShortcut_min, self).__init__()
+        self.layers = layers  # layer indices
+        self.weight = weight  # apply weights boolean
+        self.n = len(layers) + 1  # number of layers
+        self.bits = bits
+        self.FPGA = FPGA
+        self.range_tracker_x = AveragedRangeTracker(q_level='L', out_channels=-1)
+        self.range_tracker_a = AveragedRangeTracker(q_level='L', out_channels=-1)
+        self.range_tracker_sum = AveragedRangeTracker(q_level='L', out_channels=-1)
+        self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
+
+        self.quantizer_output = quantizer_output
+        self.reorder = reorder
+        self.TM = TM
+        self.TN = TN
+        self.name = name
+        self.layer_idx = layer_idx
+
+        if weight:
+            self.w = nn.Parameter(torch.zeros(self.n), requires_grad=True)  # layer weights
+
+    # 量化
+    def quantize(self, input):
+        output = input / self.scale
+        return output
+
+    def round(self, input):
+        output = Round.apply(input)
+        return output
+
+    # 截断
+    def clamp(self, input):
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+        output = torch.clamp(input, min_val, max_val)
+        return output
+
+    # 反量化
+    def dequantize(self, input):
+        output = (input) * self.scale
+        return output
+
+    def get_shortcut_value(self, x, a, nx, na):
+        # 得到输入两个feature和一个输出的scale
+        self.range_tracker_a(x)
+        self.range_tracker_x(a)
+        float_max_val = max(self.range_tracker_x.max_val, self.range_tracker_a.max_val)
+        float_min_val = min(self.range_tracker_x.min_val, self.range_tracker_a.min_val)
+        quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
+        quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+        quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
+        if self.FPGA == False:
+            float_range = torch.max(torch.abs(float_min_val),
+                                    torch.abs(float_max_val))  # 量化前范围
+        else:
+            float_max = torch.max(torch.abs(float_min_val),
+                                  torch.abs(float_max_val))  # 量化前范围
+            floor_float_range = 2 ** float_max.log2().floor()
+            ceil_float_range = 2 ** float_max.log2().ceil()
+            if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                float_range = ceil_float_range
+            else:
+                float_range = floor_float_range
+        shortcut_scale = float_range / quantized_range  # 量化比例因子
+        #############移位修正
+        move_scale = math.log2(shortcut_scale)
+        move_scale = np.array(move_scale).reshape(1, -1)
+        return move_scale
+
+    def forward(self, x, outputs):
+        # Weights
+        if self.weight:
+            w = torch.sigmoid(self.w) * (2 / self.n)  # sigmoid weights (0-1)
+            x = x * w[0]
+
+        # Fusion
+        nx = x.shape[1]  # input channels
+        for i in range(self.n - 1):
+            a = outputs[self.layers[i]] * w[i + 1] if self.weight else outputs[self.layers[i]]  # feature to add
+            na = a.shape[1]  # feature channels
+            if self.training == True:
+                # 得到输入两个feature和一个输出的scale
+                self.range_tracker_a(x)
+                self.range_tracker_x(a)
+                float_max_val = min(self.range_tracker_x.max_val, self.range_tracker_a.max_val)
+                float_min_val = max(self.range_tracker_x.min_val, self.range_tracker_a.min_val)
+                quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
+                quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+                quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
+                if self.FPGA == False:
+                    float_range = torch.max(torch.abs(float_min_val),
+                                            torch.abs(float_max_val))  # 量化前范围
+                else:
+                    float_max = torch.max(torch.abs(float_min_val),
+                                          torch.abs(float_max_val))  # 量化前范围
+                    floor_float_range = 2 ** float_max.log2().floor()
+                    ceil_float_range = 2 ** float_max.log2().ceil()
+                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                        float_range = ceil_float_range
+                    else:
+                        float_range = floor_float_range
+                self.scale = float_range / quantized_range  # 量化比例因子
+
+            # 量化x
+            x = self.quantize(x)  # 量化
+            x = self.round(x)
+            x = self.clamp(x)  # 截断
+            x = self.dequantize(x)  # 反量化
+
+            # 量化a
+            a = self.quantize(a)  # 量化
+            a = self.round(a)
+            a = self.clamp(a)  # 截断
+            a = self.dequantize(a)  # 反量化
+
+            # Adjust channels
+            if nx == na:  # same shape
+                x = x + a
+            elif nx > na:  # slice input
+                x[:, :na] = x[:, :na] + a  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
+            else:  # slice feature
+                x = x + a[:, :nx]
+            # 量化和
+            x = self.quantize(x)  # 量化
+            x = self.round(x)
+            x = self.clamp(x)  # 截断
+            if self.training == True:
+                # 得到输入两个feature和一个输出的scale
+                self.range_tracker_sum(x)
+                float_max_val = self.range_tracker_sum.max_val
+                float_min_val = self.range_tracker_sum.min_val
+                quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
+                quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+                quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
+                if self.FPGA == False:
+                    float_range = torch.max(torch.abs(float_min_val),
+                                            torch.abs(float_max_val))  # 量化前范围
+                else:
+                    float_max = torch.max(torch.abs(float_min_val),
+                                          torch.abs(float_max_val))  # 量化前范围
+                    floor_float_range = 2 ** float_max.log2().floor()
+                    ceil_float_range = 2 ** float_max.log2().ceil()
+                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                        float_range = ceil_float_range
+                    else:
+                        float_range = floor_float_range
+                self.scale = float_range / quantized_range  # 量化比例因子
+            # 量化因子数据输出
+            if self.quantizer_output == True:
+                if not os.path.isdir('./quantizer_output/q_activation_out'):
+                    os.makedirs('./quantizer_output/q_activation_out')
+                if not os.path.isdir('./quantizer_output/a_scale_out'):
+                    os.makedirs('./quantizer_output/a_scale_out')
+                if not os.path.isdir('./quantizer_output/q_activation_max'):
+                    os.makedirs('./quantizer_output/q_activation_max')
+                if not os.path.isdir('./quantizer_output/max_activation_count'):
+                    os.makedirs('./quantizer_output/max_activation_count')
+                if not os.path.isdir('./quantizer_output/q_activation_reorder'):
+                    os.makedirs('./quantizer_output/q_activation_reorder')
+
+                if self.layer_idx == -1:
+
+                    q_a_shortcut = a
+                    q_x_shortcut = x
+
+                    shortcut_scale = - self.get_shortcut_value(q_x_shortcut, q_a_shortcut, nx, na)
+                    np.savetxt(('./quantizer_output/a_scale_out/shortcut_scale_%s.txt' % self.name), shortcut_scale,
+                               delimiter='\n')
+
+                elif int(self.name[1:4]) == self.layer_idx:
+
+                    q_a_shortcut = a
+                    q_x_shortcut = x
+
+                    shortcut_scale = - self.get_shortcut_value(q_x_shortcut, q_a_shortcut, nx, na)
+                    np.savetxt(('./quantizer_output/a_scale_out/shortcut_scale_%s.txt' % self.name), shortcut_scale,
+                               delimiter='\n')
+            # 特征图量化数据输出
+            if self.quantizer_output == True:
+                if not os.path.isdir('./quantizer_output/q_activation_out'):
+                    os.makedirs('./quantizer_output/q_activation_out')
+                if not os.path.isdir('./quantizer_output/a_scale_out'):
+                    os.makedirs('./quantizer_output/a_scale_out')
+                if not os.path.isdir('./quantizer_output/q_activation_max'):
+                    os.makedirs('./quantizer_output/q_activation_max')
+                if not os.path.isdir('./quantizer_output/max_activation_count'):
+                    os.makedirs('./quantizer_output/max_activation_count')
+                if not os.path.isdir('./quantizer_output/q_activation_reorder'):
+                    os.makedirs('./quantizer_output/q_activation_reorder')
+
+                if self.layer_idx == -1:
+
+                    q_x_shortcut = x
+
+                    if self.reorder == True:
+                        a_para = q_x_shortcut
+                        # 重排序参数
+                        # print("use activation reorder!")
+                        shape_input = a_para.shape[1]
+                        num_TN = int(shape_input / self.TN)
+                        remainder_TN = shape_input % self.TN
+                        first = True
+                        reorder_a_para = None
+                        for k in range(num_TN):
+                            temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
+                            temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
+                            if first:
+                                reorder_a_para = temp.clone().cpu().data.numpy()
+                                first = False
+                            else:
+                                reorder_a_para = np.append(reorder_a_para, temp.cpu().data.numpy())
+
+                        a_para_flatten = reorder_a_para
+                        q_activation_reorder = a_para_flatten
+                        q_activation_reorder = np.array(q_activation_reorder).reshape(1, -1)
+                        np.savetxt(('./quantizer_output/q_activation_reorder/r_shortcut_%s.txt' % self.name),
+                                   q_activation_reorder, delimiter='\n')
+                        ###保存重排序的二进制文件
+                        activation_flat = q_activation_reorder.astype(np.int8)
+                        writer = open('./quantizer_output/q_activation_reorder/%s_shortcut_q_bin' % self.name, "wb")
+                        writer.write(activation_flat)
+                        writer.close()
+                    ##########shortcut重排序结束
+
+                    Q_shortcut = np.array(q_x_shortcut.cpu()).reshape(1, -1)
+                    np.savetxt(('./quantizer_output/q_activation_out/Q_shortcut_%s.txt' % self.name), Q_shortcut,
+                               delimiter='\n')
+
+                elif int(self.name[1:4]) == self.layer_idx:
+
+                    q_x_shortcut = x
+
+                    if self.reorder == True:
+                        a_para = q_x_shortcut
+                        # 重排序参数
+                        # print("use activation reorder!")
+                        shape_input = a_para.shape[1]
+                        num_TN = int(shape_input / self.TN)
+                        remainder_TN = shape_input % self.TN
+                        first = True
+                        reorder_a_para = None
+                        for k in range(num_TN):
+                            temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
+                            temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
+                            if first:
+                                reorder_a_para = temp.clone().cpu().data.numpy()
+                                first = False
+                            else:
+                                reorder_a_para = np.append(reorder_a_para, temp.cpu().data.numpy())
+
+                        a_para_flatten = reorder_a_para
+                        q_activation_reorder = a_para_flatten
+                        q_activation_reorder = np.array(q_activation_reorder).reshape(1, -1)
+                        np.savetxt(('./quantizer_output/q_activation_reorder/r_shortcut_%s.txt' % self.name),
+                                   q_activation_reorder, delimiter='\n')
+                        ###保存重排序的二进制文件
+                        activation_flat = q_activation_reorder.astype(np.int8)
+                        writer = open('./quantizer_output/q_activation_reorder/%s_shortcut_q_bin' % self.name, "wb")
+                        writer.write(activation_flat)
+                        writer.close()
+                    ##########shortcut重排序结束
+                    Q_shortcut = np.array(q_x_shortcut.cpu()).reshape(1, -1)
+                    np.savetxt(('./quantizer_output/q_activation_out/Q_shortcut_%s.txt' % self.name), Q_shortcut,
+                               delimiter='\n')
+
+            x = self.dequantize(x)  # 反量化
+        return x
+
+
+class QuantizedFeatureConcat_max(nn.Module):
     def __init__(self, layers, groups, bits=8, FPGA=False,
-                 quantizer_output=False,reorder=False, TM=32, TN=32,name='', layer_idx=-1,):
-        super(QuantizedFeatureConcat, self).__init__()
+                 quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
+        super(QuantizedFeatureConcat_max, self).__init__()
         self.layers = layers  # layer indices
         self.groups = groups
         self.multiple = len(layers) > 1  # multiple layers flag
@@ -1215,7 +1490,7 @@ class QuantizedFeatureConcat(nn.Module):
         output = (input) * self.scale
         return output
 
-    def get_concat_scale(self,outputs):
+    def get_concat_scale(self, outputs):
         float_max_list = []
         quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
         quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
@@ -1238,7 +1513,6 @@ class QuantizedFeatureConcat(nn.Module):
         move_scale = math.log2(concat_scale)
         move_scale = np.array(move_scale).reshape(1, -1)
         return move_scale
-
 
     def forward(self, x, outputs):
         if self.multiple:
@@ -1269,13 +1543,13 @@ class QuantizedFeatureConcat(nn.Module):
 
                     concat_scale = - self.get_concat_scale(q_a_concat)
                     np.savetxt(('./quantizer_output/a_scale_out/concat_scale_%s.txt' % self.name), concat_scale,
-                           delimiter='\n')
+                               delimiter='\n')
 
                     for i in self.layers:
                         q_a_concat[i] = self.quantize(q_a_concat[i])  # 量化
                         q_a_concat[i] = self.round(q_a_concat[i])
                         q_a_concat[i] = self.clamp(q_a_concat[i])  # 截断
-                    Q_concat=torch.cat([q_a_concat[i] for i in self.layers], 1)
+                    Q_concat = torch.cat([q_a_concat[i] for i in self.layers], 1)
 
                     if self.reorder == True:
                         a_para = Q_concat
@@ -1308,7 +1582,8 @@ class QuantizedFeatureConcat(nn.Module):
                     ##########concat重排序结束
 
                     Q_concat = np.array(Q_concat.cpu()).reshape(1, -1)
-                    np.savetxt(('./quantizer_output/q_activation_out/a_concat_%s.txt' % self.name), Q_concat,delimiter='\n')
+                    np.savetxt(('./quantizer_output/q_activation_out/a_concat_%s.txt' % self.name), Q_concat,
+                               delimiter='\n')
 
 
                 elif int(self.name[1:4]) == self.layer_idx:
@@ -1357,6 +1632,200 @@ class QuantizedFeatureConcat(nn.Module):
                     np.savetxt(('./quantizer_output/q_activation_out/a_concat_%s.txt' % self.name), Q_concat,
                                delimiter='\n')
 
+            # 量化
+            for i in self.layers:
+                outputs[i] = self.quantize(outputs[i])  # 量化
+                outputs[i] = self.round(outputs[i])
+                outputs[i] = self.clamp(outputs[i])  # 截断
+                outputs[i] = self.dequantize(outputs[i])  # 反量化
+            return torch.cat([outputs[i] for i in self.layers], 1)
+        else:
+            if self.groups:
+                return x[:, (x.shape[1] // 2):]
+            else:
+                return outputs[self.layers[0]]
+
+
+class QuantizedFeatureConcat_min(nn.Module):
+    def __init__(self, layers, groups, bits=8, FPGA=False,
+                 quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
+        super(QuantizedFeatureConcat_min, self).__init__()
+        self.layers = layers  # layer indices
+        self.groups = groups
+        self.multiple = len(layers) > 1  # multiple layers flag
+        self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
+        self.bits = bits
+        self.FPGA = FPGA
+
+        self.quantizer_output = quantizer_output
+        self.reorder = reorder
+        self.TM = TM
+        self.TN = TN
+        self.name = name
+        self.layer_idx = layer_idx
+
+    # 量化
+    def quantize(self, input):
+        output = input / self.scale
+        return output
+
+    def round(self, input):
+        output = Round.apply(input)
+        return output
+
+    # 截断
+    def clamp(self, input):
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+        output = torch.clamp(input, min_val, max_val)
+        return output
+
+    # 反量化
+    def dequantize(self, input):
+        output = (input) * self.scale
+        return output
+
+    def get_concat_scale(self, outputs):
+        float_max_list = []
+        quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
+        quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+        quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
+        for i in self.layers:
+            float_max_list.append(torch.max(outputs[i]))
+            float_max_list.append(torch.abs(torch.min(outputs[i])))
+        if self.FPGA == False:
+            float_range = min(float_max_list).unsqueeze(0)  # 量化前范围
+        else:
+            float_max = max(float_max_list).unsqueeze(0)  # 量化前范围
+            floor_float_range = 2 ** float_max.log2().floor()
+            ceil_float_range = 2 ** float_max.log2().ceil()
+            if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                float_range = ceil_float_range
+            else:
+                float_range = floor_float_range
+        concat_scale = float_range / quantized_range
+        #############移位修正
+        move_scale = math.log2(concat_scale)
+        move_scale = np.array(move_scale).reshape(1, -1)
+        return move_scale
+
+    def forward(self, x, outputs):
+        if self.multiple:
+            if self.training == True:
+                float_max_list = []
+                quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
+                quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+                quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
+                for i in self.layers:
+                    float_max_list.append(torch.max(outputs[i]))
+                    float_max_list.append(torch.abs(torch.min(outputs[i])))
+                if self.FPGA == False:
+                    float_range = min(float_max_list).unsqueeze(0)  # 量化前范围
+                else:
+                    float_max = max(float_max_list).unsqueeze(0)  # 量化前范围
+                    floor_float_range = 2 ** float_max.log2().floor()
+                    ceil_float_range = 2 ** float_max.log2().ceil()
+                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                        float_range = ceil_float_range
+                    else:
+                        float_range = floor_float_range
+                self.scale = float_range / quantized_range  # 量化比例因子
+
+            if self.quantizer_output == True:
+
+                if self.layer_idx == -1:
+                    q_a_concat = outputs
+
+                    concat_scale = - self.get_concat_scale(q_a_concat)
+                    np.savetxt(('./quantizer_output/a_scale_out/concat_scale_%s.txt' % self.name), concat_scale,
+                               delimiter='\n')
+
+                    for i in self.layers:
+                        q_a_concat[i] = self.quantize(q_a_concat[i])  # 量化
+                        q_a_concat[i] = self.round(q_a_concat[i])
+                        q_a_concat[i] = self.clamp(q_a_concat[i])  # 截断
+                    Q_concat = torch.cat([q_a_concat[i] for i in self.layers], 1)
+
+                    if self.reorder == True:
+                        a_para = Q_concat
+                        # 重排序参数
+                        # print("use activation reorder!")
+                        shape_input = a_para.shape[1]
+                        num_TN = int(shape_input / self.TN)
+                        first = True
+                        reorder_a_para = None
+                        for k in range(num_TN):
+                            temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
+                            temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
+                            if first:
+                                reorder_a_para = temp.clone().cpu().data.numpy()
+                                first = False
+                            else:
+                                reorder_a_para = np.append(reorder_a_para, temp.cpu().data.numpy())
+
+                        a_para_flatten = reorder_a_para
+                        q_activation_reorder = a_para_flatten
+                        q_activation_reorder = np.array(q_activation_reorder).reshape(1, -1)
+                        np.savetxt(('./quantizer_output/q_activation_reorder/r_concat_%s.txt' % self.name),
+                                   q_activation_reorder, delimiter='\n')
+                        ###保存重排序的二进制文件
+                        activation_flat = q_activation_reorder.astype(np.int8)
+                        writer = open('./quantizer_output/q_activation_reorder/%s_concat_q_bin' % self.name, "wb")
+                        writer.write(activation_flat)
+                        writer.close()
+                    ##########concat重排序结束
+
+                    Q_concat = np.array(Q_concat.cpu()).reshape(1, -1)
+                    np.savetxt(('./quantizer_output/q_activation_out/a_concat_%s.txt' % self.name), Q_concat,
+                               delimiter='\n')
+
+
+                elif int(self.name[1:4]) == self.layer_idx:
+                    q_a_concat = outputs
+
+                    concat_scale = - self.get_concat_scale(q_a_concat)
+                    np.savetxt(('./quantizer_output/a_scale_out/concat_scale_%s.txt' % self.name), concat_scale,
+                               delimiter='\n')
+
+                    for i in self.layers:
+                        q_a_concat[i] = self.quantize(q_a_concat[i])  # 量化
+                        q_a_concat[i] = self.round(q_a_concat[i])
+                        q_a_concat[i] = self.clamp(q_a_concat[i])  # 截断
+                    Q_concat = torch.cat([q_a_concat[i] for i in self.layers], 1)
+
+                    if self.reorder == True:
+                        a_para = Q_concat
+                        # 重排序参数
+                        # print("use activation reorder!")
+                        shape_input = a_para.shape[1]
+                        num_TN = int(shape_input / self.TN)
+                        first = True
+                        reorder_a_para = None
+                        for k in range(num_TN):
+                            temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
+                            temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
+                            if first:
+                                reorder_a_para = temp.clone().cpu().data.numpy()
+                                first = False
+                            else:
+                                reorder_a_para = np.append(reorder_a_para, temp.cpu().data.numpy())
+
+                        a_para_flatten = reorder_a_para
+                        q_activation_reorder = a_para_flatten
+                        q_activation_reorder = np.array(q_activation_reorder).reshape(1, -1)
+                        np.savetxt(('./quantizer_output/q_activation_reorder/r_concat_%s.txt' % self.name),
+                                   q_activation_reorder, delimiter='\n')
+                        ###保存重排序的二进制文件
+                        activation_flat = q_activation_reorder.astype(np.int8)
+                        writer = open('./quantizer_output/q_activation_reorder/%s_concat_q_bin' % self.name, "wb")
+                        writer.write(activation_flat)
+                        writer.close()
+                    ##########concat重排序结束
+                    Q_concat = np.array(Q_concat.cpu()).reshape(1, -1)
+                    np.savetxt(('./quantizer_output/q_activation_out/a_concat_%s.txt' % self.name), Q_concat,
+                               delimiter='\n')
 
             # 量化
             for i in self.layers:

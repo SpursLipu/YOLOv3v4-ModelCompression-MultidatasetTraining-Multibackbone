@@ -109,7 +109,8 @@ def train(hyp):
     # Initialize model
     steps = math.ceil(len(open(train_path).readlines()) / batch_size) * epochs
     model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
-                    FPGA=opt.FPGA, steps=steps, is_gray_scale=opt.gray_scale, maxabsscaler=opt.maxabsscaler).to(device)
+                    FPGA=opt.FPGA, steps=steps, is_gray_scale=opt.gray_scale, maxabsscaler=opt.maxabsscaler,
+                    shortcut_way=opt.shortcut_way).to(device)
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
 
@@ -505,7 +506,8 @@ def train(hyp):
                                       FPGA=opt.FPGA,
                                       rank=opt.local_rank,
                                       plot=True,
-                                      maxabsscaler=opt.maxabsscaler)
+                                      maxabsscaler=opt.maxabsscaler,
+                                      shortcut_way=opt.shortcut_way)
             torch.cuda.empty_cache()
         # Write
         if opt.local_rank in [-1, 0]:
@@ -614,6 +616,7 @@ if __name__ == '__main__':
     parser.add_argument('--prune', type=int, default=-1,
                         help='0:nomal prune or regular prune 1:shortcut prune 2:layer prune')
     parser.add_argument('--quantized', type=int, default=-1, help='quantization way')
+    parser.add_argument('--shortcut_way', type=int, default=-1, help='--shortcut quantization way')
     parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', '-FPGA', dest='FPGA', action='store_true', help='FPGA')

@@ -15,7 +15,7 @@ def convert():
 
     # Initialize model
     model = Darknet(opt.cfg, img_size, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
-                    FPGA=opt.FPGA, is_gray_scale=opt.gray_scale)
+                    FPGA=opt.FPGA, is_gray_scale=opt.gray_scale, shortcut_way=opt.shortcut_way)
 
     # Load weights
     attempt_download(weights)
@@ -109,7 +109,9 @@ def convert():
                         for k in range(num_TN):
                             temp = para[0:remainder_TM, k * opt.TN:(k + 1) * opt.TN, :, :]
                             temp = temp.view(temp.shape[0], temp.shape[1], temp.shape[2] * temp.shape[3])
-                            temp = temp.permute(2, 0, 1).contiguous().view(-1)
+                            fill = torch.zeros(opt.TM, opt.TN, temp.shape[2]).to(temp.device)
+                            fill[0:remainder_TM, :, :] = temp
+                            temp = fill.permute(2, 0, 1).contiguous().view(-1)
                             if first:
                                 reorder_para = temp.clone().cpu().data.numpy()
                                 first = False
@@ -119,6 +121,12 @@ def convert():
                     para_flatten = reorder_para
                     if shape_input == 3 or (opt.gray_scale and shape_input == 1):
                         if para_flatten.size == para.shape[0] * 32 * para.shape[2] * para.shape[3]:
+                            print("convert correctly!")
+                        else:
+                            print("convert mismatchingly!")
+                    elif mdef['activation'] == 'linear':
+                        if para_flatten.size == ((para.shape[0]) // 32 + 1) * 32 * para.shape[1] * para.shape[2] * \
+                                para.shape[3]:
                             print("convert correctly!")
                         else:
                             print("convert mismatchingly!")
@@ -163,6 +171,7 @@ if __name__ == '__main__':
     parser.add_argument('--nms-thres', type=float, default=0.8, help='iou threshold for non-maximum suppression')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
     parser.add_argument('--quantized', type=int, default=-1, help='quantization way')
+    parser.add_argument('--shortcut_way', type=int, default=-1, help='--shortcut quantization way')
     parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')

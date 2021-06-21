@@ -14,7 +14,7 @@ ONNX_EXPORT = False
 # YOLO
 def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, layer_idx, reorder, TM, TN, a_bit=8,
                    w_bit=8,
-                   FPGA=False, steps=0, is_gray_scale=False, maxabsscaler=False):
+                   FPGA=False, steps=0, is_gray_scale=False, maxabsscaler=False, shortcut_way=-1):
     # Constructs module list of layer blocks from module configuration in module_defs
 
     img_size = [img_size] * 2 if isinstance(img_size, int) else img_size  # expand if necessary
@@ -520,17 +520,35 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
                     modules = FeatureConcat(layers=layers, groups=False)
             else:
                 if 'groups' in mdef:
-                    modules = QuantizedFeatureConcat(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,quantizer_output=quantizer_output,
-                                                                                       reorder=reorder, TM=TM, TN=TN,
-                                                                                       name="{:04d}".format(i) + "_" +
-                                                                                            mdef['type'][:4],
-                                                                                       layer_idx=layer_idx,)
+                    if shortcut_way == 1:
+                        modules = QuantizedFeatureConcat_min(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
+                                                             quantizer_output=quantizer_output,
+                                                             reorder=reorder, TM=TM, TN=TN,
+                                                             name="{:04d}".format(i) + "_" +
+                                                                  mdef['type'][:4],
+                                                             layer_idx=layer_idx, )
+                    elif shortcut_way == 2:
+                        modules = QuantizedFeatureConcat_max(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
+                                                             quantizer_output=quantizer_output,
+                                                             reorder=reorder, TM=TM, TN=TN,
+                                                             name="{:04d}".format(i) + "_" +
+                                                                  mdef['type'][:4],
+                                                             layer_idx=layer_idx, )
                 else:
-                    modules = QuantizedFeatureConcat(layers=layers, groups=False, bits=a_bit, FPGA=FPGA,quantizer_output=quantizer_output,
-                                                                                       reorder=reorder, TM=TM, TN=TN,
-                                                                                       name="{:04d}".format(i) + "_" +
-                                                                                            mdef['type'][:4],
-                                                                                       layer_idx=layer_idx,)
+                    if shortcut_way == 1:
+                        modules = QuantizedFeatureConcat_min(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
+                                                             quantizer_output=quantizer_output,
+                                                             reorder=reorder, TM=TM, TN=TN,
+                                                             name="{:04d}".format(i) + "_" +
+                                                                  mdef['type'][:4],
+                                                             layer_idx=layer_idx, )
+                    elif shortcut_way == 2:
+                        modules = QuantizedFeatureConcat_max(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
+                                                             quantizer_output=quantizer_output,
+                                                             reorder=reorder, TM=TM, TN=TN,
+                                                             name="{:04d}".format(i) + "_" +
+                                                                  mdef['type'][:4],
+                                                             layer_idx=layer_idx, )
 
 
         elif mdef['type'] == 'shortcut':  # nn.Sequential() placeholder for 'shortcut' layer
@@ -540,14 +558,20 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
             if quantized == -1 or quantized == 2:
                 modules = Shortcut(layers=layers, weight='weights_type' in mdef)
             else:
-                modules = QuantizedShortcut(layers=layers, weight='weights_type' in mdef, bits=a_bit, FPGA=FPGA,
-                                            quantizer_output=quantizer_output,
-                                            reorder=reorder, TM=TM, TN=TN,
-                                            name="{:04d}".format(i) + "_" +
-                                                 mdef['type'][:4],
-                                            layer_idx=layer_idx,)
-
-
+                if shortcut_way == 1:
+                    modules = QuantizedShortcut_min(layers=layers, weight='weights_type' in mdef, bits=a_bit, FPGA=FPGA,
+                                                    quantizer_output=quantizer_output,
+                                                    reorder=reorder, TM=TM, TN=TN,
+                                                    name="{:04d}".format(i) + "_" +
+                                                         mdef['type'][:4],
+                                                    layer_idx=layer_idx, )
+                elif shortcut_way == 2:
+                    modules = QuantizedShortcut_max(layers=layers, weight='weights_type' in mdef, bits=a_bit, FPGA=FPGA,
+                                                    quantizer_output=quantizer_output,
+                                                    reorder=reorder, TM=TM, TN=TN,
+                                                    name="{:04d}".format(i) + "_" +
+                                                         mdef['type'][:4],
+                                                    layer_idx=layer_idx, )
 
         elif mdef['type'] == 'reorg3d':  # yolov3-spp-pan-scale
             pass
@@ -685,7 +709,7 @@ class Darknet(nn.Module):
 
     def __init__(self, cfg, img_size=(416, 416), verbose=False, quantized=-1, a_bit=8, w_bit=8, FPGA=False,
                  quantizer_output=False, layer_idx=-1, reorder=False, TM=32, TN=32, steps=0, is_gray_scale=False,
-                 maxabsscaler=False):
+                 maxabsscaler=False, shortcut_way=-1):
         super(Darknet, self).__init__()
 
         if isinstance(cfg, str):
@@ -707,7 +731,8 @@ class Darknet(nn.Module):
                                                       quantizer_output=self.quantizer_output, reorder=self.reorder,
                                                       TM=self.TM, TN=self.TN, layer_idx=self.layer_idx,
                                                       a_bit=self.a_bit, w_bit=self.w_bit, FPGA=self.FPGA, steps=steps,
-                                                      is_gray_scale=is_gray_scale, maxabsscaler=maxabsscaler)
+                                                      is_gray_scale=is_gray_scale, maxabsscaler=maxabsscaler,
+                                                      shortcut_way=shortcut_way)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)
 
@@ -765,7 +790,8 @@ class Darknet(nn.Module):
 
         for i, module in enumerate(self.module_list):
             name = module.__class__.__name__
-            if name in ['Shortcut', 'FeatureConcat', 'QuantizedShortcut', 'QuantizedFeatureConcat']:  # sum, concat
+            if name in ['Shortcut', 'FeatureConcat', 'QuantizedShortcut_max', 'QuantizedShortcut_min',
+                        'QuantizedFeatureConcat_max', 'QuantizedFeatureConcat_min']:  # sum, concat
                 if verbose:
                     l = [i - 1] + module.layers  # layers
                     sh = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes

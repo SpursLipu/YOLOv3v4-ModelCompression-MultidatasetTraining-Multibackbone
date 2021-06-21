@@ -24,7 +24,7 @@ def detect(save_img=False):
     model = Darknet(opt.cfg, imgsz, quantized=opt.quantized, quantizer_output=opt.quantizer_output,
                     layer_idx=opt.layer_idx,
                     reorder=opt.reorder, TN=opt.TN, TM=opt.TM, a_bit=opt.a_bit, w_bit=opt.w_bit, FPGA=opt.FPGA,
-                    is_gray_scale=opt.gray_scale, maxabsscaler=opt.maxabsscaler)
+                    is_gray_scale=opt.gray_scale, maxabsscaler=opt.maxabsscaler, shortcut_way=opt.shortcut_way)
 
     # Load weights
     attempt_download(weights)
@@ -165,6 +165,7 @@ if __name__ == '__main__':
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--quantized', type=int, default=0, help='quantization way')
+    parser.add_argument('--shortcut_way', type=int, default=-1, help='--shortcut quantization way')
     parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')

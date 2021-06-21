@@ -27,7 +27,8 @@ def test(cfg,
          rank=-1,
          plot=True,
          is_gray_scale=False,
-         maxabsscaler=False):
+         maxabsscaler=False,
+         shortcut_way=-1):
     # Initialize/load model and set device
     if model is None:
         device = torch_utils.select_device(opt.device, batch_size=batch_size)
@@ -39,7 +40,7 @@ def test(cfg,
 
         # Initialize model
         model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit,
-                        FPGA=FPGA, is_gray_scale=is_gray_scale, maxabsscaler=maxabsscaler)
+                        FPGA=FPGA, is_gray_scale=is_gray_scale, maxabsscaler=maxabsscaler, shortcut_way=shortcut_way)
 
         # Load weights
         attempt_download(weights)
@@ -268,6 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--quantized', type=int, default=-1, help='quantization way')
+    parser.add_argument('--shortcut_way', type=int, default=-1, help='--shortcut quantization way')
     parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
@@ -299,7 +301,8 @@ if __name__ == '__main__':
              FPGA=opt.FPGA,
              rank=-1,
              is_gray_scale=opt.gray_scale,
-             maxabsscaler=opt.maxabsscaler)
+             maxabsscaler=opt.maxabsscaler,
+             shortcut_way=opt.shortcut_way)
 
     elif opt.task == 'benchmark':  # mAPs at 256-640 at conf 0.5 and 0.7
         y = []

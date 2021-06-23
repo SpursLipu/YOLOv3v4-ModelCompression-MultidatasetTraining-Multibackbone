@@ -25,7 +25,9 @@ def PTQ(cfg,
     print('')  # skip a line
     # Initialize model
     model = Darknet(cfg, is_gray_scale=opt.gray_scale)
-    q_model = Darknet(cfg, quantized=5, a_bit=a_bit, w_bit=w_bit, FPGA=True, is_gray_scale=opt.gray_scale)
+    q_model = Darknet(cfg, quantized=5, a_bit=a_bit, w_bit=w_bit, FPGA=True, is_gray_scale=opt.gray_scale,
+                      maxabsscaler=opt.maxabsscaler,
+                      shortcut_way=opt.shortcut_way)
 
     # Load weights
     attempt_download(weights)
@@ -78,7 +80,12 @@ def PTQ(cfg,
     print('<.....................Quantize.......................>')
 
     for batch_i, (imgs, _, _, _) in enumerate(tqdm(c_dataloader)):
-        imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
+        if opt.maxabsscaler:
+            imgs = imgs.to(device).float() / 256.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
+            imgs = imgs * 2 - 1
+        else:
+            imgs = imgs.to(device).float() / 256.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
+
         # Disable gradients
         with torch.no_grad():
             _, _ = q_model(imgs, augment=augment)  # inference and training outputs
@@ -127,7 +134,8 @@ if __name__ == '__main__':
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
     parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
-
+    parser.add_argument('--maxabsscaler', '-mas', action='store_true', help='Standarize input to (-1,1)')
+    parser.add_argument('--shortcut_way', type=int, default=-1, help='--shortcut quantization way')
     opt = parser.parse_args()
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
     opt.t_data = list(glob.iglob('./**/' + opt.t_data, recursive=True))[0]  # find file

@@ -527,7 +527,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
                                                           mdef['type'][:4],
                                                      layer_idx=layer_idx, )
                 else:
-                    modules = QuantizedFeatureConcat(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
+                    modules = QuantizedFeatureConcat(layers=layers, groups=False, bits=a_bit, FPGA=FPGA,
                                                      quantizer_output=quantizer_output,
                                                      reorder=reorder, TM=TM, TN=TN,
                                                      name="{:04d}".format(i) + "_" +
@@ -775,7 +775,7 @@ class Darknet(nn.Module):
         for i, module in enumerate(self.module_list):
             name = module.__class__.__name__
             if name in ['Shortcut', 'FeatureConcat', 'QuantizedShortcut_max', 'QuantizedShortcut_min',
-                        'QuantizedFeatureConcat_max', 'QuantizedFeatureConcat_min']:  # sum, concat
+                        'QuantizedFeatureConcat']:  # sum, concat
                 if verbose:
                     l = [i - 1] + module.layers  # layers
                     sh = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes

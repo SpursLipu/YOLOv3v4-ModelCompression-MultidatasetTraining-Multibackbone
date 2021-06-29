@@ -1189,6 +1189,7 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
         self.range_tracker_x = AveragedRangeTracker(q_level='L', out_channels=-1)
         self.range_tracker_a = AveragedRangeTracker(q_level='L', out_channels=-1)
         self.range_tracker_sum = AveragedRangeTracker(q_level='L', out_channels=-1)
+        self.register_buffer('input_scale', torch.zeros(1))  # 量化比例因子
         self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
 
         self.quantizer_output = quantizer_output
@@ -1202,8 +1203,11 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
             self.w = nn.Parameter(torch.zeros(self.n), requires_grad=True)  # layer weights
 
     # 量化
-    def quantize(self, input):
-        output = input / self.scale
+    def quantize(self, input, featrure_in=False):
+        if featrure_in:
+            output = input / self.input_scale
+        else:
+            output = input / self.scale
         return output
 
     def round(self, input):
@@ -1218,36 +1222,12 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
         return output
 
     # 反量化
-    def dequantize(self, input):
-        output = (input) * self.scale
-        return output
-
-    def get_shortcut_value(self, x, a, nx, na):
-        # 得到输入两个feature和一个输出的scale
-        self.range_tracker_a(x)
-        self.range_tracker_x(a)
-        float_max_val = max(self.range_tracker_x.max_val, self.range_tracker_a.max_val)
-        float_min_val = min(self.range_tracker_x.min_val, self.range_tracker_a.min_val)
-        quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
-        quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
-        quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
-        if self.FPGA == False:
-            float_range = torch.max(torch.abs(float_min_val),
-                                    torch.abs(float_max_val))  # 量化前范围
+    def dequantize(self, input, featrure_in=False):
+        if featrure_in:
+            output = (input) * self.input_scale
         else:
-            float_max = torch.max(torch.abs(float_min_val),
-                                  torch.abs(float_max_val))  # 量化前范围
-            floor_float_range = 2 ** float_max.log2().floor()
-            ceil_float_range = 2 ** float_max.log2().ceil()
-            if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                float_range = ceil_float_range
-            else:
-                float_range = floor_float_range
-        shortcut_scale = float_range / quantized_range  # 量化比例因子
-        #############移位修正
-        move_scale = math.log2(shortcut_scale)
-        move_scale = np.array(move_scale).reshape(1, -1)
-        return move_scale
+            output = (input) * self.scale
+        return output
 
     def forward(self, x, outputs):
         # Weights
@@ -1262,8 +1242,8 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
             na = a.shape[1]  # feature channels
             if self.training == True:
                 # 得到输入两个feature和一个输出的scale
-                self.range_tracker_a(x)
-                self.range_tracker_x(a)
+                self.range_tracker_a(a)
+                self.range_tracker_x(x)
                 float_max_val = min(self.range_tracker_x.max_val, self.range_tracker_a.max_val)
                 float_min_val = max(self.range_tracker_x.min_val, self.range_tracker_a.min_val)
                 quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
@@ -1281,19 +1261,19 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
                         float_range = ceil_float_range
                     else:
                         float_range = floor_float_range
-                self.scale = float_range / quantized_range  # 量化比例因子
+                self.input_scale = float_range / quantized_range  # 量化比例因子
 
             # 量化x
-            x = self.quantize(x)  # 量化
+            x = self.quantize(x, featrure_in=True)  # 量化
             x = self.round(x)
             x = self.clamp(x)  # 截断
-            x = self.dequantize(x)  # 反量化
+            x = self.dequantize(x, featrure_in=True)  # 反量化
 
             # 量化a
-            a = self.quantize(a)  # 量化
+            a = self.quantize(a, featrure_in=True)  # 量化
             a = self.round(a)
             a = self.clamp(a)  # 截断
-            a = self.dequantize(a)  # 反量化
+            a = self.dequantize(a, featrure_in=True)  # 反量化
 
             # Adjust channels
             if nx == na:  # same shape
@@ -1303,9 +1283,6 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
             else:  # slice feature
                 x = x + a[:, :nx]
             # 量化和
-            x = self.quantize(x)  # 量化
-            x = self.round(x)
-            x = self.clamp(x)  # 截断
             if self.training == True:
                 # 得到输入两个feature和一个输出的scale
                 self.range_tracker_sum(x)
@@ -1327,6 +1304,9 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
                     else:
                         float_range = floor_float_range
                 self.scale = float_range / quantized_range  # 量化比例因子
+            x = self.quantize(x)  # 量化
+            x = self.round(x)
+            x = self.clamp(x)  # 截断
             # 量化因子数据输出
             if self.quantizer_output == True:
                 if not os.path.isdir('./quantizer_output/q_activation_out'):
@@ -1342,19 +1322,15 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
 
                 if self.layer_idx == -1:
 
-                    q_a_shortcut = a
-                    q_x_shortcut = x
-
-                    shortcut_scale = - self.get_shortcut_value(q_x_shortcut, q_a_shortcut, nx, na)
+                    move_scale = math.log2(self.scale)
+                    shortcut_scale = - np.array(move_scale).reshape(1, -1)
                     np.savetxt(('./quantizer_output/a_scale_out/shortcut_scale_%s.txt' % self.name), shortcut_scale,
                                delimiter='\n')
 
                 elif int(self.name[1:4]) == self.layer_idx:
 
-                    q_a_shortcut = a
-                    q_x_shortcut = x
-
-                    shortcut_scale = - self.get_shortcut_value(q_x_shortcut, q_a_shortcut, nx, na)
+                    move_scale = math.log2(self.scale)
+                    shortcut_scale = - np.array(move_scale).reshape(1, -1)
                     np.savetxt(('./quantizer_output/a_scale_out/shortcut_scale_%s.txt' % self.name), shortcut_scale,
                                delimiter='\n')
             # 特征图量化数据输出

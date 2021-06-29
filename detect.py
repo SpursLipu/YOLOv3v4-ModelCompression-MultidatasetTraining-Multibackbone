@@ -169,7 +169,7 @@ if __name__ == '__main__':
     parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
-    parser.add_argument('--quantizer_output', type=bool, default=False, help='output')
+    parser.add_argument('--quantizer_output', action='store_true', help='quantizer output')
     parser.add_argument('--layer_idx', type=int, default=-1, help='output')
     parser.add_argument('--reorder', type=bool, default=False, help='reorder')
     parser.add_argument('--TN', type=int, default=32, help='TN')

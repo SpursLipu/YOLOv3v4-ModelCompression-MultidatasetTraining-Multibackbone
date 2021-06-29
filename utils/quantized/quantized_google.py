@@ -1,3 +1,4 @@
+import copy
 import math
 import time
 import numpy as np
@@ -1466,30 +1467,6 @@ class QuantizedFeatureConcat(nn.Module):
         output = (input) * self.scale
         return output
 
-    def get_concat_scale(self, outputs):
-        float_max_list = []
-        quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
-        quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
-        quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
-        for i in self.layers:
-            float_max_list.append(torch.max(outputs[i]))
-            float_max_list.append(torch.abs(torch.min(outputs[i])))
-        if self.FPGA == False:
-            float_range = max(float_max_list).unsqueeze(0)  # 量化前范围
-        else:
-            float_max = max(float_max_list).unsqueeze(0)  # 量化前范围
-            floor_float_range = 2 ** float_max.log2().floor()
-            ceil_float_range = 2 ** float_max.log2().ceil()
-            if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                float_range = ceil_float_range
-            else:
-                float_range = floor_float_range
-        concat_scale = float_range / quantized_range
-        #############移位修正
-        move_scale = math.log2(concat_scale)
-        move_scale = np.array(move_scale).reshape(1, -1)
-        return move_scale
-
     def forward(self, x, outputs):
         if self.multiple:
             if self.training == True:
@@ -1515,9 +1492,10 @@ class QuantizedFeatureConcat(nn.Module):
             if self.quantizer_output == True:
 
                 if self.layer_idx == -1:
-                    q_a_concat = outputs
+                    q_a_concat =copy.deepcopy(outputs)
 
-                    concat_scale = - self.get_concat_scale(q_a_concat)
+                    move_scale = math.log2(self.scale)
+                    concat_scale = -np.array(move_scale).reshape(1, -1)
                     np.savetxt(('./quantizer_output/a_scale_out/concat_scale_%s.txt' % self.name), concat_scale,
                                delimiter='\n')
 
@@ -1560,12 +1538,11 @@ class QuantizedFeatureConcat(nn.Module):
                     Q_concat = np.array(Q_concat.cpu()).reshape(1, -1)
                     np.savetxt(('./quantizer_output/q_activation_out/a_concat_%s.txt' % self.name), Q_concat,
                                delimiter='\n')
-
-
                 elif int(self.name[1:4]) == self.layer_idx:
                     q_a_concat = outputs
 
-                    concat_scale = - self.get_concat_scale(q_a_concat)
+                    move_scale = math.log2(self.scale)
+                    concat_scale = -np.array(move_scale).reshape(1, -1)
                     np.savetxt(('./quantizer_output/a_scale_out/concat_scale_%s.txt' % self.name), concat_scale,
                                delimiter='\n')
 

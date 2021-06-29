@@ -952,41 +952,6 @@ class QuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers http
         output = (input) * self.scale
         return output
 
-    def get_shortcut_value(self, x, a, nx, na):
-        # 得到输入两个feature和一个输出的scale
-        self.range_tracker_a(x)
-        self.range_tracker_x(a)
-        if nx == na:  # same shape
-            self.range_tracker_sum(x + a)
-        elif nx > na:  # slice input
-            self.range_tracker_sum(x[:, :na] + a)  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
-        else:  # slice feature
-            self.range_tracker_sum(x + a[:, :nx])
-        float_max_val = max(self.range_tracker_sum.max_val, self.range_tracker_x.max_val,
-                            self.range_tracker_a.max_val)
-        float_min_val = min(self.range_tracker_sum.min_val, self.range_tracker_x.min_val,
-                            self.range_tracker_a.min_val)
-        quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
-        quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
-        quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
-        if self.FPGA == False:
-            float_range = torch.max(torch.abs(float_min_val),
-                                    torch.abs(float_max_val))  # 量化前范围
-        else:
-            float_max = torch.max(torch.abs(float_min_val),
-                                  torch.abs(float_max_val))  # 量化前范围
-            floor_float_range = 2 ** float_max.log2().floor()
-            ceil_float_range = 2 ** float_max.log2().ceil()
-            if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                float_range = ceil_float_range
-            else:
-                float_range = floor_float_range
-        shortcut_scale = float_range / quantized_range  # 量化比例因子
-        #############移位修正
-        move_scale = math.log2(shortcut_scale)
-        move_scale = np.array(move_scale).reshape(1, -1)
-        return move_scale
-
     def forward(self, x, outputs):
         # Weights
         if self.weight:
@@ -1044,19 +1009,15 @@ class QuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers http
 
                 if self.layer_idx == -1:
 
-                    q_a_shortcut = a
-                    q_x_shortcut = x
-
-                    shortcut_scale = - self.get_shortcut_value(q_x_shortcut, q_a_shortcut, nx, na)
+                    move_scale = math.log2(self.scale)
+                    shortcut_scale = -np.array(move_scale).reshape(1, -1)
                     np.savetxt(('./quantizer_output/a_scale_out/shortcut_scale_%s.txt' % self.name), shortcut_scale,
                                delimiter='\n')
 
                 elif int(self.name[1:4]) == self.layer_idx:
 
-                    q_a_shortcut = a
-                    q_x_shortcut = x
-
-                    shortcut_scale = - self.get_shortcut_value(q_x_shortcut, q_a_shortcut, nx, na)
+                    move_scale = math.log2(self.scale)
+                    shortcut_scale = -np.array(move_scale).reshape(1, -1)
                     np.savetxt(('./quantizer_output/a_scale_out/shortcut_scale_%s.txt' % self.name), shortcut_scale,
                                delimiter='\n')
 
@@ -1492,7 +1453,7 @@ class QuantizedFeatureConcat(nn.Module):
             if self.quantizer_output == True:
 
                 if self.layer_idx == -1:
-                    q_a_concat =copy.deepcopy(outputs)
+                    q_a_concat = copy.deepcopy(outputs)
 
                     move_scale = math.log2(self.scale)
                     concat_scale = -np.array(move_scale).reshape(1, -1)

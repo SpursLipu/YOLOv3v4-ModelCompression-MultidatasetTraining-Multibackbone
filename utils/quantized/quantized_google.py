@@ -1228,13 +1228,11 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
             # 量化x
             x = self.quantize(x, featrure_in=True)  # 量化
             x = self.round(x)
-            x = self.clamp(x)  # 截断
             x = self.dequantize(x, featrure_in=True)  # 反量化
 
             # 量化a
             a = self.quantize(a, featrure_in=True)  # 量化
             a = self.round(a)
-            a = self.clamp(a)  # 截断
             a = self.dequantize(a, featrure_in=True)  # 反量化
 
             # Adjust channels

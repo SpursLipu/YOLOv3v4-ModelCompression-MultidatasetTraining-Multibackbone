@@ -1,5 +1,6 @@
 import argparse
 import subprocess
+import Val_upsample
 
 from models import *  # set ONNX_EXPORT in models.py
 from utils.datasets import *
@@ -183,3 +184,6 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         detect()
+
+        if opt.quantizer_output == True and opt.layer_idx == -1:
+            Val_upsample.Val_upsample(opt.cfg)

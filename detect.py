@@ -186,4 +186,4 @@ if __name__ == '__main__':
         detect()
 
         if opt.quantizer_output == True and opt.layer_idx == -1:
-            Val_upsample.Val_upsample(opt.cfg)
+            Val_upsample.Val_upsample(opt.cfg,opt.TN)

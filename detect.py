@@ -1,6 +1,7 @@
 import argparse
 import subprocess
 import Val_upsample
+import os
 
 from models import *  # set ONNX_EXPORT in models.py
 from utils.datasets import *
@@ -65,6 +66,18 @@ def detect(save_img=False):
         if opt.maxabsscaler:
             img /= 256
             img = img * 2 - 1
+            #输出第一层的要送入卷积的量化数据
+            if opt.quantizer_output == True:
+                if not os.path.isdir('./quantizer_output/'):
+                    os.makedirs('./quantizer_output/')
+                q_img_input= copy.deepcopy(img)
+                q_img_input = q_img_input * (2**(opt.a_bit-1))
+                q_img_input = np.array(q_img_input.cpu()).reshape(1, -1)
+                np.savetxt('./quantizer_output/q_img_input.txt', q_img_input,delimiter='\n')
+                q_img_input = q_img_input.astype(np.int8)
+                writer = open('./quantizer_output/q_img_bin', "wb")
+                writer.write(q_img_input)
+                writer.close()
         else:
             img /= 256.0  # 0 - 255 to 0.0 - 1.0
         if opt.quantized != -1:
@@ -167,12 +180,12 @@ if __name__ == '__main__':
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--quantized', type=int, default=-1, help='quantization way')
     parser.add_argument('--shortcut_way', type=int, default=-1, help='--shortcut quantization way')
-    parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
-    parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
+    parser.add_argument('--a_bit', type=int, default=8, help='a-bit')
+    parser.add_argument('--w_bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')
     parser.add_argument('--quantizer_output', action='store_true', help='quantizer output')
     parser.add_argument('--layer_idx', type=int, default=-1, help='output')
-    parser.add_argument('--reorder', type=bool, default=False, help='reorder')
+    parser.add_argument('--reorder', action='store_true', help='reorder')
     parser.add_argument('--TN', type=int, default=32, help='TN')
     parser.add_argument('--TM', type=int, default=32, help='TM')
     parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')

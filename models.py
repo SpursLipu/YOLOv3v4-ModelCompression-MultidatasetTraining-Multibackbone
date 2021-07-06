@@ -572,7 +572,8 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
                                 img_size=img_size,  # (416, 416)
                                 yolo_index=yolo_index,  # 0, 1, 2...
                                 layers=layers,  # output layers
-                                stride=stride[yolo_index])
+                                stride=stride[yolo_index],
+                                quantizer_output = quantizer_output)
 
             # Initialize preceding Conv2d() bias (https://arxiv.org/pdf/1708.02002.pdf section 3.3)
             try:
@@ -600,7 +601,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
 
 
 class YOLOLayer(nn.Module):
-    def __init__(self, anchors, nc, img_size, yolo_index, layers, stride):
+    def __init__(self, anchors, nc, img_size, yolo_index, layers, stride ,quantizer_output):
         super(YOLOLayer, self).__init__()
         self.anchors = torch.Tensor(anchors)
         self.index = yolo_index  # index of this layer in layers
@@ -613,6 +614,8 @@ class YOLOLayer(nn.Module):
         self.nx, self.ny, self.ng = 0, 0, 0  # initialize number of x, y gridpoints
         self.anchor_vec = self.anchors / self.stride
         self.anchor_wh = self.anchor_vec.view(1, self.na, 1, 1, 2)
+
+        self.quantizer_output = quantizer_output
 
         if ONNX_EXPORT:
             self.training = False
@@ -681,10 +684,30 @@ class YOLOLayer(nn.Module):
 
         else:  # inference
             io = p.clone()  # inference output
+            if self.quantizer_output == True:
+                sigmoid_output = p.clone()
             io[..., :2] = torch.sigmoid(io[..., :2]) + self.grid  # xy
             io[..., 2:4] = torch.exp(io[..., 2:4]) * self.anchor_wh  # wh yolo method
             io[..., :4] *= self.stride
             torch.sigmoid_(io[..., 4:])
+            ##输出
+            if self.quantizer_output == True:
+                xy_sigmoid_output = torch.sigmoid(sigmoid_output[..., :2])
+                cls_sigmoid_output = sigmoid_output[..., 4:]*self.stride
+                cls_sigmoid_output = torch.sigmoid_(cls_sigmoid_output)
+                xy_sigmoid_output = np.array(xy_sigmoid_output.cpu()).reshape(1, -1)
+                np.savetxt(('./quantizer_output/xy_sigmoid_output.txt'), xy_sigmoid_output,
+                           delimiter='\n')
+                writer = open('./quantizer_output/xy_sigmoid_bin', "wb")
+                writer.write(xy_sigmoid_output)
+                writer.close()
+
+                cls_sigmoid_output = np.array(cls_sigmoid_output.cpu()).reshape(1, -1)
+                np.savetxt(('./quantizer_output/cls_sigmoid_output.txt'), cls_sigmoid_output,
+                           delimiter='\n')
+                writer = open('./quantizer_output/cls_sigmoid_bin', "wb")
+                writer.write(cls_sigmoid_output)
+                writer.close()
             return io.view(bs, -1, self.no), p  # view [1, 3, 13, 13, 85] as [1, 507, 85]
 
 

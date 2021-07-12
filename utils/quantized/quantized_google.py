@@ -1435,13 +1435,16 @@ class QuantizedFeatureConcat(nn.Module):
                 quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
                 j = 0
                 for i in self.layers:
+                    temp = outputs[i].detach()
                     if self.float_max_list[j] == 0:
                         self.float_max_list[j].add_(
-                            torch.max(torch.max(outputs[i]), torch.abs(torch.min(outputs[i]))))
+                            torch.max(torch.max(temp), torch.abs(torch.min(temp))))
                     else:
                         self.float_max_list[j].mul_(1 - self.momentum).add_(
-                            torch.max(torch.max(outputs[i]), torch.abs(torch.min(outputs[i]))) * self.momentum)
+                            torch.max(torch.max(temp), torch.abs(torch.min(temp))) * self.momentum)
                     j = j + 1
+                    del temp
+                    torch.cuda.empty_cache()
                 if self.FPGA == False:
                     float_range = max(self.float_max_list).unsqueeze(0)  # 量化前范围
                 else:
@@ -1452,7 +1455,7 @@ class QuantizedFeatureConcat(nn.Module):
                         float_range = ceil_float_range
                     else:
                         float_range = floor_float_range
-                self.scale = (float_range / quantized_range).detach()  # 量化比例因子
+                self.scale = float_range / quantized_range # 量化比例因子
 
             if self.quantizer_output == True:
 

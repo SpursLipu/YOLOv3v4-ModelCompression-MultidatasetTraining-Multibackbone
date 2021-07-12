@@ -1395,17 +1395,18 @@ class QuantizedFeatureConcat(nn.Module):
         self.groups = groups
         self.multiple = len(layers) > 1  # multiple layers flag
         self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
+        self.register_buffer('float_max_list', torch.zeros(len(layers)))
         self.bits = bits
         self.FPGA = FPGA
-
+        self.momentum = 0.1
         self.quantizer_output = quantizer_output
         self.reorder = reorder
         self.TM = TM
         self.TN = TN
         self.name = name
         self.layer_idx = layer_idx
+        # 量化
 
-    # 量化
     def quantize(self, input):
         output = input / self.scale
         return output
@@ -1429,24 +1430,29 @@ class QuantizedFeatureConcat(nn.Module):
     def forward(self, x, outputs):
         if self.multiple:
             if self.training == True:
-                float_max_list = []
                 quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
                 quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
                 quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
+                j = 0
                 for i in self.layers:
-                    float_max_list.append(torch.max(outputs[i]))
-                    float_max_list.append(torch.abs(torch.min(outputs[i])))
+                    if self.float_max_list[j] == 0:
+                        self.float_max_list[j].add_(
+                            torch.max(torch.max(outputs[i]), torch.abs(torch.min(outputs[i]))))
+                    else:
+                        self.float_max_list[j].mul_(1 - self.momentum).add_(
+                            torch.max(torch.max(outputs[i]), torch.abs(torch.min(outputs[i]))) * self.momentum)
+                    j = j + 1
                 if self.FPGA == False:
-                    float_range = max(float_max_list).unsqueeze(0)  # 量化前范围
+                    float_range = max(self.float_max_list).unsqueeze(0)  # 量化前范围
                 else:
-                    float_max = max(float_max_list).unsqueeze(0)  # 量化前范围
+                    float_max = max(self.float_max_list).unsqueeze(0)  # 量化前范围
                     floor_float_range = 2 ** float_max.log2().floor()
                     ceil_float_range = 2 ** float_max.log2().ceil()
                     if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
                         float_range = ceil_float_range
                     else:
                         float_range = floor_float_range
-                self.scale = float_range / quantized_range  # 量化比例因子
+                self.scale = (float_range / quantized_range).detach()  # 量化比例因子
 
             if self.quantizer_output == True:
 

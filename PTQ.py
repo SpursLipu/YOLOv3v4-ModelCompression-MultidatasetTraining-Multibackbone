@@ -24,7 +24,7 @@ def PTQ(cfg,
     print('PTQ only support for one gpu!')
     print('')  # skip a line
     # Initialize model
-    model = Darknet(cfg, is_gray_scale=opt.gray_scale)
+    model = Darknet(cfg, is_gray_scale=opt.gray_scale, maxabsscaler=opt.maxabsscaler)
     q_model = Darknet(cfg, quantized=5, a_bit=a_bit, w_bit=w_bit, FPGA=True, is_gray_scale=opt.gray_scale,
                       maxabsscaler=opt.maxabsscaler,
                       shortcut_way=opt.shortcut_way)
@@ -73,7 +73,8 @@ def PTQ(cfg,
               imgsz=imgsz,
               model=model,
               dataloader=t_dataloader,
-              rank=-1)
+              rank=-1,
+              maxabsscaler=opt.maxabsscaler)
 
     q_model.train()
     print('')  # skip a line
@@ -101,7 +102,8 @@ def PTQ(cfg,
               quantized=4,
               a_bit=opt.a_bit,
               w_bit=opt.w_bit,
-              rank=-1)
+              rank=-1,
+              maxabsscaler=opt.maxabsscaler)
     # Save model
 
     if hasattr(q_model, 'module'):

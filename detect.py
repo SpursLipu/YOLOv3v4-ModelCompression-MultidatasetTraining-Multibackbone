@@ -64,26 +64,37 @@ def detect(save_img=False):
         img = torch.from_numpy(img).to(device)
         img = img.float()  # uint8 to fp16/32
         if opt.maxabsscaler:
-            if opt.quantizer_output == True:
-                val_img= copy.deepcopy(img)
-                val_img = val_img - 128
-            img /= 256
-            img = img * 2 - 1
-            #输出第一层的要送入卷积的量化数据
+            # 输出原始图片
             if opt.quantizer_output == True:
                 if not os.path.isdir('./quantizer_output/'):
                     os.makedirs('./quantizer_output/')
-                q_img_input= copy.deepcopy(img)
-                q_img_input = q_img_input * (2**(opt.a_bit-1))
+                ori_img = copy.deepcopy(img)
+                ori_img_input = np.array(ori_img.cpu()).reshape(1, -1)
+                np.savetxt('./quantizer_output/img_input.txt', ori_img_input, delimiter='\n')
+                ori_img_input = ori_img_input.astype(np.int8)
+                writer = open('./quantizer_output/img_bin', "wb")
+                writer.write(ori_img_input)
+                writer.close()
+
+                val_img = copy.deepcopy(img)
+                val_img = val_img - 128
+            img /= 256
+            img = img * 2 - 1
+            # 输出第一层的要送入卷积的量化数据
+            if opt.quantizer_output == True:
+                if not os.path.isdir('./quantizer_output/'):
+                    os.makedirs('./quantizer_output/')
+                q_img_input = copy.deepcopy(img)
+                q_img_input = q_img_input * (2 ** (opt.a_bit - 1))
 
                 # 软硬件处理方式对比
                 delt = val_img - q_img_input
                 delt = np.array(delt.cpu()).reshape(1, -1)
                 delt_count = [np.sum(abs(delt) > 0)]
-                np.savetxt(('./quantizer_output/not0_count.txt'),delt_count)
+                np.savetxt(('./quantizer_output/not0_count.txt'), delt_count)
 
                 q_img_input = np.array(q_img_input.cpu()).reshape(1, -1)
-                np.savetxt('./quantizer_output/q_img_input.txt', q_img_input,delimiter='\n')
+                np.savetxt('./quantizer_output/q_img_input.txt', q_img_input, delimiter='\n')
                 q_img_input = q_img_input.astype(np.int8)
                 writer = open('./quantizer_output/q_img_bin', "wb")
                 writer.write(q_img_input)
@@ -209,4 +220,4 @@ if __name__ == '__main__':
         detect()
 
         if opt.quantizer_output == True and opt.layer_idx == -1:
-            Val_upsample.Val_upsample(opt.cfg,opt.TN)
+            Val_upsample.Val_upsample(opt.cfg, opt.TN)

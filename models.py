@@ -542,20 +542,40 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
             if quantized == -1 or quantized == 2:
                 modules = Shortcut(layers=layers, weight='weights_type' in mdef)
             else:
-                if shortcut_way == 1:
-                    modules = QuantizedShortcut_min(layers=layers, weight='weights_type' in mdef, bits=a_bit, FPGA=FPGA,
-                                                    quantizer_output=quantizer_output,
-                                                    reorder=reorder, TM=TM, TN=TN,
-                                                    name="{:04d}".format(i) + "_" +
-                                                         mdef['type'][:4],
-                                                    layer_idx=layer_idx, )
-                elif shortcut_way == 2:
-                    modules = QuantizedShortcut_max(layers=layers, weight='weights_type' in mdef, bits=a_bit, FPGA=FPGA,
-                                                    quantizer_output=quantizer_output,
-                                                    reorder=reorder, TM=TM, TN=TN,
-                                                    name="{:04d}".format(i) + "_" +
-                                                         mdef['type'][:4],
-                                                    layer_idx=layer_idx, )
+                if quantized == 5:
+                    if shortcut_way == 1:
+                        modules = COSPTQuantizedShortcut_min(layers=layers, weight='weights_type' in mdef, bits=a_bit,
+                                                             FPGA=FPGA,
+                                                             quantizer_output=quantizer_output,
+                                                             reorder=reorder, TM=TM, TN=TN,
+                                                             name="{:04d}".format(i) + "_" +
+                                                                  mdef['type'][:4],
+                                                             layer_idx=layer_idx, )
+                    elif shortcut_way == 2:
+                        modules = COSPTQuantizedShortcut_max(layers=layers, weight='weights_type' in mdef, bits=a_bit,
+                                                             FPGA=FPGA,
+                                                             quantizer_output=quantizer_output,
+                                                             reorder=reorder, TM=TM, TN=TN,
+                                                             name="{:04d}".format(i) + "_" +
+                                                                  mdef['type'][:4],
+                                                             layer_idx=layer_idx, )
+                else:
+                    if shortcut_way == 1:
+                        modules = QuantizedShortcut_min(layers=layers, weight='weights_type' in mdef, bits=a_bit,
+                                                        FPGA=FPGA,
+                                                        quantizer_output=quantizer_output,
+                                                        reorder=reorder, TM=TM, TN=TN,
+                                                        name="{:04d}".format(i) + "_" +
+                                                             mdef['type'][:4],
+                                                        layer_idx=layer_idx, )
+                    elif shortcut_way == 2:
+                        modules = QuantizedShortcut_max(layers=layers, weight='weights_type' in mdef, bits=a_bit,
+                                                        FPGA=FPGA,
+                                                        quantizer_output=quantizer_output,
+                                                        reorder=reorder, TM=TM, TN=TN,
+                                                        name="{:04d}".format(i) + "_" +
+                                                             mdef['type'][:4],
+                                                        layer_idx=layer_idx, )
 
         elif mdef['type'] == 'reorg3d':  # yolov3-spp-pan-scale
             pass
@@ -573,7 +593,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
                                 yolo_index=yolo_index,  # 0, 1, 2...
                                 layers=layers,  # output layers
                                 stride=stride[yolo_index],
-                                quantizer_output = quantizer_output)
+                                quantizer_output=quantizer_output)
 
             # Initialize preceding Conv2d() bias (https://arxiv.org/pdf/1708.02002.pdf section 3.3)
             try:
@@ -601,7 +621,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
 
 
 class YOLOLayer(nn.Module):
-    def __init__(self, anchors, nc, img_size, yolo_index, layers, stride ,quantizer_output):
+    def __init__(self, anchors, nc, img_size, yolo_index, layers, stride, quantizer_output):
         super(YOLOLayer, self).__init__()
         self.anchors = torch.Tensor(anchors)
         self.index = yolo_index  # index of this layer in layers
@@ -693,7 +713,7 @@ class YOLOLayer(nn.Module):
             ##输出
             if self.quantizer_output == True:
                 xy_sigmoid_output = torch.sigmoid(sigmoid_output[..., :2])
-                cls_sigmoid_output = sigmoid_output[..., 4:]*self.stride
+                cls_sigmoid_output = sigmoid_output[..., 4:] * self.stride
                 cls_sigmoid_output = torch.sigmoid_(cls_sigmoid_output)
                 xy_sigmoid_output = np.array(xy_sigmoid_output.cpu()).reshape(1, -1)
                 np.savetxt(('./quantizer_output/xy_sigmoid_output.txt'), xy_sigmoid_output,
@@ -798,7 +818,8 @@ class Darknet(nn.Module):
         for i, module in enumerate(self.module_list):
             name = module.__class__.__name__
             if name in ['Shortcut', 'FeatureConcat', 'QuantizedShortcut_max', 'QuantizedShortcut_min',
-                        'QuantizedFeatureConcat']:  # sum, concat
+                        'QuantizedFeatureConcat', 'COSPTQuantizedShortcut_min',
+                        'COSPTQuantizedShortcut_max']:  # sum, concat
                 if verbose:
                     l = [i - 1] + module.layers  # layers
                     sh = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes

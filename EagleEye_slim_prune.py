@@ -5,6 +5,7 @@ from utils.datasets import *
 import os
 import test
 import argparse
+from thop import profile
 
 
 def obtain_avg_forward_time(input, model, repeat=200):
@@ -60,6 +61,10 @@ def obtain_l1_mask(conv_module, random_rate):
 
     return mask
 
+#macs = flops / 2
+def performance_summary(model, opt=None, prefix=""):
+    macs, _ = profile(model, inputs=(torch.zeros(1, 3, 480, 640).to(device),), verbose=False)
+    return macs
 
 def rand_prune_and_eval(model, min_rate, max_rate):
     while True:
@@ -94,7 +99,9 @@ def rand_prune_and_eval(model, min_rate, max_rate):
         compact_model = Darknet([model.hyperparams.copy()] + compact_module_defs).to(device)
         current_parameters = obtain_num_parameters(compact_model)
         # print(current_parameters/origin_nparameters, end='；')
-        if current_parameters / origin_nparameters > remain_ratio + delta or current_parameters / origin_nparameters < remain_ratio - delta:
+        current_macs = performance_summary(compact_model)
+        # macs = flops/2
+        if current_macs / origin_macs > remain_ratio + delta or current_macs / origin_macs < remain_ratio - delta:
             # print('missing')
             del model_copy
             del compact_model
@@ -212,6 +219,7 @@ if __name__ == '__main__':
                                         rank=-1,
                                         plot=False)
     origin_nparameters = obtain_num_parameters(model)
+    origin_macs = performance_summary(model)
 
     CBL_idx, Conv_idx, prune_idx, _, _ = parse_module_defs2(model.module_defs)
 
@@ -248,6 +256,10 @@ if __name__ == '__main__':
     compact_module_defs = deepcopy(compact_model_winnner.module_defs)
     compact_nparameters = obtain_num_parameters(compact_model_winnner)
 
+    compact_macs =  performance_summary(compact_model_winnner)
+    compact_flops =  compact_macs*2 / 1024**3
+    origin_flops = origin_macs*2 / 1024**3
+
     random_input = torch.rand((16, 3, 416, 416)).to(device)
 
     pruned_forward_time, pruned_output = obtain_avg_forward_time(random_input, model)
@@ -269,6 +281,7 @@ if __name__ == '__main__':
         ["Metric", "Before", "After"],
         ["mAP", f'{origin_model_metric[1].mean():.6f}', f'{compact_model_metric[1].mean():.6f}'],
         ["Parameters", f"{origin_nparameters}", f"{compact_nparameters}"],
+        ["GFLOPs",f"{origin_flops}",f"{compact_flops}"],
         ["Inference", f'{pruned_forward_time:.4f}', f'{compact_forward_time:.4f}']
     ]
     print(AsciiTable(metric_table).table)

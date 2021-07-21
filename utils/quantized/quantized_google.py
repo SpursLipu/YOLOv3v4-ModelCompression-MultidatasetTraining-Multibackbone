@@ -1455,7 +1455,7 @@ class QuantizedFeatureConcat(nn.Module):
                         float_range = ceil_float_range
                     else:
                         float_range = floor_float_range
-                self.scale = float_range / quantized_range # 量化比例因子
+                self.scale = float_range / quantized_range  # 量化比例因子
 
             if self.quantizer_output == True:
 
@@ -1507,7 +1507,7 @@ class QuantizedFeatureConcat(nn.Module):
                     np.savetxt(('./quantizer_output/q_activation_out/a_concat_%s.txt' % self.name), Q_concat,
                                delimiter='\n')
                 elif int(self.name[1:4]) == self.layer_idx:
-                    q_a_concat = outputs
+                    q_a_concat = copy.deepcopy(outputs)
 
                     move_scale = math.log2(self.scale)
                     concat_scale = -np.array(move_scale).reshape(1, -1)

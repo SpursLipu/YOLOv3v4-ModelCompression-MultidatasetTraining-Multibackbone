@@ -476,7 +476,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
                 #######################输出当前层的权重量化因子
                 weight_scale = - self.weight_quantizer.get_scale()
-                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s' % self.name), weight_scale, delimiter='\n')
+                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s.txt' % self.name), weight_scale, delimiter='\n')
                 #######################输出当前层的量化权重
                 q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
 
@@ -589,7 +589,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
             elif int(self.name[1:4]) == self.layer_idx:
                 #######################输出当前层的权重量化因子
                 weight_scale = - self.weight_quantizer.get_scale()
-                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s' % self.name), weight_scale, delimiter='\n')
+                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s.txt' % self.name), weight_scale, delimiter='\n')
                 #######################输出当前层的量化权重
                 q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
 
@@ -1443,20 +1443,32 @@ class QuantizedFeatureConcat(nn.Module):
                         self.float_max_list[j].mul_(1 - self.momentum).add_(
                             torch.max(torch.max(temp), torch.abs(torch.min(temp))) * self.momentum)
                     j = j + 1
+
                     del temp
                     torch.cuda.empty_cache()
                 if self.FPGA == False:
                     float_range = max(self.float_max_list).unsqueeze(0)  # 量化前范围
+                    self.scale = float_range / quantized_range  # 量化比例因子
                 else:
-                    float_max = max(self.float_max_list).unsqueeze(0)  # 量化前范围
-                    floor_float_range = 2 ** float_max.log2().floor()
-                    ceil_float_range = 2 ** float_max.log2().ceil()
-                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                        float_range = ceil_float_range
-                    else:
-                        float_range = floor_float_range
-                self.scale = float_range / quantized_range  # 量化比例因子
+                    if j > 1:#两个output张量进行concat
+                        float_max =self.float_max_list[0].mul(self.float_max_list[1]).sqrt()
 
+                        floor_float_range = 2 ** float_max.log2().floor()
+                        ceil_float_range = 2 ** float_max.log2().ceil()
+                        if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                            float_range = ceil_float_range
+                        else:
+                            float_range = floor_float_range
+                        self.scale = float_range / quantized_range  # 量化比例因子
+                    else:#1个output张量进行concat
+                        float_max = max(self.float_max_list).unsqueeze(0)  # 量化前范围
+                        floor_float_range = 2 ** float_max.log2().floor()
+                        ceil_float_range = 2 ** float_max.log2().ceil()
+                        if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                            float_range = ceil_float_range
+                        else:
+                            float_range = floor_float_range
+                        self.scale = float_range / quantized_range  # 量化比例因子
             if self.quantizer_output == True:
 
                 if self.layer_idx == -1:

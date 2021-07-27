@@ -1448,27 +1448,16 @@ class QuantizedFeatureConcat(nn.Module):
                     torch.cuda.empty_cache()
                 if self.FPGA == False:
                     float_range = max(self.float_max_list).unsqueeze(0)  # 量化前范围
-                    self.scale = float_range / quantized_range  # 量化比例因子
                 else:
-                    if j > 1:#两个output张量进行concat
-                        float_max =self.float_max_list[0].mul(self.float_max_list[1]).sqrt()
+                    float_max = max(self.float_max_list).unsqueeze(0)  # 量化前范围
+                    floor_float_range = 2 ** float_max.log2().floor()
+                    ceil_float_range = 2 ** float_max.log2().ceil()
+                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                        float_range = ceil_float_range
+                    else:
+                        float_range = floor_float_range
+                self.scale = float_range / quantized_range  # 量化比例因子
 
-                        floor_float_range = 2 ** float_max.log2().floor()
-                        ceil_float_range = 2 ** float_max.log2().ceil()
-                        if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                            float_range = ceil_float_range
-                        else:
-                            float_range = floor_float_range
-                        self.scale = float_range / quantized_range  # 量化比例因子
-                    else:#1个output张量进行concat
-                        float_max = max(self.float_max_list).unsqueeze(0)  # 量化前范围
-                        floor_float_range = 2 ** float_max.log2().floor()
-                        ceil_float_range = 2 ** float_max.log2().ceil()
-                        if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                            float_range = ceil_float_range
-                        else:
-                            float_range = floor_float_range
-                        self.scale = float_range / quantized_range  # 量化比例因子
             if self.quantizer_output == True:
 
                 if self.layer_idx == -1:

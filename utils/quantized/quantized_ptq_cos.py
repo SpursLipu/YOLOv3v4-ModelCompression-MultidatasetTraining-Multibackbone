@@ -228,7 +228,7 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
 
                 #######################输出当前层的权重量化因子
                 weight_scale = - self.weight_quantizer.get_scale()
-                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s' % self.name), weight_scale, delimiter='\n')
+                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s.txt' % self.name), weight_scale, delimiter='\n')
                 #######################输出当前层的量化权重
                 q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
 
@@ -340,7 +340,7 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
             elif int(self.name[1:4]) == self.layer_idx:
                 #######################输出当前层的权重量化因子
                 weight_scale = - self.weight_quantizer.get_scale()
-                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s' % self.name), weight_scale, delimiter='\n')
+                np.savetxt(('./quantizer_output/w_scale_out/w_scale_%s.txt' % self.name), weight_scale, delimiter='\n')
                 #######################输出当前层的量化权重
                 q_weight_txt = self.weight_quantizer.get_quantize_value(weight)
 

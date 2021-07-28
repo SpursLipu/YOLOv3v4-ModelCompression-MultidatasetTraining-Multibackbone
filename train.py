@@ -616,7 +616,7 @@ if __name__ == '__main__':
     parser.add_argument('--prune', type=int, default=-1,
                         help='0:nomal prune or regular prune 1:shortcut prune 2:layer prune')
     parser.add_argument('--quantized', type=int, default=-1, help='quantization way')
-    parser.add_argument('--shortcut_way', type=int, default=-1, help='--shortcut quantization way')
+    parser.add_argument('--shortcut_way', type=int, default=1, help='--shortcut quantization way')
     parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', '-FPGA', dest='FPGA', action='store_true', help='FPGA')

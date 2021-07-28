@@ -137,7 +137,7 @@ if __name__ == '__main__':
                         help='w-bit')
     parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
     parser.add_argument('--maxabsscaler', '-mas', action='store_true', help='Standarize input to (-1,1)')
-    parser.add_argument('--shortcut_way', type=int, default=-1, help='--shortcut quantization way')
+    parser.add_argument('--shortcut_way', type=int, default=1, help='--shortcut quantization way')
     opt = parser.parse_args()
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
     opt.t_data = list(glob.iglob('./**/' + opt.t_data, recursive=True))[0]  # find file

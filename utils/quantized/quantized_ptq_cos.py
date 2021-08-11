@@ -1,6 +1,5 @@
 # Author:LiPu
 import math
-import time
 import numpy as np
 import os
 
@@ -140,7 +139,7 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
             groups=1,
             bias=False,
             eps=1e-5,
-            momentum=0.1,
+            momentum=0.5,
             a_bits=8,
             w_bits=8,
             bn=0,
@@ -210,7 +209,8 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                 float_input = input
             # 浮点卷积
             float_output = F.conv2d(
-                input=float_input,
+                # input=float_input,
+                input=quant_input,
                 weight=weight,
                 bias=bias,
                 stride=self.stride,
@@ -672,10 +672,10 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                            delimiter='\n')
 
         output = self.activation_quantizer(output)
-        # if self.training and self.activate != 'linear':
-        #     return [output, float_output]
-        # else:
-        return output
+        if self.training and self.activate != 'linear':
+            return [output, float_output]
+        else:
+            return output
 
     def BN_fuse(self):
         if self.bn:

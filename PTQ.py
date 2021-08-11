@@ -65,16 +65,16 @@ def PTQ(cfg,
                               num_workers=min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8]),
                               pin_memory=True,
                               collate_fn=t_dataset.collate_fn)
-    # print('')  # skip a line
-    # print('<.....................test original model.......................>')
-    # test.test(cfg,
-    #           data=opt.t_data,
-    #           batch_size=batch_size,
-    #           imgsz=imgsz,
-    #           model=model,
-    #           dataloader=t_dataloader,
-    #           rank=-1,
-    #           maxabsscaler=opt.maxabsscaler)
+    print('')  # skip a line
+    print('<.....................test original model.......................>')
+    test.test(cfg,
+              data=opt.t_data,
+              batch_size=batch_size,
+              imgsz=imgsz,
+              model=model,
+              dataloader=t_dataloader,
+              rank=-1,
+              maxabsscaler=opt.maxabsscaler)
 
     q_model.train()
     print('')  # skip a line

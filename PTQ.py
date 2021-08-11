@@ -49,7 +49,7 @@ def PTQ(cfg,
 
     # Dataloader
     c_dataset = LoadImagesAndLabels(c_path, imgsz, batch_size, rect=True, single_cls=single_cls,
-                                    is_gray_scale=True if opt.gray_scale else False)
+                                    is_gray_scale=True if opt.gray_scale else False, subset_len=opt.subset_len)
     c_batch_size = min(batch_size, len(c_dataset))
     c_dataloader = DataLoader(c_dataset,
                               batch_size=c_batch_size,
@@ -65,16 +65,16 @@ def PTQ(cfg,
                               num_workers=min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8]),
                               pin_memory=True,
                               collate_fn=t_dataset.collate_fn)
-    print('')  # skip a line
-    print('<.....................test original model.......................>')
-    test.test(cfg,
-              data=opt.t_data,
-              batch_size=batch_size,
-              imgsz=imgsz,
-              model=model,
-              dataloader=t_dataloader,
-              rank=-1,
-              maxabsscaler=opt.maxabsscaler)
+    # print('')  # skip a line
+    # print('<.....................test original model.......................>')
+    # test.test(cfg,
+    #           data=opt.t_data,
+    #           batch_size=batch_size,
+    #           imgsz=imgsz,
+    #           model=model,
+    #           dataloader=t_dataloader,
+    #           rank=-1,
+    #           maxabsscaler=opt.maxabsscaler)
 
     q_model.train()
     print('')  # skip a line
@@ -126,7 +126,7 @@ if __name__ == '__main__':
     parser.add_argument('--t_data', type=str, default='data/coco2014.data', help='*.data path')
     parser.add_argument('--c_data', type=str, default='data/coco2014.data', help='*.data path')
     parser.add_argument('--weights', type=str, default='weights/yolov3-spp-ultralytics.pt', help='weights path')
-    parser.add_argument('--batch-size', type=int, default=64, help='size of each image batch')
+    parser.add_argument('--batch-size', type=int, default=16, help='size of each image batch')
     parser.add_argument('--img-size', type=int, default=512, help='inference size (pixels)')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
     parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
@@ -135,6 +135,7 @@ if __name__ == '__main__':
                         help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8,
                         help='w-bit')
+    parser.add_argument('--subset_len', type=int, default=-1, help='calibration set len')
     parser.add_argument('--gray_scale', action='store_true', help='gray scale trainning')
     parser.add_argument('--maxabsscaler', '-mas', action='store_true', help='Standarize input to (-1,1)')
     parser.add_argument('--shortcut_way', type=int, default=1, help='--shortcut quantization way')

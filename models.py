@@ -828,6 +828,9 @@ class Darknet(nn.Module):
             elif name == 'YOLOLayer':
                 yolo_out.append(module(x, out))
             else:  # run module directly, i.e. mtype = 'convolutional', 'upsample', 'maxpool', 'batchnorm2d' etc.
+                if name == 'Upsample':
+                    if isinstance(x, list):
+                        x = x[0]
                 x = module(x)
                 if name == "Sequential" and self.module_list[i + 1].__class__.__name__ != 'YOLOLayer':
                     feature_out.append(x)

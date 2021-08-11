@@ -140,7 +140,7 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
             groups=1,
             bias=False,
             eps=1e-5,
-            momentum=0.01,  # 考虑量化带来的抖动影响,对momentum进行调整(0.1 ——> 0.01),削弱batch统计参数占比，一定程度抑制抖动。经实验量化训练效果更好,acc提升1%左右
+            momentum=0.1,
             a_bits=8,
             w_bits=8,
             bn=0,
@@ -170,6 +170,7 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
         self.register_buffer('running_var', torch.zeros(out_channels))
         self.register_buffer('batch_mean', torch.zeros(out_channels))
         self.register_buffer('batch_var', torch.zeros(out_channels))
+        self.register_buffer('bias_correct', torch.zeros(out_channels))
         self.quantizer_output = quantizer_output
         self.reorder = reorder
         self.TM = TM
@@ -183,6 +184,7 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
         self.activation_quantizer = Quantizer(bits=a_bits, out_channels=-1)
         self.weight_quantizer = Quantizer(bits=w_bits, out_channels=-1)
         self.bias_quantizer = Quantizer(bits=w_bits, out_channels=-1)
+        self.bias_correct_quantizer = Quantizer(bits=w_bits, out_channels=-1)
 
     def forward(self, input):
         if self.bn:
@@ -199,11 +201,66 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
         else:
             bias = self.bias
             weight = self.weight
+        if self.training:
+            if isinstance(input, list):
+                quant_input = input[0]
+                float_input = input[1]
+            else:
+                quant_input = input
+                float_input = input
+            # 浮点卷积
+            float_output = F.conv2d(
+                input=float_input,
+                weight=weight,
+                bias=bias,
+                stride=self.stride,
+                padding=self.padding,
+                dilation=self.dilation,
+                groups=self.groups
+            )
 
-        # 量化A和bn融合后的W
-        q_weight = self.weight_quantizer(weight)
-        q_bias = self.bias_quantizer(bias)
+            # 量化A和bn融合后的W
+            q_weight = self.weight_quantizer(weight)
+            q_bias = self.bias_quantizer(bias)
+            # 量化卷积
+            output = F.conv2d(
+                input=quant_input,
+                weight=q_weight,
+                bias=q_bias,
+                stride=self.stride,
+                padding=self.padding,
+                dilation=self.dilation,
+                groups=self.groups
+            )
+            # 计算bias_correct
+            bias_correct = (float_output.view(float_output.shape[1], -1) - output.view(output.shape[1], -1)).mean(1)
+            if torch.sum(self.bias_correct) == 0:
+                self.bias_correct = bias_correct
+            else:
+                self.bias_correct = self.bias_correct * (1 - self.momentum) + bias_correct * self.momentum
 
+            q_bias = self.bias_correct_quantizer(bias + self.bias_correct)
+            output = F.conv2d(
+                input=quant_input,
+                weight=q_weight,
+                bias=q_bias,
+                stride=self.stride,
+                padding=self.padding,
+                dilation=self.dilation,
+                groups=self.groups
+            )
+        else:
+            q_weight = self.weight_quantizer(weight)
+            q_bias = self.bias_correct_quantizer(bias + self.bias_correct)
+            output = F.conv2d(
+                input=input,
+                weight=q_weight,
+                bias=q_bias,
+                stride=self.stride,
+                padding=self.padding,
+                dilation=self.dilation,
+                groups=self.groups
+            )
         if self.quantizer_output == True:  # 输出量化参数txt文档
 
             # 创建的quantizer_output输出文件夹
@@ -450,16 +507,6 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                     writer.close()
                 ################偏置重排序结束
 
-        # 量化卷积
-        output = F.conv2d(
-            input=input,
-            weight=q_weight,
-            bias=q_bias,  # 注意，这里加bias，做完整的conv+bn
-            stride=self.stride,
-            padding=self.padding,
-            dilation=self.dilation,
-            groups=self.groups
-        )
         if self.activate == 'leaky':
             output = F.leaky_relu(output, 0.125 if not self.maxabsscaler else 0.25, inplace=True)
         elif self.activate == 'relu6':
@@ -625,6 +672,9 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                            delimiter='\n')
 
         output = self.activation_quantizer(output)
+        # if self.training and self.activate != 'linear':
+        #     return [output, float_output]
+        # else:
         return output
 
     def BN_fuse(self):
@@ -727,15 +777,20 @@ class COSPTQuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers
             self.scale_sum = self.float_range_sum / quantized_range  # 量化比例因子
 
     def forward(self, x, outputs):
+        if isinstance(x, list):
+            x = x[0]
         # Weights
         if self.weight:
             w = torch.sigmoid(self.w) * (2 / self.n)  # sigmoid weights (0-1)
             x = x * w[0]
-
         # Fusion
         nx = x.shape[1]  # input channels
         for i in range(self.n - 1):
-            a = outputs[self.layers[i]] * w[i + 1] if self.weight else outputs[self.layers[i]]  # feature to add
+            if isinstance(outputs[self.layers[i]], list):
+                a = outputs[self.layers[i]][0] * w[i + 1] if self.weight else outputs[self.layers[i]][
+                    0]  # feature to add
+            else:
+                a = outputs[self.layers[i]] * w[i + 1] if self.weight else outputs[self.layers[i]]  # feature to add
             na = a.shape[1]  # feature channels
             if self.training == True:
                 # 得到输入两个feature和输出的scale
@@ -1012,6 +1067,8 @@ class COSPTQuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers
             self.scale_sum = self.float_range_sum / quantized_range  # 量化比例因子
 
     def forward(self, x, outputs):
+        if isinstance(x, list):
+            x = x[0]
         # Weights
         if self.weight:
             w = torch.sigmoid(self.w) * (2 / self.n)  # sigmoid weights (0-1)
@@ -1020,7 +1077,11 @@ class COSPTQuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers
         # Fusion
         nx = x.shape[1]  # input channels
         for i in range(self.n - 1):
-            a = outputs[self.layers[i]] * w[i + 1] if self.weight else outputs[self.layers[i]]  # feature to add
+            if isinstance(outputs[self.layers[i]], list):
+                a = outputs[self.layers[i]][0] * w[i + 1] if self.weight else outputs[self.layers[i]][
+                    0]  # feature to add
+            else:
+                a = outputs[self.layers[i]] * w[i + 1] if self.weight else outputs[self.layers[i]]  # feature to add
             na = a.shape[1]  # feature channels
             if self.training == True:
                 # 得到输入两个feature和输出的scale

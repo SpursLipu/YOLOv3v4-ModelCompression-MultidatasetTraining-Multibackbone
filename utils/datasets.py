@@ -272,6 +272,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             self.img_files = [x.replace('/', os.sep) for x in f.read().splitlines()  # os-agnostic
                               if os.path.splitext(x)[-1].lower() in img_formats]
         if subset_len != -1:
+            assert subset_len <= len(self.img_files)
             self.img_files = random.sample(self.img_files, subset_len)
         n = len(self.img_files)
         assert n > 0, 'No images found in %s. See %s' % (path, help_url)

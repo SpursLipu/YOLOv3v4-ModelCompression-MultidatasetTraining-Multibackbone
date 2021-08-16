@@ -518,6 +518,21 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
                     modules = FeatureConcat(layers=layers, groups=True)
                 else:
                     modules = FeatureConcat(layers=layers, groups=False)
+            elif quantized == 5:
+                if 'groups' in mdef:
+                    modules = COSPTQuantizedFeatureConcat(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
+                                                     quantizer_output=quantizer_output,
+                                                     reorder=reorder, TM=TM, TN=TN,
+                                                     name="{:04d}".format(i) + "_" +
+                                                          mdef['type'][:4],
+                                                     layer_idx=layer_idx, )
+                else:
+                    modules = COSPTQuantizedFeatureConcat(layers=layers, groups=False, bits=a_bit, FPGA=FPGA,
+                                                     quantizer_output=quantizer_output,
+                                                     reorder=reorder, TM=TM, TN=TN,
+                                                     name="{:04d}".format(i) + "_" +
+                                                          mdef['type'][:4],
+                                                     layer_idx=layer_idx, )
             else:
                 if 'groups' in mdef:
                     modules = QuantizedFeatureConcat(layers=layers, groups=True, bits=a_bit, FPGA=FPGA,
@@ -819,7 +834,7 @@ class Darknet(nn.Module):
             name = module.__class__.__name__
             if name in ['Shortcut', 'FeatureConcat', 'QuantizedShortcut_max', 'QuantizedShortcut_min',
                         'QuantizedFeatureConcat', 'COSPTQuantizedShortcut_min',
-                        'COSPTQuantizedShortcut_max']:  # sum, concat
+                        'COSPTQuantizedShortcut_max','COSPTQuantizedFeatureConcat']:  # sum, concat
                 if verbose:
                     l = [i - 1] + module.layers  # layers
                     sh = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes
@@ -828,10 +843,11 @@ class Darknet(nn.Module):
             elif name == 'YOLOLayer':
                 yolo_out.append(module(x, out))
             else:  # run module directly, i.e. mtype = 'convolutional', 'upsample', 'maxpool', 'batchnorm2d' etc.
-                if name == 'Upsample':
-                    if isinstance(x, list):
-                        x = x[0]
-                x = module(x)
+                if name == 'Upsample' and isinstance(x, list):
+                    x[0] = module(x[0])
+                    x[1] = module(x[1])
+                else:
+                    x = module(x)
                 if name == "Sequential" and self.module_list[i + 1].__class__.__name__ != 'YOLOLayer':
                     feature_out.append(x)
 

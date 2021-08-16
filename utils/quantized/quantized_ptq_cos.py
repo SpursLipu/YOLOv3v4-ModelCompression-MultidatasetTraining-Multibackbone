@@ -2,7 +2,7 @@
 import math
 import numpy as np
 import os
-
+import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -139,7 +139,7 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
             groups=1,
             bias=False,
             eps=1e-5,
-            momentum=0.5,
+            momentum=0.1,
             a_bits=8,
             w_bits=8,
             bn=0,
@@ -160,6 +160,8 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
         )
 
         self.bn = bn
+        if bias == False:
+            self.bias = Parameter(torch.zeros(out_channels))
         self.activate = activate
         self.eps = eps
         self.momentum = momentum
@@ -167,9 +169,12 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
         self.beta = Parameter(torch.Tensor(out_channels))
         self.register_buffer('running_mean', torch.zeros(out_channels))
         self.register_buffer('running_var', torch.zeros(out_channels))
-        self.register_buffer('batch_mean', torch.zeros(out_channels))
-        self.register_buffer('batch_var', torch.zeros(out_channels))
-        self.register_buffer('bias_correct', torch.zeros(out_channels))
+        self.register_buffer('q_bias', torch.zeros(out_channels))
+        self.register_buffer('q_weight', torch.zeros(self.weight.shape))
+        self.efficency = 0
+        self.deviation = 0
+        self.stop = False
+        self.quantized = False
         self.quantizer_output = quantizer_output
         self.reorder = reorder
         self.TM = TM
@@ -183,23 +188,27 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
         self.activation_quantizer = Quantizer(bits=a_bits, out_channels=-1)
         self.weight_quantizer = Quantizer(bits=w_bits, out_channels=-1)
         self.bias_quantizer = Quantizer(bits=w_bits, out_channels=-1)
-        self.bias_correct_quantizer = Quantizer(bits=w_bits, out_channels=-1)
 
     def forward(self, input):
-        if self.bn:
-            # BN融合
-            if self.bias is not None:
-                bias = reshape_to_bias(self.beta + (self.bias - self.running_mean) * (
-                        self.gamma / torch.sqrt(self.running_var + self.eps)))
+        if not self.quantized:
+            if self.bn:
+                # BN融合
+                if self.bias is not None:
+                    self.bias.data = reshape_to_bias(self.beta + (self.bias - self.running_mean) * (
+                            self.gamma / torch.sqrt(self.running_var + self.eps)))
+                else:
+                    self.bias.data = reshape_to_bias(
+                        self.beta - self.running_mean * self.gamma / torch.sqrt(
+                            self.running_var + self.eps))  # b融running
+                self.weight.data = self.weight * reshape_to_weight(
+                    self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
             else:
-                bias = reshape_to_bias(
-                    self.beta - self.running_mean * self.gamma / torch.sqrt(
-                        self.running_var + self.eps))  # b融running
-            weight = self.weight * reshape_to_weight(
-                self.gamma / torch.sqrt(self.running_var + self.eps))  # w融running
-        else:
-            bias = self.bias
-            weight = self.weight
+                self.bias = self.bias
+                self.weight = self.weight
+            # 量化A和bn融合后的W
+            self.q_weight = self.weight_quantizer(self.weight)
+            self.q_bias = self.bias_quantizer(self.bias)
+            self.quantized = True
         if self.training:
             if isinstance(input, list):
                 quant_input = input[0]
@@ -207,55 +216,78 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
             else:
                 quant_input = input
                 float_input = input
+
             # 浮点卷积
             float_output = F.conv2d(
-                # input=float_input,
-                input=quant_input,
-                weight=weight,
-                bias=bias,
+                input=float_input,
+                weight=self.weight,
+                bias=self.bias,
                 stride=self.stride,
                 padding=self.padding,
                 dilation=self.dilation,
                 groups=self.groups
             )
 
-            # 量化A和bn融合后的W
-            q_weight = self.weight_quantizer(weight)
-            q_bias = self.bias_quantizer(bias)
-            # 量化卷积
-            output = F.conv2d(
-                input=quant_input,
-                weight=q_weight,
-                bias=q_bias,
-                stride=self.stride,
-                padding=self.padding,
-                dilation=self.dilation,
-                groups=self.groups
-            )
             # 计算bias_correct
-            bias_correct = (float_output.view(float_output.shape[1], -1) - output.view(output.shape[1], -1)).mean(1)
-            if torch.sum(self.bias_correct) == 0:
-                self.bias_correct = bias_correct
-            else:
-                self.bias_correct = self.bias_correct * (1 - self.momentum) + bias_correct * self.momentum
+            if not self.stop:
+                # 量化卷积
+                output = F.conv2d(
+                    input=quant_input,
+                    weight=self.q_weight,
+                    bias=self.q_bias,
+                    stride=self.stride,
+                    padding=self.padding,
+                    dilation=self.dilation,
+                    groups=self.groups
+                )
 
-            q_bias = self.bias_correct_quantizer(bias + self.bias_correct)
+                # 补偿卷积
+                correct_output = F.conv2d(
+                    input=quant_input,
+                    weight=self.weight,
+                    bias=self.bias,
+                    stride=self.stride,
+                    padding=self.padding,
+                    dilation=self.dilation,
+                    groups=self.groups
+                )
+                rate = 0.05
+                error = torch.add(output, correct_output, alpha=-1).data
+                noise = error.pow(2).mean()
+                if noise > 0:
+                    eff = 1.25 * correct_output.pow(2).mean().div(noise).log10().detach().cpu().numpy()
+                    dev = math.fabs(eff - self.efficency)
+                    if dev > 0:
+                        self.efficency = (self.efficency * 4 + eff) * 0.2
+                        self.deviation = (self.deviation * 4 + dev) * 0.2
+                        if self.efficency > 4.0:
+                            rate = rate * 0.5
+                        if self.efficency > 4.3 or (self.deviation / self.efficency) < 0.05 or math.fabs(
+                                dev - self.deviation / dev) < 0.05:
+                            self.stop = True
+                    else:
+                        self.stop = True
+                else:
+                    self.stop = True
+                if not self.stop:
+                    error = error.mean(dim=[0, 2, 3])
+                    self.bias.data = torch.sub(self.bias.data, error, alpha=rate)
+                    self.q_bias = self.bias_quantizer(self.bias)
+                torch.cuda.empty_cache()
             output = F.conv2d(
                 input=quant_input,
-                weight=q_weight,
-                bias=q_bias,
+                weight=self.q_weight,
+                bias=self.q_bias,
                 stride=self.stride,
                 padding=self.padding,
                 dilation=self.dilation,
                 groups=self.groups
             )
         else:
-            q_weight = self.weight_quantizer(weight)
-            q_bias = self.bias_correct_quantizer(bias + self.bias_correct)
             output = F.conv2d(
                 input=input,
-                weight=q_weight,
-                bias=q_bias,
+                weight=self.q_weight,
+                bias=self.q_bias,
                 stride=self.stride,
                 padding=self.padding,
                 dilation=self.dilation,
@@ -509,14 +541,24 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
 
         if self.activate == 'leaky':
             output = F.leaky_relu(output, 0.125 if not self.maxabsscaler else 0.25, inplace=True)
+            if self.training:
+                float_output = F.leaky_relu(float_output, 0.125 if not self.maxabsscaler else 0.25, inplace=True)
         elif self.activate == 'relu6':
             output = F.relu6(output, inplace=True)
+            if self.training:
+                float_output = F.relu6(float_output, inplace=True)
         elif self.activate == 'h_swish':
             output = output * (F.relu6(output + 3.0, inplace=True) / 6.0)
+            if self.training:
+                float_output = output * (F.relu6(float_output + 3.0, inplace=True) / 6.0)
         elif self.activate == 'relu':
             output = F.relu(output, inplace=True)
+            if self.training:
+                float_output = F.relu(float_output, inplace=True)
         elif self.activate == 'mish':
             output = output * F.softplus(output).tanh()
+            if self.training:
+                float_output = output * F.softplus(float_output).tanh()
         elif self.activate == 'linear':
             # return output
             pass
@@ -777,7 +819,8 @@ class COSPTQuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers
             self.scale_sum = self.float_range_sum / quantized_range  # 量化比例因子
 
     def forward(self, x, outputs):
-        if isinstance(x, list):
+        if self.training:
+            float = x[1]
             x = x[0]
         # Weights
         if self.weight:
@@ -786,7 +829,7 @@ class COSPTQuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers
         # Fusion
         nx = x.shape[1]  # input channels
         for i in range(self.n - 1):
-            if isinstance(outputs[self.layers[i]], list):
+            if self.training:
                 a = outputs[self.layers[i]][0] * w[i + 1] if self.weight else outputs[self.layers[i]][
                     0]  # feature to add
             else:
@@ -984,7 +1027,32 @@ class COSPTQuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers
                                delimiter='\n')
 
             x = self.dequantize(x, type="sum")  # 反量化
-        return x
+
+        if self.training:
+            # float compute
+            # Weights
+            if self.weight:
+                w = torch.sigmoid(self.w) * (2 / self.n)  # sigmoid weights (0-1)
+                float = float * w[0]
+
+            # Fusion
+            nx = float.shape[1]  # input channels
+            for i in range(self.n - 1):
+                a = outputs[self.layers[i]][1] * w[i + 1] if self.weight else outputs[self.layers[i]][
+                    1]  # feature to add
+                na = a.shape[1]  # feature channels
+
+                # Adjust channels
+                if nx == na:  # same shape
+                    float = float + a
+                elif nx > na:  # slice input
+                    float[:, :na] = float[:, :na] + a  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
+                else:  # slice feature
+                    float = float + a[:, :nx]
+
+            return [x, float]
+        else:
+            return x
 
 
 class COSPTQuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
@@ -1067,7 +1135,8 @@ class COSPTQuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers
             self.scale_sum = self.float_range_sum / quantized_range  # 量化比例因子
 
     def forward(self, x, outputs):
-        if isinstance(x, list):
+        if self.training:
+            float = x[1]
             x = x[0]
         # Weights
         if self.weight:
@@ -1077,7 +1146,7 @@ class COSPTQuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers
         # Fusion
         nx = x.shape[1]  # input channels
         for i in range(self.n - 1):
-            if isinstance(outputs[self.layers[i]], list):
+            if self.training:
                 a = outputs[self.layers[i]][0] * w[i + 1] if self.weight else outputs[self.layers[i]][
                     0]  # feature to add
             else:
@@ -1266,4 +1335,224 @@ class COSPTQuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers
                                delimiter='\n')
 
             x = self.dequantize(x, type="sum")  # 反量化
-        return x
+        if self.training:
+            # float compute
+            # Weights
+            if self.weight:
+                w = torch.sigmoid(self.w) * (2 / self.n)  # sigmoid weights (0-1)
+                float = float * w[0]
+
+            # Fusion
+            nx = float.shape[1]  # input channels
+            for i in range(self.n - 1):
+                a = outputs[self.layers[i]][1] * w[i + 1] if self.weight else outputs[self.layers[i]][
+                    1]  # feature to add
+                na = a.shape[1]  # feature channels
+
+                # Adjust channels
+                if nx == na:  # same shape
+                    float = float + a
+                elif nx > na:  # slice input
+                    float[:, :na] = float[:, :na] + a  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
+                else:  # slice feature
+                    float = float + a[:, :nx]
+
+            return [x, float]
+        else:
+            return x
+
+
+class COSPTQuantizedFeatureConcat(nn.Module):
+    def __init__(self, layers, groups, bits=8, FPGA=False,
+                 quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
+        super(COSPTQuantizedFeatureConcat, self).__init__()
+        self.layers = layers  # layer indices
+        self.groups = groups
+        self.multiple = len(layers) > 1  # multiple layers flag
+        self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
+        self.register_buffer('float_max_list', torch.zeros(len(layers)))
+        self.bits = bits
+        self.FPGA = FPGA
+        self.momentum = 0.1
+        self.quantizer_output = quantizer_output
+        self.reorder = reorder
+        self.TM = TM
+        self.TN = TN
+        self.name = name
+        self.layer_idx = layer_idx
+        # 量化
+
+    def quantize(self, input):
+        output = input / self.scale
+        return output
+
+    def round(self, input):
+        output = Round.apply(input)
+        return output
+
+    # 截断
+    def clamp(self, input):
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+        output = torch.clamp(input, min_val, max_val)
+        return output
+
+    # 反量化
+    def dequantize(self, input):
+        output = (input) * self.scale
+        return output
+
+    def forward(self, x, outputs):
+        if self.training:
+            float = x[1]
+            x = x[0]
+        if self.multiple:
+            if self.training == True:
+                quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
+                quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+                quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
+                j = 0
+                for i in self.layers:
+                    temp = outputs[i][0].detach()
+                    if self.float_max_list[j] == 0:
+                        self.float_max_list[j].add_(
+                            torch.max(torch.max(temp), torch.abs(torch.min(temp))))
+                    else:
+                        self.float_max_list[j].mul_(1 - self.momentum).add_(
+                            torch.max(torch.max(temp), torch.abs(torch.min(temp))) * self.momentum)
+                    j = j + 1
+
+                    del temp
+                    torch.cuda.empty_cache()
+                if self.FPGA == False:
+                    float_range = max(self.float_max_list).unsqueeze(0)  # 量化前范围
+                else:
+                    float_max = max(self.float_max_list).unsqueeze(0)  # 量化前范围
+                    floor_float_range = 2 ** float_max.log2().floor()
+                    ceil_float_range = 2 ** float_max.log2().ceil()
+                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                        float_range = ceil_float_range
+                    else:
+                        float_range = floor_float_range
+                self.scale = float_range / quantized_range  # 量化比例因子
+
+            if self.quantizer_output == True:
+
+                if self.layer_idx == -1:
+                    q_a_concat = copy.deepcopy(outputs[0])
+
+                    move_scale = math.log2(self.scale)
+                    concat_scale = -np.array(move_scale).reshape(1, -1)
+                    np.savetxt(('./quantizer_output/a_scale_out/concat_scale_%s.txt' % self.name), concat_scale,
+                               delimiter='\n')
+
+                    for i in self.layers:
+                        q_a_concat[i] = self.quantize(q_a_concat[i])  # 量化
+                        q_a_concat[i] = self.round(q_a_concat[i])
+                        q_a_concat[i] = self.clamp(q_a_concat[i])  # 截断
+                    Q_concat = torch.cat([q_a_concat[i] for i in self.layers], 1)
+
+                    if self.reorder == True:
+                        a_para = Q_concat
+                        # 重排序参数
+                        # print("use activation reorder!")
+                        shape_input = a_para.shape[1]
+                        num_TN = int(shape_input / self.TN)
+                        first = True
+                        reorder_a_para = None
+                        for k in range(num_TN):
+                            temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
+                            temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
+                            if first:
+                                reorder_a_para = temp.clone().cpu().data.numpy()
+                                first = False
+                            else:
+                                reorder_a_para = np.append(reorder_a_para, temp.cpu().data.numpy())
+
+                        a_para_flatten = reorder_a_para
+                        q_activation_reorder = a_para_flatten
+                        q_activation_reorder = np.array(q_activation_reorder).reshape(1, -1)
+                        np.savetxt(('./quantizer_output/q_activation_reorder/r_concat_%s.txt' % self.name),
+                                   q_activation_reorder, delimiter='\n')
+                        ###保存重排序的二进制文件
+                        activation_flat = q_activation_reorder.astype(np.int8)
+                        writer = open('./quantizer_output/q_activation_reorder/%s_concat_q_bin' % self.name, "wb")
+                        writer.write(activation_flat)
+                        writer.close()
+                    ##########concat重排序结束
+
+                    Q_concat = np.array(Q_concat.cpu()).reshape(1, -1)
+                    np.savetxt(('./quantizer_output/q_activation_out/a_concat_%s.txt' % self.name), Q_concat,
+                               delimiter='\n')
+                elif int(self.name[1:4]) == self.layer_idx:
+                    q_a_concat = copy.deepcopy(outputs[0])
+
+                    move_scale = math.log2(self.scale)
+                    concat_scale = -np.array(move_scale).reshape(1, -1)
+                    np.savetxt(('./quantizer_output/a_scale_out/concat_scale_%s.txt' % self.name), concat_scale,
+                               delimiter='\n')
+
+                    for i in self.layers:
+                        q_a_concat[i] = self.quantize(q_a_concat[i])  # 量化
+                        q_a_concat[i] = self.round(q_a_concat[i])
+                        q_a_concat[i] = self.clamp(q_a_concat[i])  # 截断
+                    Q_concat = torch.cat([q_a_concat[i] for i in self.layers], 1)
+
+                    if self.reorder == True:
+                        a_para = Q_concat
+                        # 重排序参数
+                        # print("use activation reorder!")
+                        shape_input = a_para.shape[1]
+                        num_TN = int(shape_input / self.TN)
+                        first = True
+                        reorder_a_para = None
+                        for k in range(num_TN):
+                            temp = a_para[:, k * self.TN:(k + 1) * self.TN, :, :]
+                            temp = temp.view(temp.shape[1], temp.shape[2], temp.shape[3])
+                            temp = temp.permute(1, 2, 0).contiguous().view(-1)
+                            if first:
+                                reorder_a_para = temp.clone().cpu().data.numpy()
+                                first = False
+                            else:
+                                reorder_a_para = np.append(reorder_a_para, temp.cpu().data.numpy())
+
+                        a_para_flatten = reorder_a_para
+                        q_activation_reorder = a_para_flatten
+                        q_activation_reorder = np.array(q_activation_reorder).reshape(1, -1)
+                        np.savetxt(('./quantizer_output/q_activation_reorder/r_concat_%s.txt' % self.name),
+                                   q_activation_reorder, delimiter='\n')
+                        ###保存重排序的二进制文件
+                        activation_flat = q_activation_reorder.astype(np.int8)
+                        writer = open('./quantizer_output/q_activation_reorder/%s_concat_q_bin' % self.name, "wb")
+                        writer.write(activation_flat)
+                        writer.close()
+                    ##########concat重排序结束
+                    Q_concat = np.array(Q_concat.cpu()).reshape(1, -1)
+                    np.savetxt(('./quantizer_output/q_activation_out/a_concat_%s.txt' % self.name), Q_concat,
+                               delimiter='\n')
+
+            # 量化
+            if self.training:
+                for i in self.layers:
+                    outputs[i][0] = self.quantize(outputs[i][0])  # 量化
+                    outputs[i][0] = self.round(outputs[i][0])
+                    outputs[i][0] = self.clamp(outputs[i][0])  # 截断
+                    outputs[i][0] = self.dequantize(outputs[i][0])  # 反量化
+                return [torch.cat([outputs[i][0] for i in self.layers], 1),
+                        torch.cat([outputs[i][1] for i in self.layers], 1)]
+            else:
+                for i in self.layers:
+                    outputs[i] = self.quantize(outputs[i])  # 量化
+                    outputs[i] = self.round(outputs[i])
+                    outputs[i] = self.clamp(outputs[i])  # 截断
+                    outputs[i] = self.dequantize(outputs[i])  # 反量化
+                return torch.cat([outputs[i] for i in self.layers], 1)
+        else:
+            if self.groups:
+                if self.training:
+                    return [x[:, (x.shape[1] // 2):], float[:, (x.shape[1] // 2):]]
+                else:
+                    return x[:, (x.shape[1] // 2):]
+            else:
+                return outputs[self.layers[0]]

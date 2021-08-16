@@ -86,7 +86,6 @@ def PTQ(cfg,
             imgs = imgs * 2 - 1
         else:
             imgs = imgs.to(device).float() / 256.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
-
         # Disable gradients
         with torch.no_grad():
             _, _ = q_model(imgs, augment=augment)  # inference and training outputs

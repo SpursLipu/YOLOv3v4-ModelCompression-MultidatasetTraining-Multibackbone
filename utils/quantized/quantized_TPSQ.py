@@ -30,46 +30,76 @@ class Search_Pow2(Function):
 
     @staticmethod
     def forward(self, input):
-        ceil_float_range = 2 ** input.log2().ceil()
-        floor_float_range = 2 ** input.log2().floor()
-        if abs(ceil_float_range - input) < abs(floor_float_range - input):
-            output = ceil_float_range
-        else:
-            output = floor_float_range
+        # ceil_float_range = 2 ** input.log2().ceil()
+        # floor_float_range = 2 ** input.log2().floor()
+        # if abs(ceil_float_range - input) < abs(floor_float_range - input):
+        #     output = ceil_float_range
+        # else:
+        #     output = floor_float_range
+        # return output
+        output = input
+        output[output < 0].data.copy_(torch.Tensor([2 ** -5]))
+        output[output > 2 ** (8 + 5)].data.copy_(torch.Tensor([2 ** (8 + 5)]))
+        ceil_float_range = 2 ** output.log2().ceil()
+        floor_float_range = 2 ** output.log2().floor()
+        output[abs(ceil_float_range - output) < abs(floor_float_range - output)].data.copy_(ceil_float_range[
+                                                                                                abs(
+                                                                                                    ceil_float_range - output) < abs(
+                                                                                                    floor_float_range - output)].data)
+        output[abs(ceil_float_range - output) >= abs(floor_float_range - output)].data.copy_(floor_float_range[
+                                                                                                 abs(
+                                                                                                     ceil_float_range - output) >= abs(
+                                                                                                     floor_float_range - output)].data)
+        self.save_for_backward(input, output)
         return output
 
     @staticmethod
     def backward(self, grad_output):
+        # # 线性
+        # grad_input = 0.8985 * (grad_output.clone())
+        # # 多项式
+        # # temp = grad_output.clone()
+        # # grad_input = -0.668 * temp + 1.335
+        #
+        # return grad_input
+        input, output = self.saved_tensors
+        scale = output / input
+        grad_input = scale * grad_output.clone()
         # 线性
-        grad_input = 0.8985 * (grad_output.clone())
+        # grad_input = 0.8985 * (grad_output.clone())
         # 多项式
-        # temp = grad_output.clone()
-        # grad_input = -0.668 * temp + 1.335
+        # grad_input = -0.668 * grad_output.clone() + 1.335
+        # grad_input[grad_input.ge(0.5)] = 0
+        # grad_input[grad_input.le(-0.5)] = 0
+        # 指数
+        # grad_input = 0.2379145 * torch.exp(2.2235 * grad_output.clone())
+        # grad_input[grad_input.ge(0.1)] = 0
+        # grad_input[grad_input.le(-0.1)] = 0
 
         return grad_input
 
 
 class Quantizer(nn.Module):
-    def __init__(self, bits, out_channels, FPGA):
+    def __init__(self, bits, out_channels, FPGA, warmup=False):
         super().__init__()
-        self.bits = bits
-        self.FPGA = FPGA
+        # self.bits = bits
+        # self.FPGA = FPGA
         self.first = True
         self.momentum = 0.1
-
-        self.out_channels = out_channels
-        if self.out_channels == -1:
-            self.register_buffer('min_val', torch.zeros(1))
-            self.register_buffer('max_val', torch.zeros(1))
-            self.scale = Parameter(torch.Tensor(1))  # 量化比例因子
+        self.bits = bits
+        self.FPGA = FPGA
+        if warmup:
+            self.register_buffer('warmup', torch.ones(1))
         else:
-            self.register_buffer('min_val', torch.zeros(out_channels, 1, 1, 1))
-            self.register_buffer('max_val', torch.zeros(out_channels, 1, 1, 1))
-            self.scale = Parameter(torch.Tensor(self.out_channels, 1, 1, 1))  # 量化比例因子
-        init.ones_(self.scale)
+            self.register_buffer('warmup', torch.zeros(1))
+        self.momentum = 0.1
 
     # 截断
     def clamp(self, input):
+        print('==============')
+        print((Search_Pow2.apply(self.scale)).size())
+        print(input.size())
+        print('==============')
         if self.FPGA:
             output = 0.5 * (
                     torch.abs(input + Search_Pow2.apply(self.scale)) - torch.abs(input - Search_Pow2.apply(self.scale)))
@@ -104,7 +134,7 @@ class Quantizer(nn.Module):
         if self.bits == 32:
             output = input
         elif self.bits == 1:
-            print('！Binary quantization is not supported ！')
+            print('!Binary quantization is not supported !')
             assert self.bits != 1
         else:
             output = self.clamp(input)  # 截断
@@ -118,7 +148,7 @@ class Quantizer(nn.Module):
         if self.bits == 32:
             output = input
         elif self.bits == 1:
-            print('！Binary quantization is not supported ！')
+            print('!Binary quantization is not supported!')
             assert self.bits != 1
         else:
             output = self.quantize(input)  # 量化
@@ -195,7 +225,7 @@ class Bias_Quantizer(nn.Module):
         if self.bits == 32:
             output = input
         elif self.bits == 1:
-            print('！Binary quantization is not supported ！')
+            print('!Binary quantization is not supported !')
             assert self.bits != 1
         else:
             if self.training == True:
@@ -211,7 +241,7 @@ class Bias_Quantizer(nn.Module):
         if self.bits == 32:
             output = input
         elif self.bits == 1:
-            print('！Binary quantization is not supported ！')
+            print('!Binary quantization is not supported !')
             assert self.bits != 1
         else:
             output = self.quantize(input)  # 量化
@@ -246,6 +276,150 @@ class SymmetricQuantizer(Bias_Quantizer):
         self.scale = float_range / quantized_range  # 量化比例因子
 
 
+class Weight_Quantizer(Quantizer):
+    def __init__(self, bits, out_channels, FPGA, warmup):
+        super().__init__(bits, FPGA, warmup)
+        self.out_channels = out_channels
+        if self.out_channels == -1:
+            self.scale = Parameter(torch.Tensor(1))  # 量化比例因子
+        else:
+            self.scale = Parameter(torch.Tensor(self.out_channels, 1, 1, 1))  # 量化比例因子
+        init.ones_(self.scale)
+
+    def forward(self, input):
+        if self.bits == 32:
+            output = input
+        elif self.bits == 1:
+            print('!Binary quantization is not supported !')
+            assert self.bits != 1
+        else:
+            if self.warmup:
+                max_metrics = -1
+                max_step = -5
+                step = (torch.max(input)) / 1000
+                # if self.out_channels == -1:
+                for i in range(1, 1000):
+                    self.scale.data.copy_(torch.Tensor([step * i]))
+                    output = self.clamp(input)  # 截断
+                    output = self.quantize(output)  # 量化
+                    output = self.round(output)
+                    output = self.dequantize(output)  # 反量化
+                    cosine_similarity = torch.cosine_similarity(input.view(-1), output.view(-1), dim=0)
+                    if cosine_similarity > max_metrics:
+                        max_metrics = cosine_similarity
+                        max_step = i
+                print("max_step:", max_step)
+                print("max_metrics:", max_metrics)
+                self.scale.data.copy_(torch.Tensor([step * max_step]))
+                # else:
+                #     for k in range(input.shape[0]):
+                #         for i in range(1, 1000):
+                #             self.scale[k].data.copy_(torch.Tensor([step * i]))
+                #             output = self.clamp(input)  # 截断
+                #             output = self.quantize(output)  # 量化
+                #             output = self.round(output)
+                #             output = self.dequantize(output)  # 反量化
+                #             cosine_similarity = torch.cosine_similarity(input.view(-1), output.view(-1), dim=0)
+                #             if cosine_similarity > max_metrics:
+                #                 max_metrics = cosine_similarity
+                #                 max_step = i
+                #         print("max_step:", max_step)
+                #         self.scale[k].data.copy_(torch.Tensor([step * max_step]))
+                #     print("max_metrics:", max_metrics)
+                self.warmup.add_(-1)
+            else:
+                output = self.clamp(input)  # 截断
+                output = self.quantize(output)  # 量化
+                output = self.round(output)
+                output = self.dequantize(output)  # 反量化
+        return output
+
+
+class Activattion_Quantizer(Quantizer):
+    def __init__(self, bits, out_channels, FPGA, warmup):
+        super().__init__(bits, out_channels, FPGA, warmup)
+        self.out_channels = out_channels
+        if self.out_channels == -1:
+            self.scale = Parameter(torch.Tensor(1))  # 量化比例因子
+        else:
+            self.scale = Parameter(torch.Tensor(1, self.out_channels, 1, 1))  # 量化比例因子
+        init.ones_(self.scale)
+
+    def forward(self, input):
+        if self.bits == 32:
+            output = input
+        elif self.bits == 1:
+            print('!Binary quantization is not supported !')
+            assert self.bits != 1
+        else:
+            if self.warmup:
+                max_metrics = -1
+                max_step = -5
+                step = (torch.max(input)) / 1000
+                # if self.out_channels == -1:
+                for i in range(1, 1000):
+                    self.scale.data.copy_(torch.Tensor([step * i]))
+                    output = self.clamp(input)  # 截断
+                    output = self.quantize(output)  # 量化
+                    output = self.round(output)
+                    output = self.dequantize(output)  # 反量化
+                    cosine_similarity = torch.cosine_similarity(input.view(-1), output.view(-1), dim=0)
+                    if cosine_similarity > max_metrics:
+                        max_metrics = cosine_similarity
+                        max_step = i
+                print("max_step:", max_step)
+                print("max_metrics:", max_metrics)
+                self.scale.data.copy_(torch.Tensor([step * max_step]))
+                # else:
+                #     for k in range(input.shape[1]):
+                #         for i in range(1, 1000):
+                #             self.scale[:, k, :, :].data.copy_(torch.Tensor([step * i]))
+                #             output = self.clamp(input)  # 截断
+                #             output = self.quantize(output)  # 量化
+                #             output = self.round(output)
+                #             output = self.dequantize(output)  # 反量化
+                #             cosine_similarity = torch.cosine_similarity(input.view(-1), output.view(-1), dim=0)
+                #             if cosine_similarity > max_metrics:
+                #                 max_metrics = cosine_similarity
+                #                 max_step = i
+                #         print("max_step:", max_step)
+                #         self.scale[:, k, :, :].data.copy_(torch.Tensor([step * max_step]))
+                #     print("max_metrics:", max_metrics)
+                self.warmup.add_(-1)
+            else:
+                output = self.clamp(input)  # 截断
+                output = self.quantize(output)  # 量化
+                output = self.round(output)
+                output = self.dequantize(output)  # 反量化
+        return output
+
+
+class Dorefa_Weight_Quantizer(nn.Module):
+    def __init__(self, w_bits):
+        super().__init__()
+        self.w_bits = w_bits
+
+    def round(self, input):
+        output = Round.apply(input)
+        return output
+
+    def forward(self, input):
+        if self.w_bits == 32:
+            output = input
+        elif self.w_bits == 1:
+            print('!Binary quantization is not supported !')
+            assert self.w_bits != 1
+        else:
+            output = torch.tanh(input)
+            output = output / 2 / torch.max(torch.abs(output)) + 0.5  # 归一化-[0,1]
+            scale = float(2 ** self.w_bits - 1)
+            output = output * scale
+            output = self.round(output)
+            output = output / scale
+            output = 2 * output - 1
+        return output
+
+
 # ********************* 量化卷积（同时量化A/W，并做卷积） *********************
 class TPSQ_QuantizedConv2d(nn.Conv2d):
     def __init__(
@@ -259,7 +433,8 @@ class TPSQ_QuantizedConv2d(nn.Conv2d):
             groups=1,
             bias=True,
             a_bits=8,
-            w_bits=8):
+            w_bits=8,
+            warmup=False):
         super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
@@ -271,8 +446,9 @@ class TPSQ_QuantizedConv2d(nn.Conv2d):
             bias=bias
         )
         # 实例化量化器（A-layer级，W-channel级）
-        self.activation_quantizer = Quantizer(bits=a_bits, out_channels=-1, FPGA=False)
-        self.weight_quantizer = Quantizer(bits=w_bits, out_channels=-1, FPGA=False)
+        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=in_channels, FPGA=True,
+                                                          warmup=warmup)
+        self.weight_quantizer = Weight_Quantizer(bits=w_bits, out_channels=out_channels, FPGA=True, warmup=warmup)
 
     def forward(self, input):
         # 量化A和W
@@ -324,7 +500,8 @@ class TPSQ_BNFold_QuantizedConv2d_For_FPGA(TPSQ_QuantizedConv2d):
             activate='leaky',
             steps=0,
             quantizer_output=False,
-            maxabsscaler=False
+            maxabsscaler=False,
+            warmup=False
     ):
         super().__init__(
             in_channels=in_channels,
@@ -354,10 +531,10 @@ class TPSQ_BNFold_QuantizedConv2d_For_FPGA(TPSQ_QuantizedConv2d):
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
 
-        self.activation_quantizer = Quantizer(bits=a_bits, out_channels=-1, FPGA=True)
-        self.weight_quantizer = Quantizer(bits=w_bits, out_channels=-1, FPGA=True)
-        self.bias_quantizer = SymmetricQuantizer(bits=w_bits,
-                                                 range_tracker=GlobalRangeTracker())
+        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=in_channels, FPGA=True,
+                                                          warmup=warmup)
+        self.weight_quantizer = Weight_Quantizer(bits=w_bits, out_channels=out_channels, FPGA=True, warmup=warmup)
+        self.bias_quantizer = SymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker())
 
     def forward(self, input):
         # 训练态

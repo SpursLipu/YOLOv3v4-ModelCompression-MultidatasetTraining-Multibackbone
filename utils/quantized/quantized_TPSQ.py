@@ -30,38 +30,22 @@ class Search_Pow2(Function):
 
     @staticmethod
     def forward(self, input):
-        # ceil_float_range = 2 ** input.log2().ceil()
-        # floor_float_range = 2 ** input.log2().floor()
-        # if abs(ceil_float_range - input) < abs(floor_float_range - input):
-        #     output = ceil_float_range
-        # else:
-        #     output = floor_float_range
-        # return output
         output = input
         output[output < 0].data.copy_(torch.Tensor([2 ** -5]))
         output[output > 2 ** (8 + 5)].data.copy_(torch.Tensor([2 ** (8 + 5)]))
         ceil_float_range = 2 ** output.log2().ceil()
         floor_float_range = 2 ** output.log2().floor()
         output[abs(ceil_float_range - output) < abs(floor_float_range - output)].data.copy_(ceil_float_range[
-                                                                                                abs(
-                                                                                                    ceil_float_range - output) < abs(
+                                                                                                abs(ceil_float_range - output) < abs(
                                                                                                     floor_float_range - output)].data)
         output[abs(ceil_float_range - output) >= abs(floor_float_range - output)].data.copy_(floor_float_range[
-                                                                                                 abs(
-                                                                                                     ceil_float_range - output) >= abs(
+                                                                                                 abs(ceil_float_range - output) >= abs(
                                                                                                      floor_float_range - output)].data)
         self.save_for_backward(input, output)
         return output
 
     @staticmethod
     def backward(self, grad_output):
-        # # 线性
-        # grad_input = 0.8985 * (grad_output.clone())
-        # # 多项式
-        # # temp = grad_output.clone()
-        # # grad_input = -0.668 * temp + 1.335
-        #
-        # return grad_input
         input, output = self.saved_tensors
         scale = output / input
         grad_input = scale * grad_output.clone()
@@ -82,8 +66,6 @@ class Search_Pow2(Function):
 class Quantizer(nn.Module):
     def __init__(self, bits, out_channels, FPGA, warmup=False):
         super().__init__()
-        # self.bits = bits
-        # self.FPGA = FPGA
         self.first = True
         self.momentum = 0.1
         self.bits = bits
@@ -96,10 +78,10 @@ class Quantizer(nn.Module):
 
     # 截断
     def clamp(self, input):
-        print('==============')
-        print((Search_Pow2.apply(self.scale)).size())
-        print(input.size())
-        print('==============')
+        #print('==============')
+        #print((Search_Pow2.apply(self.scale)).size())
+        #print(input.size())
+        #print('==============')
         if self.FPGA:
             output = 0.5 * (
                     torch.abs(input + Search_Pow2.apply(self.scale)) - torch.abs(input - Search_Pow2.apply(self.scale)))
@@ -501,7 +483,7 @@ class TPSQ_BNFold_QuantizedConv2d_For_FPGA(TPSQ_QuantizedConv2d):
             steps=0,
             quantizer_output=False,
             maxabsscaler=False,
-            warmup=False
+            warmup=True
     ):
         super().__init__(
             in_channels=in_channels,
@@ -531,7 +513,7 @@ class TPSQ_BNFold_QuantizedConv2d_For_FPGA(TPSQ_QuantizedConv2d):
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
 
-        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=in_channels, FPGA=True,
+        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=out_channels, FPGA=True,
                                                           warmup=warmup)
         self.weight_quantizer = Weight_Quantizer(bits=w_bits, out_channels=out_channels, FPGA=True, warmup=warmup)
         self.bias_quantizer = SymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker())

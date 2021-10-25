@@ -335,23 +335,26 @@ class Activattion_Quantizer(Quantizer):
             assert self.bits != 1
         else:
             if self.warmup:
-                max_metrics = -1
-                max_step = -5
-                step = (torch.max(input)) / 1000
-                # if self.out_channels == -1:
-                for i in range(1, 1000):
-                    self.scale.data.copy_(torch.Tensor([step * i]))
-                    output = self.clamp(input)  # 截断
-                    output = self.quantize(output)  # 量化
-                    output = self.round(output)
-                    output = self.dequantize(output)  # 反量化
-                    cosine_similarity = torch.cosine_similarity(input.view(-1), output.view(-1), dim=0)
-                    if cosine_similarity > max_metrics:
-                        max_metrics = cosine_similarity
-                        max_step = i
-                print("max_step:", max_step)
-                print("max_metrics:", max_metrics)
-                self.scale.data.copy_(torch.Tensor([step * max_step]))
+                with torch.no_grad():
+                    max_metrics = -1
+                    max_step = -5
+                    step = (torch.max(input)) / 1000
+                    # if self.out_channels == -1:
+                    for i in range(1, 1000):
+                        self.scale.data.copy_(torch.Tensor([step * i]))
+                        output = self.clamp(input)  # 截断
+                        output = self.quantize(output)  # 量化
+                        output = self.round(output)
+                        output = self.dequantize(output)  # 反量化
+                        cosine_similarity = torch.cosine_similarity(input.view(-1), output.view(-1), dim=0)
+                        if cosine_similarity > max_metrics:
+                            max_metrics = cosine_similarity
+                            max_step = i
+                        del output
+                        torch.cuda.empty_cache()
+                    #print("max_step:", max_step)
+                    #print("max_metrics:", max_metrics)
+                    self.scale.data.copy_(torch.Tensor([step * max_step]))
                 # else:
                 #     for k in range(input.shape[1]):
                 #         for i in range(1, 1000):
@@ -368,11 +371,10 @@ class Activattion_Quantizer(Quantizer):
                 #         self.scale[:, k, :, :].data.copy_(torch.Tensor([step * max_step]))
                 #     print("max_metrics:", max_metrics)
                 self.warmup.add_(-1)
-            else:
-                output = self.clamp(input)  # 截断
-                output = self.quantize(output)  # 量化
-                output = self.round(output)
-                output = self.dequantize(output)  # 反量化
+            output = self.clamp(input)  # 截断
+            output = self.quantize(output)  # 量化
+            output = self.round(output)
+            output = self.dequantize(output)  # 反量化
         return output
 
 

@@ -269,7 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--quantized', type=int, default=-1, help='quantization way')
-    parser.add_argument('--shortcut_way', type=int, default=-1, help='--shortcut quantization way')
+    parser.add_argument('--shortcut_way', type=int, default=1, help='--shortcut quantization way')
     parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
     parser.add_argument('--FPGA', action='store_true', help='FPGA')

@@ -118,25 +118,36 @@ def train(hyp):
     # gridmask = GridMask(d1=96, d2=224, rotate=360, ratio=0.6, mode=1, prob=0.8)
 
     # Optimizer
-    pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
+    if opt.quantized == 4:
+        pg0, pg1, pg2, pg3 = [], [], [], [] # optimizer parameter groups
+    else:
+        pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
     for k, v in dict(model.named_parameters()).items():
         if '.bias' in k:
             pg2 += [v]  # biases
         elif 'Conv2d.weight' in k:
             pg1 += [v]  # apply weight_decay
+        elif 'scale' in k and opt.quantized == 4:
+            pg3 += [v]
         else:
             pg0 += [v]  # all else
-
-    if opt.adam:
+    
+    if opt.adam or opt.quantized != -1:
         # hyp['lr0'] *= 0.1  # reduce lr (i.e. SGD=5E-3, Adam=5E-4)
-        optimizer = optim.Adam(pg0, lr=hyp['lr0'])
+        optimizer = optim.Adam(pg0, lr=hyp['lr0']*0.05)
+        if opt.quantized == 4:
+            optimizer.add_param_group({'params': pg3})
         # optimizer = AdaBound(pg0, lr=hyp['lr0'], final_lr=0.1)
     else:
         optimizer = optim.SGD(pg0, lr=hyp['lr0'], momentum=hyp['momentum'], nesterov=True)
     optimizer.add_param_group({'params': pg1, 'weight_decay': hyp['weight_decay']})  # add pg1 with weight_decay
     optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
-    print('Optimizer groups: %g .bias, %g Conv2d.weight, %g other' % (len(pg2), len(pg1), len(pg0)))
-    del pg0, pg1, pg2
+    if opt.quantized == 4:
+        print('Optimizer groups: %g .scale, %g .bias, %g Conv2d.weight, %g other' % (len(pg3), len(pg2), len(pg1), len(pg0)))
+        del pg0, pg1, pg2, pg3
+    else:
+        print('Optimizer groups: %g .bias, %g Conv2d.weight, %g other' % (len(pg2), len(pg1), len(pg0)))
+        del pg0, pg1, pg2
 
     best_fitness = 0.0
     if weights != 'None':
@@ -182,8 +193,11 @@ def train(hyp):
         print('teacher model:', t_weights, '\n')
 
     # Scheduler https://arxiv.org/pdf/1812.01187.pdf
-    lf = lambda x: (((1 + math.cos(x * math.pi / epochs)) / 2) ** 1.0) * 0.95 + 0.05  # cosine
-    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
+    if opt.quantized != -1:
+        scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[epochs//5, epochs//2, epochs//1.25], gamma=0.3)
+    else:
+        lf = lambda x: (((1 + math.cos(x * math.pi / epochs)) / 2) ** 1.0) * 0.95 + 0.05  # cosine
+        scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch - 1  # see link below
     # https://discuss.pytorch.org/t/a-problem-occured-when-resuming-an-optimizer/28822
 
@@ -340,7 +354,7 @@ def train(hyp):
                     img = sign * torch.floor(torch.abs(img) + 0.5)
                     img = img / (2 ** 14)
             # Burn-in
-            if ni <= n_burn:
+            if ni <= n_burn and opt.quantized == -1:
                 xi = [0, n_burn]  # x interp
                 model.gr = np.interp(ni, xi, [0.0, 1.0])  # giou loss ratio (obj_loss = 1.0 or giou)
                 accumulate = max(1, np.interp(ni, xi, [1, 64 / batch_size]).round())

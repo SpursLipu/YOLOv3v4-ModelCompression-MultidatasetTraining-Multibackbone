@@ -8,8 +8,6 @@ from utils.quantized.quantized_TPSQ import *
 from utils.layers import *
 import copy
 
-ONNX_EXPORT = False
-
 
 # YOLO
 def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, layer_idx, reorder, TM, TN, a_bit=8,
@@ -501,11 +499,7 @@ def create_modules(module_defs, img_size, cfg, quantized, quantizer_output, laye
                 modules.add_module('se', SE(output_filters[-1], reduction=int(mdef['reduction'])))
 
         elif mdef['type'] == 'upsample':
-            if ONNX_EXPORT:  # explicitly state size, avoid scale_factor
-                g = (yolo_index + 1) * 2 / 32  # gain
-                modules = nn.Upsample(size=tuple(int(x * g) for x in img_size))  # img_size = (320, 192)
-            else:
-                modules = nn.Upsample(scale_factor=mdef['stride'])
+            modules = nn.Upsample(scale_factor=mdef['stride'])
 
         elif mdef['type'] == 'route':  # nn.Sequential() placeholder for 'route' layer
             layers = mdef['layers']
@@ -652,10 +646,6 @@ class YOLOLayer(nn.Module):
 
         self.quantizer_output = quantizer_output
 
-        if ONNX_EXPORT:
-            self.training = False
-            self.create_grids((img_size[1] // stride, img_size[0] // stride))  # number x, y grid points
-
     def create_grids(self, ng=(13, 13), device='cpu'):
         self.nx, self.ny = ng  # x and y grid size
         self.ng = torch.tensor(ng, dtype=torch.float)
@@ -689,9 +679,6 @@ class YOLOLayer(nn.Module):
                 if j != i:
                     p += w[:, j:j + 1] * \
                          F.interpolate(out[self.layers[j]][:, :-n], size=[ny, nx], mode='bilinear', align_corners=False)
-
-        elif ONNX_EXPORT:
-            bs = 1  # batch size
         else:
             bs, _, ny, nx = p.shape  # bs, 255, 13, 13
             # if (self.nx, self.ny) != (nx, ny):
@@ -702,20 +689,6 @@ class YOLOLayer(nn.Module):
 
         if self.training:
             return p
-
-        elif ONNX_EXPORT:
-            # Avoid broadcasting for ANE operations
-            m = self.na * self.nx * self.ny
-            ng = 1. / self.ng.repeat(m, 1)
-            grid = self.grid.repeat(1, self.na, 1, 1, 1).view(m, 2)
-            anchor_wh = self.anchor_wh.repeat(1, 1, self.nx, self.ny, 1).view(m, 2) * ng
-
-            p = p.view(m, self.no)
-            xy = torch.sigmoid(p[:, 0:2]) + grid  # x, y
-            wh = torch.exp(p[:, 2:4]) * anchor_wh  # width, height
-            p_cls = torch.sigmoid(p[:, 4:5]) if self.nc == 1 else \
-                torch.sigmoid(p[:, 5:self.no]) * torch.sigmoid(p[:, 4:5])  # conf
-            return p_cls, xy * ng, wh
 
         else:  # inference
             io = p.clone()  # inference output
@@ -782,7 +755,7 @@ class Darknet(nn.Module):
         self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
         # 输出modelsummary
-        self.info(verbose) if not ONNX_EXPORT else None  # print model description
+        self.info(verbose) # print model description
 
     def forward(self, x, augment=False):
 
@@ -858,9 +831,6 @@ class Darknet(nn.Module):
 
         if self.training:  # train
             return yolo_out, feature_out
-        elif ONNX_EXPORT:  # export
-            x = [torch.cat(x, 0) for x in zip(*yolo_out)]
-            return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4
         else:  # inference or test
             x, p = zip(*yolo_out)  # inference output, training output
             x = torch.cat(x, 1)  # cat yolo outputs
@@ -889,7 +859,6 @@ class Darknet(nn.Module):
                         break
             fused_list.append(a)
         self.module_list = fused_list
-        self.info() if not ONNX_EXPORT else None  # yolov3-spp reduced from 225 to 152 layers
 
     def info(self, verbose=False):
         torch_utils.model_info(self, verbose)

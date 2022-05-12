@@ -1,9 +1,7 @@
 import argparse
-import subprocess
-import Val_upsample
-import os
+from utils import output_upsample
 
-from models import *  # set ONNX_EXPORT in models.py
+from models import *
 from utils.datasets import *
 from utils.utils import *
 
@@ -12,12 +10,12 @@ def detect(save_img=False):
     if opt.quantizer_output == True:
         tmp_dir = 'quantizer_output'
         subprocess.Popen("rm -rf %s" % tmp_dir, shell=True)
-    imgsz = (320, 192) if ONNX_EXPORT else opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
+    imgsz = opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
     out, source, weights, view_img, save_txt = opt.output, opt.source, opt.weights, opt.view_img, opt.save_txt
     webcam = source == '0' or source.startswith('rtsp') or source.startswith('http') or source.endswith('.txt')
 
     # Initialize
-    device = torch_utils.select_device(device='cpu' if ONNX_EXPORT else opt.device)
+    device = torch_utils.select_device(opt.device)
     if os.path.exists(out):
         shutil.rmtree(out)  # delete output folder
     os.makedirs(out)  # make new output folder
@@ -220,4 +218,4 @@ if __name__ == '__main__':
         detect()
 
         if opt.quantizer_output == True and opt.layer_idx == -1:
-            Val_upsample.Val_upsample(opt.cfg, opt.TN)
+            output_upsample.Val_upsample(opt.cfg, opt.TN)

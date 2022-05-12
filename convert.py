@@ -2,13 +2,13 @@
 import argparse
 from sys import platform
 
-from models import *  # set ONNX_EXPORT in models.py
+from models import *
 from utils.datasets import *
 from utils.utils import *
 
 
 def convert():
-    img_size = (320, 192) if ONNX_EXPORT else opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
+    img_size = opt.img_size  # (320, 192) or (416, 256) or (608, 352) for (height, width)
     weights = opt.weights
     # Initialize
     device = torch_utils.select_device(opt.device)

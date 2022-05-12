@@ -64,12 +64,11 @@ class Search_Pow2(Function):
 
 
 class Quantizer(nn.Module):
-    def __init__(self, bits, out_channels, FPGA, warmup=False):
+    def __init__(self, bits, out_channels, warmup=False):
         super().__init__()
         self.first = True
         self.momentum = 0.1
         self.bits = bits
-        self.FPGA = FPGA
         if warmup:
             self.register_buffer('warmup', torch.ones(1))
         else:
@@ -78,25 +77,19 @@ class Quantizer(nn.Module):
 
     # 截断
     def clamp(self, input):
-        #print('==============')
-        #print((Search_Pow2.apply(self.scale)).size())
-        #print(input.size())
-        #print('==============')
-        if self.FPGA:
-            output = 0.5 * (
-                    torch.abs(input + Search_Pow2.apply(self.scale)) - torch.abs(input - Search_Pow2.apply(self.scale)))
-        else:
-            output = 0.5 * (
-                    torch.abs(input + self.scale) - torch.abs(input - self.scale))
+        # print('==============')
+        # print((Search_Pow2.apply(self.scale)).size())
+        # print(input.size())
+        # print('==============')
+        output = 0.5 * (
+                torch.abs(input + Search_Pow2.apply(self.scale)) - torch.abs(input - Search_Pow2.apply(self.scale)))
         return output
 
     # 量化
     def quantize(self, input):
         quantized_range = torch.tensor((1 << (self.bits - 1)) - 1)
-        if self.FPGA:
-            output = (input * quantized_range) / Search_Pow2.apply(self.scale)
-        else:
-            output = (input * quantized_range) / self.scale
+        output = (input * quantized_range) / Search_Pow2.apply(self.scale)
+
         return output
 
     def round(self, input):
@@ -106,10 +99,8 @@ class Quantizer(nn.Module):
     # 反量化
     def dequantize(self, input):
         quantized_range = torch.tensor((1 << (self.bits - 1)))
-        if self.FPGA:
-            output = (input * Search_Pow2.apply(self.scale)) / quantized_range
-        else:
-            output = (input * self.scale) / quantized_range
+        output = (input * Search_Pow2.apply(self.scale)) / quantized_range
+
         return output
 
     def forward(self, input):
@@ -259,8 +250,8 @@ class SymmetricQuantizer(Bias_Quantizer):
 
 
 class Weight_Quantizer(Quantizer):
-    def __init__(self, bits, out_channels, FPGA, warmup):
-        super().__init__(bits, FPGA, warmup)
+    def __init__(self, bits, out_channels, warmup):
+        super().__init__(bits, warmup)
         self.out_channels = out_channels
         if self.out_channels == -1:
             self.scale = Parameter(torch.Tensor(1))  # 量化比例因子
@@ -318,8 +309,8 @@ class Weight_Quantizer(Quantizer):
 
 
 class Activattion_Quantizer(Quantizer):
-    def __init__(self, bits, out_channels, FPGA, warmup):
-        super().__init__(bits, out_channels, FPGA, warmup)
+    def __init__(self, bits, out_channels, warmup):
+        super().__init__(bits, out_channels, warmup)
         self.out_channels = out_channels
         if self.out_channels == -1:
             self.scale = Parameter(torch.Tensor(1))  # 量化比例因子
@@ -352,8 +343,8 @@ class Activattion_Quantizer(Quantizer):
                             max_step = i
                         del output
                         torch.cuda.empty_cache()
-                    #print("max_step:", max_step)
-                    #print("max_metrics:", max_metrics)
+                    # print("max_step:", max_step)
+                    # print("max_metrics:", max_metrics)
                     self.scale.data.copy_(torch.Tensor([step * max_step]))
                 # else:
                 #     for k in range(input.shape[1]):
@@ -430,9 +421,9 @@ class TPSQ_QuantizedConv2d(nn.Conv2d):
             bias=bias
         )
         # 实例化量化器（A-layer级，W-channel级）
-        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=in_channels, FPGA=True,
+        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=in_channels,
                                                           warmup=warmup)
-        self.weight_quantizer = Weight_Quantizer(bits=w_bits, out_channels=out_channels, FPGA=True, warmup=warmup)
+        self.weight_quantizer = Weight_Quantizer(bits=w_bits, out_channels=out_channels, warmup=warmup)
 
     def forward(self, input):
         # 量化A和W
@@ -515,9 +506,9 @@ class TPSQ_BNFold_QuantizedConv2d_For_FPGA(TPSQ_QuantizedConv2d):
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
 
-        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=out_channels, FPGA=True,
+        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=out_channels,
                                                           warmup=warmup)
-        self.weight_quantizer = Weight_Quantizer(bits=w_bits, out_channels=out_channels, FPGA=True, warmup=warmup)
+        self.weight_quantizer = Weight_Quantizer(bits=w_bits, out_channels=out_channels, warmup=warmup)
         self.bias_quantizer = SymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker())
 
     def forward(self, input):

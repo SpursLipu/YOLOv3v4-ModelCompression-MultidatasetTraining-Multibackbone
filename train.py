@@ -83,7 +83,7 @@ def train(hyp):
     data_dict = parse_data_cfg(data)
     train_path = data_dict['train']
     test_path = data_dict['valid']
-    nc = 1 if opt.single_cls else int(data_dict['classes'])  # number of classes
+    nc = int(data_dict['classes'])  # number of classes
     hyp['cls'] *= nc / 80  # update coco-tuned hyp['cls'] to current dataset
 
     # Remove previous results
@@ -109,7 +109,7 @@ def train(hyp):
     # Initialize model
     steps = math.ceil(len(open(train_path).readlines()) / batch_size) * epochs
     model = Darknet(cfg, quantized=opt.quantized, a_bit=opt.a_bit, w_bit=opt.w_bit,
-                    FPGA=opt.FPGA, steps=steps, is_gray_scale=opt.gray_scale, maxabsscaler=opt.maxabsscaler,
+                    steps=steps, is_gray_scale=opt.gray_scale, maxabsscaler=opt.maxabsscaler,
                     shortcut_way=opt.shortcut_way).to(device)
     if t_cfg:
         t_model = Darknet(t_cfg).to(device)
@@ -119,7 +119,7 @@ def train(hyp):
 
     # Optimizer
     if opt.quantized == 4:
-        pg0, pg1, pg2, pg3 = [], [], [], [] # optimizer parameter groups
+        pg0, pg1, pg2, pg3 = [], [], [], []  # optimizer parameter groups
     else:
         pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
     for k, v in dict(model.named_parameters()).items():
@@ -131,10 +131,10 @@ def train(hyp):
             pg3 += [v]
         else:
             pg0 += [v]  # all else
-    
+
     if opt.adam or opt.quantized != -1:
         # hyp['lr0'] *= 0.1  # reduce lr (i.e. SGD=5E-3, Adam=5E-4)
-        optimizer = optim.Adam(pg0, lr=hyp['lr0']*0.05)
+        optimizer = optim.Adam(pg0, lr=hyp['lr0'] * 0.05)
         if opt.quantized == 4:
             optimizer.add_param_group({'params': pg3})
         # optimizer = AdaBound(pg0, lr=hyp['lr0'], final_lr=0.1)
@@ -143,7 +143,8 @@ def train(hyp):
     optimizer.add_param_group({'params': pg1, 'weight_decay': hyp['weight_decay']})  # add pg1 with weight_decay
     optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
     if opt.quantized == 4:
-        print('Optimizer groups: %g .scale, %g .bias, %g Conv2d.weight, %g other' % (len(pg3), len(pg2), len(pg1), len(pg0)))
+        print('Optimizer groups: %g .scale, %g .bias, %g Conv2d.weight, %g other' % (
+            len(pg3), len(pg2), len(pg1), len(pg0)))
         del pg0, pg1, pg2, pg3
     else:
         print('Optimizer groups: %g .bias, %g Conv2d.weight, %g other' % (len(pg2), len(pg1), len(pg0)))
@@ -180,7 +181,7 @@ def train(hyp):
 
         elif len(weights) > 0:  # darknet format
             # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-            load_darknet_weights(model, weights, pt=opt.pt, FPGA=opt.FPGA)
+            load_darknet_weights(model, weights, pt=opt.pt, quant=(opt.quantized != -1))
     if t_cfg:
         if t_weights.endswith('.pt'):
             t_model.load_state_dict(torch.load(t_weights, map_location=device)['model'])
@@ -194,7 +195,8 @@ def train(hyp):
 
     # Scheduler https://arxiv.org/pdf/1812.01187.pdf
     if opt.quantized != -1:
-        scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[epochs//5, epochs//2, epochs//1.25], gamma=0.3)
+        scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[epochs // 5, epochs // 2, epochs // 1.25],
+                                             gamma=0.3)
     else:
         lf = lambda x: (((1 + math.cos(x * math.pi / epochs)) / 2) ** 1.0) * 0.95 + 0.05  # cosine
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
@@ -226,7 +228,6 @@ def train(hyp):
                                   hyp=hyp,  # augmentation hyperparameters
                                   rect=opt.rect,  # rectangular training
                                   cache_images=opt.cache_images,
-                                  single_cls=opt.single_cls,
                                   rank=opt.local_rank,
                                   is_gray_scale=True if opt.gray_scale else False)
 
@@ -234,7 +235,6 @@ def train(hyp):
                                   hyp=hyp,
                                   rect=True,
                                   cache_images=opt.cache_images,
-                                  single_cls=opt.single_cls,
                                   rank=opt.local_rank,
                                   is_gray_scale=True if opt.gray_scale else False)
 
@@ -283,7 +283,6 @@ def train(hyp):
                                                                  hyp=hyp,
                                                                  rect=True,
                                                                  cache_images=opt.cache_images,
-                                                                 single_cls=opt.single_cls,
                                                                  rank=opt.local_rank,
                                                                  is_gray_scale=True if opt.gray_scale else False),
                                              batch_size=batch_size // 4,
@@ -511,13 +510,11 @@ def train(hyp):
                                       imgsz=imgsz_test,
                                       model=ema.ema if opt.ema else model,
                                       save_json=final_epoch and is_coco,
-                                      single_cls=opt.single_cls,
                                       dataloader=testloader,
                                       multi_label=ni > n_burn,
                                       quantized=opt.quantized,
                                       a_bit=opt.a_bit,
                                       w_bit=opt.w_bit,
-                                      FPGA=opt.FPGA,
                                       rank=opt.local_rank,
                                       plot=True,
                                       maxabsscaler=opt.maxabsscaler,
@@ -621,7 +618,6 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
     parser.add_argument('--ema', action='store_true', help='use ema')
-    parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--pretrain', '-pt', dest='pt', action='store_true',
                         help='use pretrain model')
     parser.add_argument('--mixedprecision', '-mpt', dest='mpt', action='store_true',
@@ -633,7 +629,6 @@ if __name__ == '__main__':
     parser.add_argument('--shortcut_way', type=int, default=1, help='--shortcut quantization way')
     parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
-    parser.add_argument('--FPGA', '-FPGA', dest='FPGA', action='store_true', help='FPGA')
     parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')
     parser.add_argument('--maxabsscaler', '-mas', action='store_true', help='Standarize input to (-1,1)')
     # DDP get local-rank

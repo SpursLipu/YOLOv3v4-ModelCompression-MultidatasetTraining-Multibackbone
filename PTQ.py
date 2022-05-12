@@ -15,7 +15,6 @@ def PTQ(cfg,
         weights=None,
         batch_size=64,
         imgsz=416,
-        single_cls=False,
         augment=False,
         a_bit=8,
         w_bit=8, ):
@@ -25,7 +24,7 @@ def PTQ(cfg,
     print('')  # skip a line
     # Initialize model
     model = Darknet(cfg, is_gray_scale=opt.gray_scale, maxabsscaler=opt.maxabsscaler)
-    q_model = Darknet(cfg, quantized=5, a_bit=a_bit, w_bit=w_bit, FPGA=True, is_gray_scale=opt.gray_scale,
+    q_model = Darknet(cfg, quantized=3, a_bit=a_bit, w_bit=w_bit, is_gray_scale=opt.gray_scale,
                       maxabsscaler=opt.maxabsscaler,
                       shortcut_way=opt.shortcut_way)
 
@@ -36,7 +35,7 @@ def PTQ(cfg,
         q_model.load_state_dict(torch.load(weights, map_location=device)['model'])
     else:  # darknet format
         load_darknet_weights(model, weights)
-        load_darknet_weights(q_model, weights, FPGA=True)
+        load_darknet_weights(q_model, weights, quant=True)
 
     model.to(device)
     q_model.to(device)
@@ -45,10 +44,10 @@ def PTQ(cfg,
     t_data = parse_data_cfg(t_data)
     t_path = t_data['valid']  # path to test images
     c_data = parse_data_cfg(c_data)
-    c_path = c_data['valid']  # path to test images
+    c_path = c_data['train']  # path to test images
 
     # Dataloader
-    c_dataset = LoadImagesAndLabels(c_path, imgsz, batch_size, rect=True, single_cls=single_cls,
+    c_dataset = LoadImagesAndLabels(c_path, imgsz, batch_size, rect=True,
                                     is_gray_scale=True if opt.gray_scale else False, subset_len=opt.subset_len)
     c_batch_size = min(batch_size, len(c_dataset))
     c_dataloader = DataLoader(c_dataset,
@@ -57,7 +56,7 @@ def PTQ(cfg,
                               pin_memory=True,
                               collate_fn=c_dataset.collate_fn)
 
-    t_dataset = LoadImagesAndLabels(t_path, imgsz, batch_size, rect=True, single_cls=single_cls,
+    t_dataset = LoadImagesAndLabels(t_path, imgsz, batch_size, rect=True,
                                     is_gray_scale=True if opt.gray_scale else False)
     t_batch_size = min(batch_size, len(t_dataset))
     t_dataloader = DataLoader(t_dataset,
@@ -98,7 +97,7 @@ def PTQ(cfg,
               imgsz=imgsz,
               model=q_model,
               dataloader=t_dataloader,
-              quantized=4,
+              quantized=3,
               a_bit=opt.a_bit,
               w_bit=opt.w_bit,
               rank=-1,
@@ -151,7 +150,6 @@ if __name__ == '__main__':
         opt.weights,
         opt.batch_size,
         opt.img_size,
-        opt.single_cls,
         opt.augment,
         a_bit=opt.a_bit,
         w_bit=opt.w_bit)

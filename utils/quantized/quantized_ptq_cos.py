@@ -738,14 +738,13 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
 
 
 class COSPTQuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
-    def __init__(self, layers, weight=False, bits=8, FPGA=False,
+    def __init__(self, layers, weight=False, bits=8,
                  quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
         super(COSPTQuantizedShortcut_min, self).__init__()
         self.layers = layers  # layer indices
         self.weight = weight  # apply weights boolean
         self.n = len(layers) + 1  # number of layers
         self.bits = bits
-        self.FPGA = FPGA
 
         self.register_buffer('scale_x', torch.zeros(1))  # 量化比例因子
         self.register_buffer('float_range_x', torch.zeros(1))
@@ -1056,14 +1055,13 @@ class COSPTQuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers
 
 
 class COSPTQuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
-    def __init__(self, layers, weight=False, bits=8, FPGA=False,
+    def __init__(self, layers, weight=False, bits=8,
                  quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
         super(COSPTQuantizedShortcut_max, self).__init__()
         self.layers = layers  # layer indices
         self.weight = weight  # apply weights boolean
         self.n = len(layers) + 1  # number of layers
         self.bits = bits
-        self.FPGA = FPGA
 
         self.register_buffer('scale_x', torch.zeros(1))  # 量化比例因子
         self.register_buffer('float_range_x', torch.zeros(1))
@@ -1363,7 +1361,7 @@ class COSPTQuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers
 
 
 class COSPTQuantizedFeatureConcat(nn.Module):
-    def __init__(self, layers, groups, bits=8, FPGA=False,
+    def __init__(self, layers, groups, bits=8,
                  quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
         super(COSPTQuantizedFeatureConcat, self).__init__()
         self.layers = layers  # layer indices
@@ -1372,7 +1370,6 @@ class COSPTQuantizedFeatureConcat(nn.Module):
         self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
         self.register_buffer('float_max_list', torch.zeros(len(layers)))
         self.bits = bits
-        self.FPGA = FPGA
         self.momentum = 0.1
         self.quantizer_output = quantizer_output
         self.reorder = reorder
@@ -1424,16 +1421,13 @@ class COSPTQuantizedFeatureConcat(nn.Module):
 
                     del temp
                     torch.cuda.empty_cache()
-                if self.FPGA == False:
-                    float_range = max(self.float_max_list).unsqueeze(0)  # 量化前范围
+                float_max = max(self.float_max_list).unsqueeze(0)  # 量化前范围
+                floor_float_range = 2 ** float_max.log2().floor()
+                ceil_float_range = 2 ** float_max.log2().ceil()
+                if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                    float_range = ceil_float_range
                 else:
-                    float_max = max(self.float_max_list).unsqueeze(0)  # 量化前范围
-                    floor_float_range = 2 ** float_max.log2().floor()
-                    ceil_float_range = 2 ** float_max.log2().ceil()
-                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                        float_range = ceil_float_range
-                    else:
-                        float_range = floor_float_range
+                    float_range = floor_float_range
                 self.scale = float_range / quantized_range  # 量化比例因子
 
             if self.quantizer_output == True:

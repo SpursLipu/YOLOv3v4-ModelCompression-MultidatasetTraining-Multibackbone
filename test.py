@@ -15,7 +15,6 @@ def test(cfg,
          conf_thres=0.001,
          iou_thres=0.6,  # for nms
          save_json=False,
-         single_cls=False,
          augment=False,
          model=None,
          dataloader=None,
@@ -23,7 +22,6 @@ def test(cfg,
          quantized=-1,
          a_bit=8,
          w_bit=8,
-         FPGA=False,
          rank=-1,
          plot=True,
          is_gray_scale=False,
@@ -40,17 +38,18 @@ def test(cfg,
 
         # Initialize model
         model = Darknet(cfg, imgsz, quantized=quantized, a_bit=a_bit, w_bit=w_bit,
-                        FPGA=FPGA, is_gray_scale=is_gray_scale, maxabsscaler=maxabsscaler, shortcut_way=shortcut_way)
+                        is_gray_scale=is_gray_scale, maxabsscaler=maxabsscaler, shortcut_way=shortcut_way)
 
         # Load weights
         attempt_download(weights)
         if weights.endswith('.pt'):  # pytorch format
             model.load_state_dict(torch.load(weights, map_location=device)['model'])
         else:  # darknet format
-            load_darknet_weights(model, weights, FPGA=FPGA)
+            load_darknet_weights(model, weights, quant=(quantized != -1))
 
         # Fuse
-        model.fuse(quantized=quantized, FPGA=opt.FPGA)
+        if quantized == -1:
+            model.fuse()
         model.to(device)
 
         if device.type != 'cpu' and torch.cuda.device_count() > 1:
@@ -61,7 +60,7 @@ def test(cfg,
         verbose = False
     # Configure run
     data = parse_data_cfg(data)
-    nc = 1 if single_cls else int(data['classes'])  # number of classes
+    nc = int(data['classes'])  # number of classes
     path = data['valid']  # path to test images
     names = load_classes(data['names'])  # class names
     iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
@@ -70,7 +69,7 @@ def test(cfg,
 
     # Dataloader
     if dataloader is None:
-        dataset = LoadImagesAndLabels(path, imgsz, batch_size, rect=True, single_cls=single_cls,
+        dataset = LoadImagesAndLabels(path, imgsz, batch_size, rect=True,
                                       is_gray_scale=is_gray_scale)
         batch_size = min(batch_size, len(dataset))
         dataloader = DataLoader(dataset,
@@ -266,13 +265,11 @@ if __name__ == '__main__':
     parser.add_argument('--save-json', action='store_true', help='save a cocoapi-compatible JSON results file')
     parser.add_argument('--task', default='test', help="'test', 'study', 'benchmark'")
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
-    parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--quantized', type=int, default=-1, help='quantization way')
     parser.add_argument('--shortcut_way', type=int, default=1, help='--shortcut quantization way')
     parser.add_argument('--a-bit', type=int, default=8, help='a-bit')
     parser.add_argument('--w-bit', type=int, default=8, help='w-bit')
-    parser.add_argument('--FPGA', action='store_true', help='FPGA')
     parser.add_argument('--gray-scale', action='store_true', help='gray scale trainning')
     parser.add_argument('--maxabsscaler', '-mas', action='store_true', help='Standarize input to (-1,1)')
 
@@ -293,12 +290,10 @@ if __name__ == '__main__':
              opt.conf_thres,
              opt.iou_thres,
              opt.save_json,
-             opt.single_cls,
              opt.augment,
              quantized=opt.quantized,
              a_bit=opt.a_bit,
              w_bit=opt.w_bit,
-             FPGA=opt.FPGA,
              rank=-1,
              is_gray_scale=opt.gray_scale,
              maxabsscaler=opt.maxabsscaler,

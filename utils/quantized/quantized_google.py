@@ -93,11 +93,10 @@ class Round(Function):
 
 
 class Quantizer(nn.Module):
-    def __init__(self, bits, range_tracker, out_channels, FPGA, sign=True):
+    def __init__(self, bits, range_tracker, out_channels, sign=True):
         super().__init__()
         self.bits = bits
         self.range_tracker = range_tracker
-        self.FPGA = FPGA
         self.sign = sign
         if out_channels == -1:
             self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
@@ -183,17 +182,13 @@ class SymmetricQuantizer(Quantizer):
 
         quantized_range = torch.max(torch.abs(min_val), torch.abs(max_val))  # 量化后范围
 
-        if self.FPGA == False:
-            float_range = torch.max(torch.abs(self.range_tracker.min_val),
-                                    torch.abs(self.range_tracker.max_val))  # 量化前范围
+        float_max = torch.max(torch.abs(self.range_tracker.min_val), torch.abs(self.range_tracker.max_val))  # 量化前范围
+        floor_float_range = 2 ** float_max.log2().floor()
+        ceil_float_range = 2 ** float_max.log2().ceil()
+        if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+            float_range = ceil_float_range
         else:
-            float_max = torch.max(torch.abs(self.range_tracker.min_val), torch.abs(self.range_tracker.max_val))  # 量化前范围
-            floor_float_range = 2 ** float_max.log2().floor()
-            ceil_float_range = 2 ** float_max.log2().ceil()
-            if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                float_range = ceil_float_range
-            else:
-                float_range = floor_float_range
+            float_range = floor_float_range
         self.scale = float_range / quantized_range  # 量化比例因子
         self.zero_point = torch.zeros_like(self.scale)  # 量化零点
 
@@ -209,16 +204,14 @@ class AsymmetricQuantizer(Quantizer):
             min_val = torch.tensor(0)
             max_val = torch.tensor((1 << self.bits) - 1)
         quantized_range = max_val - min_val  # 量化后范围
-        if self.FPGA == False:
-            float_range = self.range_tracker.max_val - self.range_tracker.min_val  # 量化前范围
+
+        float_range = self.range_tracker.max_val - self.range_tracker.min_val  # 量化前范围
+        ceil_float_range = 2 ** float_range.log2().ceil()
+        floor_float_range = 2 ** float_range.log2().floor()
+        if abs(ceil_float_range - float_range) < abs(floor_float_range - float_range):
+            float_range = ceil_float_range
         else:
-            float_range = self.range_tracker.max_val - self.range_tracker.min_val  # 量化前范围
-            ceil_float_range = 2 ** float_range.log2().ceil()
-            floor_float_range = 2 ** float_range.log2().floor()
-            if abs(ceil_float_range - float_range) < abs(floor_float_range - float_range):
-                float_range = ceil_float_range
-            else:
-                float_range = floor_float_range
+            float_range = floor_float_range
         self.scale = float_range / quantized_range  # 量化比例因子
         self.zero_point = torch.round(max_val - self.range_tracker.max_val / self.scale)  # 量化零点
 
@@ -252,18 +245,18 @@ class QuantizedConv2d(nn.Conv2d):
         if q_type == 0:
             self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L',
                                                                                                            out_channels=-1),
-                                                           out_channels=-1, FPGA=False)
+                                                           out_channels=-1)
             self.weight_quantizer = SymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
                                                                                                      out_channels=out_channels),
-                                                       out_channels=out_channels, FPGA=False)
+                                                       out_channels=out_channels)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
                                                             range_tracker=AveragedRangeTracker(q_level='L',
                                                                                                out_channels=-1),
-                                                            out_channels=-1, FPGA=False, sign=False)
+                                                            out_channels=-1, sign=False)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
                                                                                                       out_channels=out_channels),
-                                                        out_channels=out_channels, FPGA=False, sign=False)
+                                                        out_channels=out_channels, sign=False)
 
     def forward(self, input):
         # 量化A和W
@@ -358,24 +351,24 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         if q_type == 0:
             self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L',
                                                                                                            out_channels=-1),
-                                                           out_channels=-1, FPGA=True)
+                                                           out_channels=-1)
             self.weight_quantizer = SymmetricQuantizer(bits=w_bits,
                                                        range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                       out_channels=-1, FPGA=True)
+                                                       out_channels=-1)
             self.bias_quantizer = SymmetricQuantizer(bits=w_bits,
                                                      range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                     out_channels=-1, FPGA=True)
+                                                     out_channels=-1)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
                                                             range_tracker=AveragedRangeTracker(q_level='L',
                                                                                                out_channels=-1),
-                                                            out_channels=-1, FPGA=True, sign=False)
+                                                            out_channels=-1, sign=False)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits,
                                                         range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                        out_channels=-1, FPGA=True, sign=False)
+                                                        out_channels=-1, sign=False)
             self.bias_quantizer = AsymmetricQuantizer(bits=w_bits,
                                                       range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                      out_channels=-1, FPGA=True, sign=False)
+                                                      out_channels=-1, sign=False)
 
     def forward(self, input):
         # 训练态
@@ -908,14 +901,13 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
 
 
 class QuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
-    def __init__(self, layers, weight=False, bits=8, FPGA=False,
+    def __init__(self, layers, weight=False, bits=8,
                  quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
         super(QuantizedShortcut_max, self).__init__()
         self.layers = layers  # layer indices
         self.weight = weight  # apply weights boolean
         self.n = len(layers) + 1  # number of layers
         self.bits = bits
-        self.FPGA = FPGA
         self.range_tracker_x = AveragedRangeTracker(q_level='L', out_channels=-1)
         self.range_tracker_a = AveragedRangeTracker(q_level='L', out_channels=-1)
         self.range_tracker_sum = AveragedRangeTracker(q_level='L', out_channels=-1)
@@ -980,18 +972,14 @@ class QuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers http
                 quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
                 quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
                 quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
-                if self.FPGA == False:
-                    float_range = torch.max(torch.abs(float_min_val),
-                                            torch.abs(float_max_val))  # 量化前范围
+                float_max = torch.max(torch.abs(float_min_val),
+                                      torch.abs(float_max_val))  # 量化前范围
+                floor_float_range = 2 ** float_max.log2().floor()
+                ceil_float_range = 2 ** float_max.log2().ceil()
+                if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                    float_range = ceil_float_range
                 else:
-                    float_max = torch.max(torch.abs(float_min_val),
-                                          torch.abs(float_max_val))  # 量化前范围
-                    floor_float_range = 2 ** float_max.log2().floor()
-                    ceil_float_range = 2 ** float_max.log2().ceil()
-                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                        float_range = ceil_float_range
-                    else:
-                        float_range = floor_float_range
+                    float_range = floor_float_range
                 self.scale = float_range / quantized_range  # 量化比例因子
 
             # 量化因子数据输出
@@ -1140,14 +1128,13 @@ class QuantizedShortcut_max(nn.Module):  # weighted sum of 2 or more layers http
 
 
 class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
-    def __init__(self, layers, weight=False, bits=8, FPGA=False,
+    def __init__(self, layers, weight=False, bits=8,
                  quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
         super(QuantizedShortcut_min, self).__init__()
         self.layers = layers  # layer indices
         self.weight = weight  # apply weights boolean
         self.n = len(layers) + 1  # number of layers
         self.bits = bits
-        self.FPGA = FPGA
         self.range_tracker_x = AveragedRangeTracker(q_level='L', out_channels=-1)
         self.range_tracker_a = AveragedRangeTracker(q_level='L', out_channels=-1)
         self.range_tracker_sum = AveragedRangeTracker(q_level='L', out_channels=-1)
@@ -1211,18 +1198,14 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
                 quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
                 quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
                 quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
-                if self.FPGA == False:
-                    float_range = torch.max(torch.abs(float_min_val),
-                                            torch.abs(float_max_val))  # 量化前范围
+                float_max = torch.max(torch.abs(float_min_val),
+                                      torch.abs(float_max_val))  # 量化前范围
+                floor_float_range = 2 ** float_max.log2().floor()
+                ceil_float_range = 2 ** float_max.log2().ceil()
+                if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                    float_range = ceil_float_range
                 else:
-                    float_max = torch.max(torch.abs(float_min_val),
-                                          torch.abs(float_max_val))  # 量化前范围
-                    floor_float_range = 2 ** float_max.log2().floor()
-                    ceil_float_range = 2 ** float_max.log2().ceil()
-                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                        float_range = ceil_float_range
-                    else:
-                        float_range = floor_float_range
+                    float_range = floor_float_range
                 self.input_scale = float_range / quantized_range  # 量化比例因子
 
             # 量化x
@@ -1251,18 +1234,14 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
                 quantized_min_val = torch.tensor(-(1 << (self.bits - 1)))
                 quantized_max_val = torch.tensor((1 << (self.bits - 1)) - 1)
                 quantized_range = torch.max(torch.abs(quantized_min_val), torch.abs(quantized_max_val))  # 量化后范围
-                if self.FPGA == False:
-                    float_range = torch.max(torch.abs(float_min_val),
-                                            torch.abs(float_max_val))  # 量化前范围
+                float_max = torch.max(torch.abs(float_min_val),
+                                      torch.abs(float_max_val))  # 量化前范围
+                floor_float_range = 2 ** float_max.log2().floor()
+                ceil_float_range = 2 ** float_max.log2().ceil()
+                if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                    float_range = ceil_float_range
                 else:
-                    float_max = torch.max(torch.abs(float_min_val),
-                                          torch.abs(float_max_val))  # 量化前范围
-                    floor_float_range = 2 ** float_max.log2().floor()
-                    ceil_float_range = 2 ** float_max.log2().ceil()
-                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                        float_range = ceil_float_range
-                    else:
-                        float_range = floor_float_range
+                    float_range = floor_float_range
                 self.scale = float_range / quantized_range  # 量化比例因子
             x = self.quantize(x)  # 量化
             x = self.round(x)
@@ -1388,7 +1367,7 @@ class QuantizedShortcut_min(nn.Module):  # weighted sum of 2 or more layers http
 
 
 class QuantizedFeatureConcat(nn.Module):
-    def __init__(self, layers, groups, bits=8, FPGA=False,
+    def __init__(self, layers, groups, bits=8,
                  quantizer_output=False, reorder=False, TM=32, TN=32, name='', layer_idx=-1, ):
         super(QuantizedFeatureConcat, self).__init__()
         self.layers = layers  # layer indices
@@ -1397,7 +1376,6 @@ class QuantizedFeatureConcat(nn.Module):
         self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
         self.register_buffer('float_max_list', torch.zeros(len(layers)))
         self.bits = bits
-        self.FPGA = FPGA
         self.momentum = 0.1
         self.quantizer_output = quantizer_output
         self.reorder = reorder
@@ -1446,16 +1424,13 @@ class QuantizedFeatureConcat(nn.Module):
 
                     del temp
                     torch.cuda.empty_cache()
-                if self.FPGA == False:
-                    float_range = max(self.float_max_list).unsqueeze(0)  # 量化前范围
+                float_max = max(self.float_max_list).unsqueeze(0)  # 量化前范围
+                floor_float_range = 2 ** float_max.log2().floor()
+                ceil_float_range = 2 ** float_max.log2().ceil()
+                if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+                    float_range = ceil_float_range
                 else:
-                    float_max = max(self.float_max_list).unsqueeze(0)  # 量化前范围
-                    floor_float_range = 2 ** float_max.log2().floor()
-                    ceil_float_range = 2 ** float_max.log2().ceil()
-                    if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-                        float_range = ceil_float_range
-                    else:
-                        float_range = floor_float_range
+                    float_range = floor_float_range
                 self.scale = float_range / quantized_range  # 量化比例因子
 
             if self.quantizer_output == True:

@@ -1,6 +1,3 @@
-import math
-import os
-import time
 from copy import deepcopy
 
 import torch.backends.cudnn as cudnn
@@ -65,41 +62,17 @@ def find_modules(model, mclass=nn.Conv2d):
     return [i for i, m in enumerate(model.module_list) if isinstance(m, mclass)]
 
 
-def fuse_conv_and_bn(conv, bn, quantized=-1, FPGA=False):
+def fuse_conv_and_bn(conv, bn):
     # https://tehnokv.com/posts/fusing-batchnorm-and-conv/
     with torch.no_grad():
         # init
-        if quantized == -1:
-            fusedconv = torch.nn.Conv2d(conv.in_channels,
-                                        conv.out_channels,
-                                        groups=conv.groups,
-                                        kernel_size=conv.kernel_size,
-                                        stride=conv.stride,
-                                        padding=conv.padding,
-                                        bias=True)
-        elif quantized == 1 and FPGA == False:
-            fusedconv = QuantizedConv2d(conv.in_channels,
-                                        conv.out_channels,
-                                        groups=conv.groups,
-                                        kernel_size=conv.kernel_size,
-                                        stride=conv.stride,
-                                        padding=conv.padding,
-                                        bias=True)
-            fusedconv.weight_quantizer = deepcopy(conv.weight_quantizer)
-            fusedconv.activation_quantizer = deepcopy(conv.activation_quantizer)
-        elif quantized == 1 and FPGA == True:
-            fusedconv = QuantizedConv2d_For_FPGA(conv.in_channels,
-                                                 conv.out_channels,
-                                                 groups=conv.groups,
-                                                 kernel_size=conv.kernel_size,
-                                                 stride=conv.stride,
-                                                 padding=conv.padding,
-                                                 bias=True)
-            fusedconv.weight_quantizer = deepcopy(conv.weight_quantizer)
-            fusedconv.activation_quantizer = deepcopy(conv.activation_quantizer)
-        else:
-            print("BN fuse error!")
-            return
+        fusedconv = torch.nn.Conv2d(conv.in_channels,
+                                    conv.out_channels,
+                                    groups=conv.groups,
+                                    kernel_size=conv.kernel_size,
+                                    stride=conv.stride,
+                                    padding=conv.padding,
+                                    bias=True)
         # prepare filters
         w_conv = conv.weight.clone().view(conv.out_channels, -1)
         w_bn = torch.diag(bn.weight.div(torch.sqrt(bn.eps + bn.running_var)))

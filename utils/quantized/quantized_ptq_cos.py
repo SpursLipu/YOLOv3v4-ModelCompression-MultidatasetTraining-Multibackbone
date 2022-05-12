@@ -30,7 +30,7 @@ class Quantizer(nn.Module):
         else:
             self.register_buffer('scale', torch.zeros(out_channels, 1, 1, 1))  # 量化比例因子
             self.register_buffer('float_range', torch.zeros(out_channels, 1, 1, 1))
-        self.scale_list = [0 for i in range(bits)]
+        self.scale_list = [0 for i in range(bits + 7)]
 
     def update_params(self, step):
         min_val = torch.tensor(-(1 << (self.bits - 1)))
@@ -71,8 +71,8 @@ class Quantizer(nn.Module):
             if self.training == True:
                 max_metrics = -1
                 max_step = 0
-                for i in range(self.bits):
-                    self.update_params(i)
+                for i in range(self.bits + 7):
+                    self.update_params(i - 5)
                     output = self.quantize(input)  # 量化
                     output = self.round(output)
                     output = self.clamp(output)  # 截断
@@ -81,8 +81,9 @@ class Quantizer(nn.Module):
                     if cosine_similarity > max_metrics:
                         max_metrics = cosine_similarity
                         max_step = i
+                    torch.cuda.empty_cache()
                 self.scale_list[max_step] += 1
-                Global_max_step = self.scale_list.index(max(self.scale_list))
+                Global_max_step = self.scale_list.index(max(self.scale_list)) - 5
                 self.update_params(Global_max_step)
 
             output = self.quantize(input)  # 量化

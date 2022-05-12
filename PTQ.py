@@ -44,7 +44,7 @@ def PTQ(cfg,
     t_data = parse_data_cfg(t_data)
     t_path = t_data['valid']  # path to test images
     c_data = parse_data_cfg(c_data)
-    c_path = c_data['train']  # path to test images
+    c_path = c_data['valid']  # path to test images
 
     # Dataloader
     c_dataset = LoadImagesAndLabels(c_path, imgsz, batch_size, rect=True,

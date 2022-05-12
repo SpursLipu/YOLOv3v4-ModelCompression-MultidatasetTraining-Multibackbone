@@ -118,7 +118,7 @@ def train(hyp):
     # gridmask = GridMask(d1=96, d2=224, rotate=360, ratio=0.6, mode=1, prob=0.8)
 
     # Optimizer
-    if opt.quantized == 4:
+    if opt.quantized == 2:
         pg0, pg1, pg2, pg3 = [], [], [], []  # optimizer parameter groups
     else:
         pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
@@ -127,7 +127,7 @@ def train(hyp):
             pg2 += [v]  # biases
         elif 'Conv2d.weight' in k:
             pg1 += [v]  # apply weight_decay
-        elif 'scale' in k and opt.quantized == 4:
+        elif 'scale' in k and opt.quantized == 2:
             pg3 += [v]
         else:
             pg0 += [v]  # all else
@@ -135,14 +135,14 @@ def train(hyp):
     if opt.adam or opt.quantized != -1:
         # hyp['lr0'] *= 0.1  # reduce lr (i.e. SGD=5E-3, Adam=5E-4)
         optimizer = optim.Adam(pg0, lr=hyp['lr0'] * 0.05)
-        if opt.quantized == 4:
+        if opt.quantized == 2:
             optimizer.add_param_group({'params': pg3})
         # optimizer = AdaBound(pg0, lr=hyp['lr0'], final_lr=0.1)
     else:
         optimizer = optim.SGD(pg0, lr=hyp['lr0'], momentum=hyp['momentum'], nesterov=True)
     optimizer.add_param_group({'params': pg1, 'weight_decay': hyp['weight_decay']})  # add pg1 with weight_decay
     optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
-    if opt.quantized == 4:
+    if opt.quantized == 2:
         print('Optimizer groups: %g .scale, %g .bias, %g Conv2d.weight, %g other' % (
             len(pg3), len(pg2), len(pg1), len(pg0)))
         del pg0, pg1, pg2, pg3

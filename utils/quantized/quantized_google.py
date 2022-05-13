@@ -93,10 +93,12 @@ class Round(Function):
 
 
 class Quantizer(nn.Module):
-    def __init__(self, bits, range_tracker, out_channels, sign=True):
+    def __init__(self, bits, range_tracker, out_channels, Scale_freeze_step, sign=True):
         super().__init__()
         self.bits = bits
         self.range_tracker = range_tracker
+        self.register_buffer('step', torch.zeros(1))
+        self.Scale_freeze_step = Scale_freeze_step
         self.sign = sign
         if out_channels == -1:
             self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
@@ -140,13 +142,14 @@ class Quantizer(nn.Module):
             print('！Binary quantization is not supported ！')
             assert self.bits != 1
         else:
-            if self.training == True:
+            if self.training == True and self.step < self.Scale_freeze_step:
                 self.range_tracker(input)
                 self.update_params()
             output = self.quantize(input)  # 量化
             output = self.round(output)
             output = self.clamp(output)  # 截断
             output = self.dequantize(output)  # 反量化
+            self.step += 1
         return output
 
     def get_quantize_value(self, input):
@@ -216,66 +219,6 @@ class AsymmetricQuantizer(Quantizer):
         self.zero_point = torch.round(max_val - self.range_tracker.max_val / self.scale)  # 量化零点
 
 
-# ********************* 量化卷积（同时量化A/W，并做卷积） *********************
-class QuantizedConv2d(nn.Conv2d):
-    def __init__(
-            self,
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride=1,
-            padding=0,
-            dilation=1,
-            groups=1,
-            bias=True,
-            a_bits=8,
-            w_bits=8,
-            q_type=0):
-        super().__init__(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            dilation=dilation,
-            groups=groups,
-            bias=bias
-        )
-        # 实例化量化器（A-layer级，W-channel级）
-        if q_type == 0:
-            self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L',
-                                                                                                           out_channels=-1),
-                                                           out_channels=-1)
-            self.weight_quantizer = SymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
-                                                                                                     out_channels=out_channels),
-                                                       out_channels=out_channels)
-        else:
-            self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
-                                                            range_tracker=AveragedRangeTracker(q_level='L',
-                                                                                               out_channels=-1),
-                                                            out_channels=-1, sign=False)
-            self.weight_quantizer = AsymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker(q_level='C',
-                                                                                                      out_channels=out_channels),
-                                                        out_channels=out_channels, sign=False)
-
-    def forward(self, input):
-        # 量化A和W
-        if input.shape[1] != 3:
-            input = self.activation_quantizer(input)
-        q_weight = self.weight_quantizer(self.weight)
-        # 量化卷积
-        output = F.conv2d(
-            input=input,
-            weight=q_weight,
-            bias=self.bias,
-            stride=self.stride,
-            padding=self.padding,
-            dilation=self.dilation,
-            groups=self.groups
-        )
-        return output
-
-
 def reshape_to_activation(input):
     return input.reshape(1, -1, 1, 1)
 
@@ -289,7 +232,7 @@ def reshape_to_bias(input):
 
 
 # ********************* bn融合_量化卷积（bn融合后，同时量化A/W，并做卷积） *********************
-class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
+class BNFold_QuantizedConv2d_For_FPGA(nn.Conv2d):
     def __init__(
             self,
             in_channels,
@@ -326,7 +269,8 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         self.activate = activate
         self.eps = eps
         self.momentum = momentum
-        self.freeze_step = int(steps * 0.9)
+        self.BN_freeze_step = int(steps * 0.9)
+        self.Scale_freeze_step = int(steps * 0.3)
         self.gamma = Parameter(torch.Tensor(out_channels))
         self.beta = Parameter(torch.Tensor(out_channels))
         self.register_buffer('running_mean', torch.zeros(out_channels))
@@ -351,24 +295,27 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
         if q_type == 0:
             self.activation_quantizer = SymmetricQuantizer(bits=a_bits, range_tracker=AveragedRangeTracker(q_level='L',
                                                                                                            out_channels=-1),
-                                                           out_channels=-1)
+                                                           out_channels=-1, Scale_freeze_step=self.Scale_freeze_step)
             self.weight_quantizer = SymmetricQuantizer(bits=w_bits,
                                                        range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                       out_channels=-1)
+                                                       out_channels=-1, Scale_freeze_step=self.Scale_freeze_step)
             self.bias_quantizer = SymmetricQuantizer(bits=w_bits,
                                                      range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                     out_channels=-1)
+                                                     out_channels=-1, Scale_freeze_step=self.Scale_freeze_step)
         else:
             self.activation_quantizer = AsymmetricQuantizer(bits=a_bits,
                                                             range_tracker=AveragedRangeTracker(q_level='L',
                                                                                                out_channels=-1),
-                                                            out_channels=-1, sign=False)
+                                                            out_channels=-1, Scale_freeze_step=self.Scale_freeze_step,
+                                                            sign=False)
             self.weight_quantizer = AsymmetricQuantizer(bits=w_bits,
                                                         range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                        out_channels=-1, sign=False)
+                                                        out_channels=-1, Scale_freeze_step=self.Scale_freeze_step,
+                                                        sign=False)
             self.bias_quantizer = AsymmetricQuantizer(bits=w_bits,
                                                       range_tracker=GlobalRangeTracker(q_level='L', out_channels=-1),
-                                                      out_channels=-1, sign=False)
+                                                      out_channels=-1, Scale_freeze_step=self.Scale_freeze_step,
+                                                      sign=False)
 
     def forward(self, input):
         # 训练态
@@ -399,7 +346,7 @@ class BNFold_QuantizedConv2d_For_FPGA(QuantizedConv2d):
                         self.running_mean.mul_(1 - self.momentum).add_(self.batch_mean * self.momentum)
                         self.running_var.mul_(1 - self.momentum).add_(self.batch_var * self.momentum)
                 # BN融合
-                if self.step < self.freeze_step:
+                if self.step < self.BN_freeze_step:
                     if self.bias is not None:
                         bias = reshape_to_bias(
                             self.beta + (self.bias - self.batch_mean) * (

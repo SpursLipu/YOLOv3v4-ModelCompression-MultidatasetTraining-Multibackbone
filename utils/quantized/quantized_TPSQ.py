@@ -171,7 +171,19 @@ class Bias_Quantizer(nn.Module):
         self.register_buffer('scale', torch.zeros(1))  # 量化比例因子
 
     def update_params(self):
-        raise NotImplementedError
+        min_val = torch.tensor(-(1 << (self.bits - 1)))
+        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
+
+        quantized_range = torch.max(torch.abs(min_val), torch.abs(max_val))  # 量化后范围
+
+        float_max = torch.max(torch.abs(self.range_tracker.min_val), torch.abs(self.range_tracker.max_val))  # 量化前范围
+        floor_float_range = 2 ** float_max.log2().floor()
+        ceil_float_range = 2 ** float_max.log2().ceil()
+        if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
+            float_range = ceil_float_range
+        else:
+            float_range = floor_float_range
+        self.scale = float_range / quantized_range  # 量化比例因子
 
     # 量化
     def quantize(self, input):
@@ -228,25 +240,6 @@ class Bias_Quantizer(nn.Module):
         move_scale = math.log2(self.scale)
         move_scale = np.array(move_scale).reshape(1, -1)
         return move_scale
-
-
-# 对称量化
-class SymmetricQuantizer(Bias_Quantizer):
-
-    def update_params(self):
-        min_val = torch.tensor(-(1 << (self.bits - 1)))
-        max_val = torch.tensor((1 << (self.bits - 1)) - 1)
-
-        quantized_range = torch.max(torch.abs(min_val), torch.abs(max_val))  # 量化后范围
-
-        float_max = torch.max(torch.abs(self.range_tracker.min_val), torch.abs(self.range_tracker.max_val))  # 量化前范围
-        floor_float_range = 2 ** float_max.log2().floor()
-        ceil_float_range = 2 ** float_max.log2().ceil()
-        if abs(ceil_float_range - float_max) < abs(floor_float_range - float_max):
-            float_range = ceil_float_range
-        else:
-            float_range = floor_float_range
-        self.scale = float_range / quantized_range  # 量化比例因子
 
 
 class Weight_Quantizer(Quantizer):
@@ -340,80 +333,6 @@ class Activattion_Quantizer(Quantizer):
         return output
 
 
-class Dorefa_Weight_Quantizer(nn.Module):
-    def __init__(self, w_bits):
-        super().__init__()
-        self.w_bits = w_bits
-
-    def round(self, input):
-        output = Round.apply(input)
-        return output
-
-    def forward(self, input):
-        if self.w_bits == 32:
-            output = input
-        elif self.w_bits == 1:
-            print('!Binary quantization is not supported !')
-            assert self.w_bits != 1
-        else:
-            output = torch.tanh(input)
-            output = output / 2 / torch.max(torch.abs(output)) + 0.5  # 归一化-[0,1]
-            scale = float(2 ** self.w_bits - 1)
-            output = output * scale
-            output = self.round(output)
-            output = output / scale
-            output = 2 * output - 1
-        return output
-
-
-# ********************* 量化卷积（同时量化A/W，并做卷积） *********************
-class TPSQ_QuantizedConv2d(nn.Conv2d):
-    def __init__(
-            self,
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride=1,
-            padding=0,
-            dilation=1,
-            groups=1,
-            bias=True,
-            a_bits=8,
-            w_bits=8,
-            warmup=False):
-        super().__init__(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            dilation=dilation,
-            groups=groups,
-            bias=bias
-        )
-        # 实例化量化器（A-layer级，W-channel级）
-        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=in_channels,
-                                                          warmup=warmup)
-        self.weight_quantizer = Weight_Quantizer(bits=w_bits, out_channels=out_channels, warmup=warmup)
-
-    def forward(self, input):
-        # 量化A和W
-        if input.shape[1] != 3:
-            input = self.activation_quantizer(input)
-        q_weight = self.weight_quantizer(self.weight)
-        # 量化卷积
-        output = F.conv2d(
-            input=input,
-            weight=q_weight,
-            bias=self.bias,
-            stride=self.stride,
-            padding=self.padding,
-            dilation=self.dilation,
-            groups=self.groups
-        )
-        return output
-
-
 def reshape_to_activation(input):
     return input.reshape(1, -1, 1, 1)
 
@@ -427,7 +346,7 @@ def reshape_to_bias(input):
 
 
 # ********************* bn融合_量化卷积（bn融合后，同时量化A/W，并做卷积） *********************
-class TPSQ_BNFold_QuantizedConv2d_For_FPGA(TPSQ_QuantizedConv2d):
+class TPSQ_BNFold_QuantizedConv2d_For_FPGA(nn.Conv2d):
     def __init__(
             self,
             in_channels,
@@ -477,10 +396,10 @@ class TPSQ_BNFold_QuantizedConv2d_For_FPGA(TPSQ_QuantizedConv2d):
         init.normal_(self.gamma, 1, 0.5)
         init.zeros_(self.beta)
 
-        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=out_channels,
+        self.activation_quantizer = Activattion_Quantizer(bits=a_bits, out_channels=-1,
                                                           warmup=warmup)
-        self.weight_quantizer = Weight_Quantizer(bits=w_bits, out_channels=out_channels, warmup=warmup)
-        self.bias_quantizer = SymmetricQuantizer(bits=w_bits, range_tracker=GlobalRangeTracker())
+        self.weight_quantizer = Weight_Quantizer(bits=w_bits, out_channels=-1, warmup=warmup)
+        self.bias_quantizer = Bias_Quantizer(bits=w_bits, range_tracker=GlobalRangeTracker())
 
     def forward(self, input):
         # 训练态

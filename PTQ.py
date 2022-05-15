@@ -10,8 +10,7 @@ PTQ_weights = wdir + 'PTQ.pt'
 
 
 def PTQ(cfg,
-        t_data,
-        c_data,
+        data,
         weights=None,
         batch_size=64,
         imgsz=416,
@@ -41,29 +40,28 @@ def PTQ(cfg,
     q_model.to(device)
 
     # Configure run
-    t_data = parse_data_cfg(t_data)
-    t_path = t_data['valid']  # path to test images
-    c_data = parse_data_cfg(c_data)
-    c_path = c_data['valid']  # path to test images
+    data_dict = parse_data_cfg(data)
+    cali_path = data_dict['train']
+    test_path = data_dict['valid']
 
     # Dataloader
-    c_dataset = LoadImagesAndLabels(c_path, imgsz, batch_size, rect=True,
+    cali_dataset = LoadImagesAndLabels(cali_path, imgsz, batch_size, rect=True,
                                     is_gray_scale=True if opt.gray_scale else False, subset_len=opt.subset_len)
-    c_batch_size = min(batch_size, len(c_dataset))
-    c_dataloader = DataLoader(c_dataset,
-                              batch_size=c_batch_size,
+    cali_batch_size = min(batch_size, len(cali_dataset))
+    cali_dataloader = DataLoader(cali_dataset,
+                              batch_size=cali_batch_size,
                               num_workers=min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8]),
                               pin_memory=True,
-                              collate_fn=c_dataset.collate_fn)
+                              collate_fn=cali_dataset.collate_fn)
 
-    t_dataset = LoadImagesAndLabels(t_path, imgsz, batch_size, rect=True,
+    test_dataset = LoadImagesAndLabels(test_path, imgsz, batch_size, rect=True,
                                     is_gray_scale=True if opt.gray_scale else False)
-    t_batch_size = min(batch_size, len(t_dataset))
-    t_dataloader = DataLoader(t_dataset,
-                              batch_size=t_batch_size,
+    test_batch_size = min(batch_size, len(test_dataset))
+    test_dataloader = DataLoader(test_dataset,
+                              batch_size=test_batch_size,
                               num_workers=min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8]),
                               pin_memory=True,
-                              collate_fn=t_dataset.collate_fn)
+                              collate_fn=test_dataset.collate_fn)
     print('')  # skip a line
     print('<.....................test original model.......................>')
     test.test(cfg,
@@ -71,7 +69,7 @@ def PTQ(cfg,
               batch_size=batch_size,
               imgsz=imgsz,
               model=model,
-              dataloader=t_dataloader,
+              dataloader=test_dataloader,
               rank=-1,
               maxabsscaler=opt.maxabsscaler)
 
@@ -79,7 +77,7 @@ def PTQ(cfg,
     print('')  # skip a line
     print('<.....................Quantize.......................>')
 
-    for batch_i, (imgs, _, _, _) in enumerate(tqdm(c_dataloader)):
+    for batch_i, (imgs, _, _, _) in enumerate(tqdm(cali_dataloader)):
         if opt.maxabsscaler:
             imgs = imgs.to(device).float() / 256.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
             imgs = imgs * 2 - 1
@@ -96,7 +94,7 @@ def PTQ(cfg,
               batch_size=batch_size,
               imgsz=imgsz,
               model=q_model,
-              dataloader=t_dataloader,
+              dataloader=test_dataloader,
               quantized=3,
               a_bit=opt.a_bit,
               w_bit=opt.w_bit,
@@ -121,8 +119,7 @@ def PTQ(cfg,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='test.py')
     parser.add_argument('--cfg', type=str, default='cfg/yolov3-spp.cfg', help='*.cfg path')
-    parser.add_argument('--t_data', type=str, default='data/coco2014.data', help='*.data path')
-    parser.add_argument('--c_data', type=str, default='data/coco2014.data', help='*.data path')
+    parser.add_argument('--data', type=str, default='data/coco2014.data', help='*.data path')
     parser.add_argument('--weights', type=str, default='weights/yolov3-spp-ultralytics.pt', help='weights path')
     parser.add_argument('--batch-size', type=int, default=16, help='size of each image batch')
     parser.add_argument('--img-size', type=int, default=512, help='inference size (pixels)')
@@ -145,8 +142,7 @@ if __name__ == '__main__':
     print(opt)
 
     PTQ(opt.cfg,
-        opt.t_data,
-        opt.c_data,
+        opt.data,
         opt.weights,
         opt.batch_size,
         opt.img_size,

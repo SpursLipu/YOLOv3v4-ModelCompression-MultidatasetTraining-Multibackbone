@@ -275,25 +275,15 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                     self.bias.data = torch.sub(self.bias.data, error, alpha=rate)
                     self.q_bias = self.bias_quantizer(self.bias)
                 torch.cuda.empty_cache()
-            output = F.conv2d(
-                input=quant_input,
-                weight=self.q_weight,
-                bias=self.q_bias,
-                stride=self.stride,
-                padding=self.padding,
-                dilation=self.dilation,
-                groups=self.groups
-            )
-        else:
-            output = F.conv2d(
-                input=input,
-                weight=self.q_weight,
-                bias=self.q_bias,
-                stride=self.stride,
-                padding=self.padding,
-                dilation=self.dilation,
-                groups=self.groups
-            )
+        output = F.conv2d(
+            input=input,
+            weight=self.q_weight,
+            bias=self.q_bias,
+            stride=self.stride,
+            padding=self.padding,
+            dilation=self.dilation,
+            groups=self.groups
+        )
         if self.quantizer_output == True:  # 输出量化参数txt文档
 
             # 创建的quantizer_output输出文件夹
@@ -541,9 +531,9 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                 ################偏置重排序结束
 
         if self.activate == 'leaky':
-            output = F.leaky_relu(output, 0.125 if not self.maxabsscaler else 0.25, inplace=True)
+            output = F.leaky_relu(output, 0.1 if not self.maxabsscaler else 0.25, inplace=True)
             if self.training:
-                float_output = F.leaky_relu(float_output, 0.125 if not self.maxabsscaler else 0.25, inplace=True)
+                float_output = F.leaky_relu(float_output, 0.1 if not self.maxabsscaler else 0.25, inplace=True)
         elif self.activate == 'relu6':
             output = F.relu6(output, inplace=True)
             if self.training:

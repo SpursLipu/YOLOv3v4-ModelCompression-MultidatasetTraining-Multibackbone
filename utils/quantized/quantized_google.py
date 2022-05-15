@@ -270,7 +270,7 @@ class BNFold_QuantizedConv2d_For_FPGA(nn.Conv2d):
         self.eps = eps
         self.momentum = momentum
         self.BN_freeze_step = int(steps * 0.9)
-        self.Scale_freeze_step = int(steps * 0.3)
+        self.Scale_freeze_step = int(steps * 0.1)
         self.gamma = Parameter(torch.Tensor(out_channels))
         self.beta = Parameter(torch.Tensor(out_channels))
         self.register_buffer('running_mean', torch.zeros(out_channels))
@@ -640,29 +640,18 @@ class BNFold_QuantizedConv2d_For_FPGA(nn.Conv2d):
                 ################偏置重排序结束
 
         # 量化卷积
-        if self.training:  # 训练态
-            output = F.conv2d(
-                input=input,
-                weight=q_weight,
-                bias=q_bias,
-                stride=self.stride,
-                padding=self.padding,
-                dilation=self.dilation,
-                groups=self.groups
-            )
 
-        else:  # 测试态
-            output = F.conv2d(
-                input=input,
-                weight=q_weight,
-                bias=q_bias,  # 注意，这里加bias，做完整的conv+bn
-                stride=self.stride,
-                padding=self.padding,
-                dilation=self.dilation,
-                groups=self.groups
-            )
+        output = F.conv2d(
+            input=input,
+            weight=q_weight,
+            bias=q_bias,
+            stride=self.stride,
+            padding=self.padding,
+            dilation=self.dilation,
+            groups=self.groups
+        )
         if self.activate == 'leaky':
-            output = F.leaky_relu(output, 0.125 if not self.maxabsscaler else 0.25, inplace=True)
+            output = F.leaky_relu(output, 0.1 if not self.maxabsscaler else 0.25, inplace=True)
         elif self.activate == 'relu6':
             output = F.relu6(output, inplace=True)
         elif self.activate == 'h_swish':

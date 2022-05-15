@@ -134,7 +134,7 @@ def train(hyp):
 
     if opt.adam or opt.quantized != -1:
         # hyp['lr0'] *= 0.1  # reduce lr (i.e. SGD=5E-3, Adam=5E-4)
-        optimizer = optim.Adam(pg0, lr=hyp['lr0'] * 0.05)
+        optimizer = optim.Adam(pg0, lr=hyp['lr0'] * 0.005)
         if opt.quantized == 2:
             optimizer.add_param_group({'params': pg3})
         # optimizer = AdaBound(pg0, lr=hyp['lr0'], final_lr=0.1)
@@ -227,14 +227,14 @@ def train(hyp):
                                   augment=True,
                                   hyp=hyp,  # augmentation hyperparameters
                                   rect=opt.rect,  # rectangular training
-                                  cache_images=opt.cache_images,
+                                  cache_images=True,
                                   rank=opt.local_rank,
                                   is_gray_scale=True if opt.gray_scale else False)
 
     testset = LoadImagesAndLabels(test_path, imgsz_test, batch_size // 4,
                                   hyp=hyp,
                                   rect=True,
-                                  cache_images=opt.cache_images,
+                                  cache_images=True,
                                   rank=opt.local_rank,
                                   is_gray_scale=True if opt.gray_scale else False)
 
@@ -282,7 +282,7 @@ def train(hyp):
     testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(test_path, imgsz_test, batch_size // 4,
                                                                  hyp=hyp,
                                                                  rect=True,
-                                                                 cache_images=opt.cache_images,
+                                                                 cache_images=True,
                                                                  rank=opt.local_rank,
                                                                  is_gray_scale=True if opt.gray_scale else False),
                                              batch_size=batch_size // 4,
@@ -610,7 +610,6 @@ if __name__ == '__main__':
     parser.add_argument('--notest', action='store_true', help='only test final epoch')
     parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
     parser.add_argument('--bucket', type=str, default='', help='gsutil bucket')
-    parser.add_argument('--cache-images', action='store_true', help='cache images for faster training')
     parser.add_argument('--weights', type=str, default='weights/yolov3-spp-ultralytics.pt', help='initial weights path')
     parser.add_argument('--t_weights', type=str, default='', help='teacher model weights')
     parser.add_argument('--KDstr', type=int, default=-1, help='KD strategy')

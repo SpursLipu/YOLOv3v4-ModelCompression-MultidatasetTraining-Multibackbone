@@ -65,7 +65,7 @@ def PTQ(cfg,
     print('')  # skip a line
     print('<.....................test original model.......................>')
     test.test(cfg,
-              data=opt.t_data,
+              data=opt.data,
               batch_size=batch_size,
               imgsz=imgsz,
               model=model,
@@ -90,7 +90,7 @@ def PTQ(cfg,
     print('<.....................test quantized model.......................>')
     print('')  # skip a line
     test.test(cfg,
-              data=opt.t_data,
+              data=opt.data,
               batch_size=batch_size,
               imgsz=imgsz,
               model=q_model,
@@ -136,8 +136,7 @@ if __name__ == '__main__':
     parser.add_argument('--shortcut_way', type=int, default=1, help='--shortcut quantization way')
     opt = parser.parse_args()
     opt.cfg = list(glob.iglob('./**/' + opt.cfg, recursive=True))[0]  # find file
-    opt.t_data = list(glob.iglob('./**/' + opt.t_data, recursive=True))[0]  # find file
-    opt.c_data = list(glob.iglob('./**/' + opt.c_data, recursive=True))[0]  # find file
+    opt.data = list(glob.iglob('./**/' + opt.data, recursive=True))[0]  # find file
 
     print(opt)
 

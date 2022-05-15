@@ -275,15 +275,25 @@ class BNFold_COSPTQuantizedConv2d_For_FPGA(nn.Conv2d):
                     self.bias.data = torch.sub(self.bias.data, error, alpha=rate)
                     self.q_bias = self.bias_quantizer(self.bias)
                 torch.cuda.empty_cache()
-        output = F.conv2d(
-            input=input,
-            weight=self.q_weight,
-            bias=self.q_bias,
-            stride=self.stride,
-            padding=self.padding,
-            dilation=self.dilation,
-            groups=self.groups
-        )
+            output = F.conv2d(
+                input=quant_input,
+                weight=self.q_weight,
+                bias=self.q_bias,
+                stride=self.stride,
+                padding=self.padding,
+                dilation=self.dilation,
+                groups=self.groups
+            )
+        else:
+            output = F.conv2d(
+                input=input,
+                weight=self.q_weight,
+                bias=self.q_bias,
+                stride=self.stride,
+                padding=self.padding,
+                dilation=self.dilation,
+                groups=self.groups
+            )
         if self.quantizer_output == True:  # 输出量化参数txt文档
 
             # 创建的quantizer_output输出文件夹

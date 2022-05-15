@@ -30,18 +30,18 @@ class Search_Pow2(Function):
 
     @staticmethod
     def forward(self, input):
+        input_data = input.data.clone()
         output = input
         output[output < 0].data.copy_(torch.Tensor([2 ** -5]))
         output[output > 2 ** (8 + 5)].data.copy_(torch.Tensor([2 ** (8 + 5)]))
         ceil_float_range = 2 ** output.log2().ceil()
         floor_float_range = 2 ** output.log2().floor()
-        output[abs(ceil_float_range - output) < abs(floor_float_range - output)].data.copy_(ceil_float_range[
-                                                                                                abs(ceil_float_range - output) < abs(
-                                                                                                    floor_float_range - output)].data)
-        output[abs(ceil_float_range - output) >= abs(floor_float_range - output)].data.copy_(floor_float_range[
-                                                                                                 abs(ceil_float_range - output) >= abs(
-                                                                                                     floor_float_range - output)].data)
-        self.save_for_backward(input, output)
+        if abs(ceil_float_range - output) < abs(floor_float_range - output):
+            output.data = ceil_float_range.data
+        else:
+            output.data = floor_float_range.data
+        output_data = output.data.clone()
+        self.save_for_backward(input_data, output_data)
         return output
 
     @staticmethod
